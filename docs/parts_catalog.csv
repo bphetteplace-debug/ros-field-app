@@ -1,0 +1,248 @@
+code,description,price,category
+41000,ROS BMS Diamondback,2150.0,BMS
+41004,ROS BMS QCU HEATER,7650.21,BMS
+41006,"CABLE, FLAT RIBBON, KEYPAD, BMS",59.61,BMS
+41007,"CABLE, FLAT RIBBON, SMALL, INTERCONNECTION, BMS",74.65,BMS
+41008,"CABLE, GROUND, 6', BLACK, -BMS",57.53,BMS
+41009,"CABLE, 4 CONDUCTOR, 20', GRAY,BMS",136.35,BMS
+41023,"DOOR, FOR -600 BMS",736.56,BMS
+41061,"MOUNTING BRACKET, WITH HOOD, FOR BMS",417.07,BMS
+41084,"STAND FOR BMS OR CQCU, SINGLE, NO WIRE TROUGH",661.09,BMS
+41104,"STAND FOR BMS OR CQCU, DUAL, WITH WIRE TROUGH",1661.06,BMS
+41105,"STAND FOR BMS OR CQCU, DUAL, NO WIRE TROUGH",1305.2,BMS
+41135,"STAND FOR BMS OR CQCU, SINGLE, WITH WIRE TROUGH",777.19,BMS
+41154,ROS BMS CONTROLLER,2687.5,BMS
+41158,BMS 600 unit,4641.1,BMS
+41192,BMS PM Multiple unit,150.0,BMS
+41232,Heater BMS/Burner/Pilot PM,275.0,BMS
+41233,Heater BMS/Burner/Pilot Service Call,115.0,BMS
+41241,Heater BMS/Burner/Pilot PM Multiple Unit,150.0,BMS
+41137,Flare arrestor PM1,nan,Flame Arrestor
+41226,"1.5"" - 4"" Arrestor PM",250.0,Flame Arrestor
+41227,"6"" - 12"" Arrestor PM",300.0,Flame Arrestor
+41235,"1.5"" - 4"" Arrestor PM Multiple Unit",125.0,Flame Arrestor
+41236,"6"" - 12"" Arrestor PM Multiple Unit",200.0,Flame Arrestor
+42109,3'' Wenco flame arrestor,1207.97,Flame Arrestor
+41073,"THERMOCOUPLE WIRE, ARMORED, WEATHER PROOF, YELLOW Typical use ( Flares and Jumper wire) not used on combustors",3.98,Flare/Combustor
+41082,"THERMOCOUPLE CABLE, CLX, 16/1 Typical use ( Heaters and Combustors)",15.58,Flare/Combustor
+41125,CLIP FLARE RAIL,32.07,Flare/Combustor
+41218,"PIPE JIC FITTING, 1/4"" MJIC X 1/4"" FLARE",3.13,Flare/Combustor
+41231,Flare Service Call,115.0,Flare/Combustor
+41245,ROS 20' Flare Package Complete,19202.94,Flare/Combustor
+42117,Flare trailer Rental,325.0,Flare/Combustor
+41001,"600, PLUS, 3.17 SOFTWARE",5193.09,Hardware / Misc
+41010,"Cable tray 4""x2""",24.48,Hardware / Misc
+41011,1/2''X4 1/4'' WEDGE ANCHOR,50.92,Hardware / Misc
+41012,Flameco 4'' Gas mixer,749.58,Hardware / Misc
+41013,IGNITION MODULE,420.39,Hardware / Misc
+41017,"PCB BOARD, DISPLAY, -500/600",830.03,Hardware / Misc
+41018,"PCB BOARD, MAIN, 600 2.42 SOFTWARE",1753.31,Hardware / Misc
+41019,"PCB BOARD, MODBUS INTERFACE,-600",731.92,Hardware / Misc
+41020,"PCB BOARD, INTERFACE 4-20mA + MODBUS, 600",1334.13,Hardware / Misc
+41021,DIN RAIL,3.81,Hardware / Misc
+41024,REFURBISHED 600 DOOR,526.0,Hardware / Misc
+41025,"PCB BOARD, ADAPTER",127.19,Hardware / Misc
+41026,"PCB BOARD, MAIN, 600, PLUS SOFTWARE, 3.17",1810.2,Hardware / Misc
+41027,"REFURBISHED PCB BOARD, MAIN, 600",1171.36,Hardware / Misc
+41028,"FACEPLATE STICKER, 600",348.65,Hardware / Misc
+41029,"BATTERY, 14AH, SLA",104.62,Hardware / Misc
+41030,"BATTERY, 7AH, SLA",76.24,Hardware / Misc
+41032,RIGHT ANGLE CONNECTOR/IGNITION MODULE,11.05,Hardware / Misc
+41033,"FUSE, 5 AMP, CERAMIC",3.58,Hardware / Misc
+41034,"1/4"" GAUGE, STAINLESS STEEL, 0-15 PSI",44.72,Hardware / Misc
+41035,"1/4"" GAUGE, STAINLESS STEEL, 0-30 PSI",44.72,Hardware / Misc
+41036,"POWER SUPPLY, 110AC/24DC, 60W",166.8,Hardware / Misc
+41037,"REGULATOR, 627, 1"" NPT, FISHER, FS627-492/P4/E",576.4,Hardware / Misc
+41038,"REGULATOR, 67CFR, 1/4"" FISHER, FS67CFR-224",165.27,Hardware / Misc
+41039,"SEAL TIGHT, 90 DEGREES, 5252",21.01,Hardware / Misc
+41040,"SOLAR CONTROLLER, SUNSAVER, SS-10-12V",118.49,Hardware / Misc
+41041,"SOLAR PANEL, 12 WATT, 12 VDC, C1D2",131.83,Hardware / Misc
+41042,"SOLAR PANEL, 25 WATT, 12VDC, CLASS I DIV 2",186.78,Hardware / Misc
+41043,"SOLENOID, 1/4"",  WATT, 24 VDC,",447.29,Hardware / Misc
+41044,"SOLENOID, 1/4"",  WATT, 12 VDC,",366.39,Hardware / Misc
+41045,RUBBER BOOT/IGNITION,13.6,Hardware / Misc
+41046,RAHJA CONNECTOR,8.89,Hardware / Misc
+41047,1.5Hp Drive,1319.82,Hardware / Misc
+41048,"THERMOCOUPLE, TYPE K, 6""",268.08,Hardware / Misc
+41049,"THERMOCOUPLE, TYPE K, 12""",268.08,Hardware / Misc
+41050,"THERMOCOUPLE, TYPE K, 6 FT",532.09,Hardware / Misc
+41051,"THERMOWELL, 12""",280.22,Hardware / Misc
+41052,"THERMOWELL, 6""",175.79,Hardware / Misc
+41053,"SOLENOID, 1"", 24VDC",2328.7,Hardware / Misc
+41055,GROUND LUG,2.34,Hardware / Misc
+41056,"SOLAR CONTROLLER, SUNSAVER, SS-10L-24V",160.99,Hardware / Misc
+41058,"SEALTIGHT 1/2"" METALLIC",8.11,Hardware / Misc
+41059,GROUND CLAMP,4.74,Hardware / Misc
+41060,"TRANSDUCER, PRESSURE, 1/4"", 0-3 PSI, C1D2",928.08,Hardware / Misc
+41062,SOLAR MOUNTING BRACKET,62.5,Hardware / Misc
+41063,"NIPPLE, XH, 1/4"" X 2"", BLK",5.02,Hardware / Misc
+41064,"NIPPLE, 1/4"" X 4""",8.91,Hardware / Misc
+41066,"THERMOCOUPLE, TYPE-K, 6"", DUAL",374.11,Hardware / Misc
+41067,HIGH VOLTAGE CABLE,5.92,Hardware / Misc
+41068,"REGULATOR, 1"", 627, BELGAS",384.62,Hardware / Misc
+41071,"CLX CONNECTOR 1/2""",104.48,Hardware / Misc
+41072,"TUBING STRAIGHT, 3/8"" FST X 1/4"" NPT",19.3,Hardware / Misc
+41074,"TUBING ELBOW, 3/8""",32.5,Hardware / Misc
+41076,"ACCESSORY ENCLOSURE, W/ BACK PLATE",272.32,Hardware / Misc
+41079,"SLEEVING 1"", BLACK per foot",8.76,Hardware / Misc
+41080,14/3 AWG,3.29,Hardware / Misc
+41081,Titanium Heat Sheilding,7.87,Hardware / Misc
+41083,CQCU BRACKET FOR DUAL MOUNTING,389.7,Hardware / Misc
+41085,1.5 HP VFD Cabinet,4452.84,Hardware / Misc
+41086,"NIPPLE, 1/2""X6"", BLK",17.3,Hardware / Misc
+41088,"GALVANIZED CONDUIT 1/2""",5.43,Hardware / Misc
+41089,"UNISTRUT 1-5/8""",12.63,Hardware / Misc
+41090,"3/8"" SST TUBING",4.46,Hardware / Misc
+41092,"1/2"", UNION STRAIGHT TUBING COUPLING",45.83,Hardware / Misc
+41093,"1/4"" SPRING NUT",2.66,Hardware / Misc
+41094,"3/4"" X 1/2"" RE REDUCER, RE21",9.98,Hardware / Misc
+41095,"MYERS HUBS 1/2""",8.28,Hardware / Misc
+41096,"SEALS OFF 1/2"" EYS116",33.6,Hardware / Misc
+41097,"1/2"" UNION MALE",21.08,Hardware / Misc
+41098,LBY-15 YB FITTINGS,27.93,Hardware / Misc
+41099,"1/2"" GUAT-16",109.83,Hardware / Misc
+41100,DURA BLOCK,76.57,Hardware / Misc
+41101,"1/2"" STRUT STRAP",2.27,Hardware / Misc
+41103,WIRE GUTTER/TROUGH ENCLOSURE,270.63,Hardware / Misc
+41106,1/2'' CLOSE NIPPLE,5.33,Hardware / Misc
+41107,"SEAL TIGHT STRAIGHT, 1"", 5234TB",26.12,Hardware / Misc
+41109,"45FT GAS HOSE ASSEMBLY, 1/4"" W/ ADAPTERS",485.69,Hardware / Misc
+41110,7-CONDUCTOR WIRE,7.01,Hardware / Misc
+41111,"25FT GAS HOSE ASSEMBLY, 1/4"", W/ ADAPTERS",332.43,Hardware / Misc
+41112,"STRAIGHT, SEAL TIGHT, 1/2"", STEEL",20.67,Hardware / Misc
+41113,"STRAIGHT, 1"", STEEL",26.12,Hardware / Misc
+41114,"FLEX CONDUIT, 1"", METALLIC",6.12,Hardware / Misc
+41115,"MYERS HUB, 1""",36.12,Hardware / Misc
+41116,"STRAIN RELIEF, SINGLE-EYE BUS DROP MESH GRIP .96""-1.25"" CABLE RANGE",39.85,Hardware / Misc
+41117,"2""X2"" Angle Tray",12.58,Hardware / Misc
+41118,3/4'' LBY,65.89,Hardware / Misc
+41119,Trerice 8'' Thermostat,745.79,Hardware / Misc
+41120,4'' Nozzle FlameCo,474.27,Hardware / Misc
+41121,"40FT GAS HOSE ASSEMBLY, 1/4"", W/ ADAPTERS",495.8,Hardware / Misc
+41122,"20FT GAS HOSE ASSEMBLY, 1/4"", W/ ADAPTERS",297.88,Hardware / Misc
+41123,"30FT GAS HOSE ASSEMBLY, 1/4"", W/ ADAPTERS",407.6,Hardware / Misc
+41126,Zip Tie,0.34,Hardware / Misc
+41129,"35FT GAS HOSE ASSEMBLY, W/ ADAPTERS",425.54,Hardware / Misc
+41130,"60FT GAS HOSE ASSEMBLY, 1/4"", W/ ADAPTERS",688.86,Hardware / Misc
+41131,"CORDGRIP, 1/2""",21.64,Hardware / Misc
+41132,"65FT GAS HOSE ASSEMBLY, 1/4"", W/ ADAPTERS",686.9,Hardware / Misc
+41136,"TIME DELAY RELAY, PLUG IN",281.03,Hardware / Misc
+41138,"1/4'' NUT,BOLT AND WASHER",2.96,Hardware / Misc
+41139,"THERMOCOUPLE 18""",320.05,Hardware / Misc
+41140,"THERMOWELL, 18""",429.44,Hardware / Misc
+41141,"3/8'' NUT, BOLT AND WASHER",2.96,Hardware / Misc
+41142,"HOSE CLAMP 1-3/4"" X 2-3/4""",4.88,Hardware / Misc
+41143,"1"" X 3/4"" REDUCING BUSHING, RE32",11.3,Hardware / Misc
+41144,Boomlift,625.0,Hardware / Misc
+41145,"STRUT STRAP, 3/4""",5.26,Hardware / Misc
+41146,"COUPLING, 3/8"" X 3/8"" STAINLESS STEEL FITTING",19.56,Hardware / Misc
+41147,"PIPE BUSHING, 1"" x 3/4"" STD BLK MALLEABE HEX BUSHING",11.3,Hardware / Misc
+41148,"PIPE NIPPLE 1/2"" x 8"" MNPT TBE STEEL PIPE SCH 40",10.57,Hardware / Misc
+41149,"PIPE NIPPLE 1/2"" x 4' MNPT TBE CS PIPE SCH 40 (48"")",30.72,Hardware / Misc
+41150,"PIPE UNION 1/4"" 3000# C/S THREADED HEX UNION",18.02,Hardware / Misc
+41151,"PIPE NIPPLE 1/4"" x 6"" SCH 80 C/S SEAMLESS",11.3,Hardware / Misc
+41152,"PIPE NIPPLE 1/4"" x 8"" SCH 80 C/S SEAMLESS",11.3,Hardware / Misc
+41153,"PIPE ELBOW 1/4"" 2000# C/S THREADED 90 DEG",6.62,Hardware / Misc
+41155,4' THERMOCOUPLE,312.8,Hardware / Misc
+41156,Stainless steel 3/8'' T,278.64,Hardware / Misc
+41157,Kimray T12 Thermostat,542.57,Hardware / Misc
+41159,"NIPPLE, 1/4 X 10"" BLK IRON",18.76,Hardware / Misc
+41160,"NIPPLE, 1/4"" X 12"" BLK IRON",20.89,Hardware / Misc
+41161,"NIPPLE, 1/2""X4"", BLK IRON",5.45,Hardware / Misc
+41162,"NIPPLE, 1/2""X8"", BLK IRON",9.61,Hardware / Misc
+41163,"NIPPLE, 1/2""X10"", BLK IRON",6.88,Hardware / Misc
+41164,"NIPPLE, 1/2""X12"", BLK IRON",13.0,Hardware / Misc
+41165,"NIPPLE, 1/4"" X CLOSE, BLK IRON",1.83,Hardware / Misc
+41166,"FUSE, 5 AMP, 25 GLASS",5.68,Hardware / Misc
+41167,"1/2"" LOCK RING",2.91,Hardware / Misc
+41168,"GAS HOSE, 1/4"", 100FT",1288.71,Hardware / Misc
+41169,"REDUCER, 1"" -3/4"" PIPE, BLK IRON",3.34,Hardware / Misc
+41170,"CABLE, GROUND, Green, 14AWG",0.85,Hardware / Misc
+41173,"GAS HOSE, 1/4"", 15FT",193.31,Hardware / Misc
+41174,10/4 TRAY CABLE(10/3 with ground),9.62,Hardware / Misc
+41175,"1/4"" ID GAS HOSE Per Foot",12.89,Hardware / Misc
+41176,#4 FJX STEEL GAS HOSE FITTING,12.37,Hardware / Misc
+41177,"PROFIRE, 2100F, DOOR",720.08,Hardware / Misc
+41178,"PROFIRE, 2100F, BACK OF ENCLOSURE",319.03,Hardware / Misc
+41179,"PROFIRE, 2100F, TERMINAL CARD (MAIN)",1938.14,Hardware / Misc
+41180,"PROFIRE, 2100F, DISPLAY BOARD",451.19,Hardware / Misc
+41181,"PROFIRE, 2100, DOOR",487.88,Hardware / Misc
+41182,"PROFIRE, 2100, BACK OF ENCLOSURE",319.03,Hardware / Misc
+41183,"PROFIRE, 2100, TERMINAL CARD (MAIN)",1986.9,Hardware / Misc
+41184,"PROFIRE, 2100, DISPLAY BOARD",567.43,Hardware / Misc
+41185,"PROFIRE, MODBUS BOARD",455.69,Hardware / Misc
+41186,"PROFIRE, 4-20MA BOARD",959.05,Hardware / Misc
+41189,PROFIRE IGNITION MODULE,892.8,Hardware / Misc
+41191,Stainless Steel 3/8'' Tubing T,62.82,Hardware / Misc
+41196,Liquid Level Swith - Kimray Pneumatic,1046.44,Hardware / Misc
+41197,Liquid Level Swith - Murphy Pneumatic,1046.44,Hardware / Misc
+41198,Wilden Pump,3525.09,Hardware / Misc
+41203,Winch,303.29,Hardware / Misc
+41212,SPLICE TRAY 4X2,91.65,Hardware / Misc
+41213,"FUSE, 5 AMP, 25, CERAMIC",3.55,Hardware / Misc
+41214,"PCB BOARD, SPARK, TRIPLE OUTPUT",192.01,Hardware / Misc
+41217,"ENCLOSURE, 600 BOX ONLY, NO DOOR",270.41,Hardware / Misc
+41221,3'' Mixer FlameCo,634.74,Hardware / Misc
+41222,3'' nozzle FlameCo,291.87,Hardware / Misc
+41223,"2"" mixer FlameCo",427.04,Hardware / Misc
+41224,2'' nozzle FlameCo,212.08,Hardware / Misc
+41225,Gasket all sizes,24.38,Hardware / Misc
+41234,50' Towable Manlift,625.0,Hardware / Misc
+41242,65' Manlift,681.95,Hardware / Misc
+41243,85' Manlift,811.9,Hardware / Misc
+41244,120' Manlift 19 ton crane,5520.0,Hardware / Misc
+42100,1'' Pipe Per foot,7.22,Hardware / Misc
+42101,"1"" TEE",10.83,Hardware / Misc
+42102,1'' X,12.43,Hardware / Misc
+42103,4''x1'' reducing bushing,146.23,Hardware / Misc
+42104,2''x1'' reducing bushing,10.94,Hardware / Misc
+42105,4''x2'' reducing bushing,114.98,Hardware / Misc
+42106,1'' Hammer Union,16.29,Hardware / Misc
+42107,1'' Pipe Nipple All sizes,4.87,Hardware / Misc
+42110,3'' Close Nipple,31.35,Hardware / Misc
+42111,3'' Hammer Union,66.9,Hardware / Misc
+42112,Emergency Call Out,322.5,Hardware / Misc
+42113,ROS Screen,283.69,Hardware / Misc
+42114,ROS Screen power supply,7.26,Hardware / Misc
+42115,Buckdown Power supply 24 v to 9v,24.1,Hardware / Misc
+42116,FIELD SUPPLIES/CLEANER AND LUBRICANTS,5.11,Hardware / Misc
+42118,Temperature Transmitter 4-20 Ma,240.78,Hardware / Misc
+42120,Ceramic mini fuse,42.69,Hardware / Misc
+41002,"600, CONVERSION KIT",3047.56,Kits
+41003,"600-M, CONVERSION KIT",3494.55,Kits
+41219,HOURLY RATE,123.62,Labor
+42119,Kalos Hourly Rate,125.0,Labor
+41005,"BRACKET FOR ION ROD, PILOT ASSEMBLY( HEATER)",71.61,Pilot
+41014,"ION ROD, KANTHAL, 9"", WITHOUT BRACKET, PILOT ASSEMBLY",136.46,Pilot
+41015,"MIXER, CAST IRON, WITH ORIFICE, FOR PILOT",124.11,Pilot
+41016,"NOZZLE, FOR,PILOT ASSEMBLY(HEATER)",199.54,Pilot
+41022,PILOT ASSEMBLY( HEATER COMPLETE PILOT),425.41,Pilot
+41031,"BUSHING, COMPRESSION SET, 1/2"" NPT, FOR FLARE PILOT/Glandnut",61.1,Pilot
+41065,"FLAMECO PILOT NOZZLE, 1/2""",25.5,Pilot
+41070,IGNITER ROD FOR FLARE PILOT,56.7,Pilot
+41075,"FLARE PILOT COMPLETE, NO BRACKET",1509.3,Pilot
+41078,NOZZLE FOR FLARE PILOT,272.63,Pilot
+41102,Flare Pilot Bracket Metal Clamp,16.52,Pilot
+41108,FLARE PILOT NOZZLE EXTENSION,151.06,Pilot
+41124,MOUNTING BRACKET FOR FLARE PILOT,239.13,Pilot
+41128,60' Retractable Pilot PM,275.0,Pilot
+41187,PROFIRE STANDARD PILOT,1315.32,Pilot
+41188,PROFIRE FSI PILOT,2070.36,Pilot
+41205,Pilot Fuel Scrubber,2438.1,Pilot
+41211,Pilot Cable Stainless steel,3.49,Pilot
+41216,"ORIFICE, FOR PILOT ASSEMBLY (HEATER)",40.62,Pilot
+41228,60' Retractable Pilot PM,275.0,Pilot
+41229,60' - 120' Retractable Pilot PM,325.0,Pilot
+41230,Fixed Pilot PM,200.0,Pilot
+41237,60' Retractable Pilot PM Multiple Uint,125.0,Pilot
+41238,60' - 120' Retractable Pilot PM Multiple Unit,175.0,Pilot
+41239,Fixed Pilot PM Multiple Unit,125.0,Pilot
+41127,Pressure wash trailer Rental,375.0,Rentals
+41220,MILEAGE,1.34,Travel
+42108,5 Mile Fence Charger,266.04,Travel
+41054,"VALVE, 1"", PNEUMATIC, D2 FISHER",1079.58,Valve / PSV
+41057,"BALL VALVE 1""",109.84,Valve / PSV
+41069,"VALVE, 1"", CONTROL, P119, BELGAS",407.18,Valve / PSV
+41077,SPEED CONTROL VALVE,35.35,Valve / PSV
+41087,"BALL VALVE 1/2""",35.89,Valve / PSV
+41215,"VALVE, BALL, 1/4""",34.48,Valve / PSV
