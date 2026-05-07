@@ -7,7 +7,7 @@ import { PARTS_CATALOG } from '../data/catalog'
 const CUSTOMERS = ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS']
 const TRUCKS = ['0001','0002','0003','0004','0005','0006','0007']
 const WORK_TYPES = [
-  'Billable Pm','Warranty Kalos','Warranty ROS','Material Drop Off Billable',h
+  'Billable Pm','Warranty Kalos','Warranty ROS','Material Drop Off Billable',
   'Install Billable','Billable Service','Billable Material Pickup',
   'PM Flare/Combustor Flame Arrester','PM Flare','PM BMS',
   'Billable Theif Hatch','Billable PRV','Billable PSV',
