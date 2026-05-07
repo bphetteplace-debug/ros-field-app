@@ -105,10 +105,15 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
   const uploaded = [];
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
-    if (!photo.dataUrl) continue;
+    if (!photo.dataUrl && !photo.file) continue;
     try {
-      const res = await fetch(photo.dataUrl);
-      const blob = await res.blob();
+      let blob;
+      if (photo.file instanceof Blob) {
+        blob = photo.file;
+      } else if (photo.dataUrl) {
+        const res = await fetch(photo.dataUrl);
+        blob = await res.blob();
+      } else continue;
       const ext = blob.type.includes('png') ? 'png' : 'jpg';
       const path = `${submissionId}/${section}-${i}.${ext}`;
       const { error: uploadError } = await supabase.storage
