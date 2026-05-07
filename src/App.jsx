@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import FormPage from './pages/FormPage.jsx';
 import PreviewPage from './pages/PreviewPage.jsx';
 import SubmissionsListPage from './pages/SubmissionsListPage.jsx';
+import ViewSubmissionPage from './pages/ViewSubmissionPage.jsx';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -17,7 +18,7 @@ export default function App() {
     );
   }
 
-  // Not logged in → only show login
+  // Not logged in — only show login
   if (!user) {
     return (
       <Routes>
@@ -27,17 +28,15 @@ export default function App() {
     );
   }
 
-  // Logged in (or local mode) → show full app
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Navigate to="/submissions" replace />} />
         <Route path="/submissions" element={<SubmissionsListPage />} />
         <Route path="/form" element={<FormPage />} />
-        <Route path="/form/:id" element={<FormPage />} />
-        <Route path="/preview/:id?" element={<PreviewPage />} />
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/preview" element={<PreviewPage />} />
+        <Route path="/view/:id" element={<ViewSubmissionPage />} />
+        <Route path="/login" element={<Navigate to="/submissions" replace />} />
+        <Route path="*" element={<Navigate to="/submissions" replace />} />
       </Routes>
     </Layout>
   );
