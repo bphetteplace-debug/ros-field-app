@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
     }
 
     // Cloud mode: hydrate session from Supabase
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+  supabase.auth.getSession().catch(() => ({ data: { session: null } })).then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
         await loadProfile(session.user.id);
