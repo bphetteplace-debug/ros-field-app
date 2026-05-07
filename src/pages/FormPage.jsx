@@ -11,7 +11,7 @@ import PartsPicker from '../components/PartsPicker.jsx';
 import EquipmentCard from '../components/EquipmentCard.jsx';
 import { CUSTOMERS, TRUCKS, TECHS, WORK_TYPES } from '../data/constants.js';
 import { PARTS_CATALOG } from '../data/catalog.js';
-import { fmt, todayISO, nowTime, uuid } from '../lib/utils.js';
+import { fmt, todayISO, nowTime, uuid, decimalHoursBetween } from '../lib/utils.js';
 import { compressImage, fileToDataURL } from '../lib/imageCompress.js';
 
 export default function FormPage() {
@@ -40,6 +40,8 @@ export default function FormPage() {
     costPerMile: '1.50',
     departureTime: '',
     laborHours: '0',
+    laborHoursOverride: false,    // when true, labor hours is manually set, ignore auto-calc
+    billableTechs: 1,             // default 1 — overridden by techs-onsite count below if tech is added
     laborRate: '115.00',
   });
 
@@ -49,6 +51,31 @@ export default function FormPage() {
   const [parts, setParts] = useState([]);
 
   const updateForm = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  // Compute time on site from start/departure (decimal hours, snapped to 0.25)
+  const timeOnSite = decimalHoursBetween(form.startTime, form.departureTime);
+
+  // Auto-sync billable tech count to # of techs in the Techs Onsite section.
+  // Only auto-updates if user hasn't manually changed it from default — once they
+  // override (e.g. drop count for a trainee), we respect that and stop auto-syncing.
+  const [billableTechsTouched, setBillableTechsTouched] = useState(false);
+  useEffect(() => {
+    if (billableTechsTouched) return;
+    const n = Math.max(1, form.techs.length);
+    if (n !== form.billableTechs) {
+      setForm((f) => ({ ...f, billableTechs: n }));
+    }
+  }, [form.techs.length, billableTechsTouched]);
+
+  // Auto-update laborHours from time-on-site × billable techs unless user has overridden.
+  useEffect(() => {
+    if (form.laborHoursOverride) return;
+    if (timeOnSite === null) return;
+    const computed = +(timeOnSite * (Number(form.billableTechs) || 0)).toFixed(2);
+    if (computed !== Number(form.laborHours)) {
+      setForm((f) => ({ ...f, laborHours: String(computed) }));
+    }
+  }, [timeOnSite, form.billableTechs, form.laborHoursOverride]);
 
   // ----- Photo handling -----
   async function processPhoto(file) {
@@ -531,7 +558,29 @@ export default function FormPage() {
             <input type="number" step="0.01" className="ros-input mono-font" value={form.costPerMile} onChange={(e) => updateForm('costPerMile', e.target.value)} />
           </Field>
           <Field label="Labor Hours">
-            <input type="number" step="0.25" className="ros-input mono-font" value={form.laborHours} onChange={(e) => updateForm('laborHours', e.target.value)} />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.25"
+                className={`ros-input mono-font flex-1 ${!form.laborHoursOverride ? 'bg-slate-50 text-slate-700' : ''}`}
+                value={form.laborHours}
+                onChange={(e) => {
+                  // Editing the field directly switches to manual override mode
+                  setForm((f) => ({ ...f, laborHours: e.target.value, laborHoursOverride: true }));
+                }}
+                title={!form.laborHoursOverride ? 'Auto-calculated. Click to override.' : 'Manually set'}
+              />
+              {form.laborHoursOverride && (
+                <button
+                  type="button"
+                  onClick={() => updateForm('laborHoursOverride', false)}
+                  className="px-2 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-md uppercase tracking-wider transition flex-shrink-0"
+                  title="Resume auto-calculation from Time On Site × Billable Techs"
+                >
+                  Auto
+                </button>
+              )}
+            </div>
           </Field>
           <Field label="Hourly Rate">
             <input type="number" step="0.01" className="ros-input mono-font" value={form.laborRate} onChange={(e) => updateForm('laborRate', e.target.value)} />
@@ -554,6 +603,40 @@ export default function FormPage() {
               </button>
             </div>
           </Field>
+          <Field label="Billable Techs" hint={billableTechsTouched ? 'Manually set' : `Default: ${form.techs.length || 1} (techs onsite)`}>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              className="ros-input mono-font"
+              value={form.billableTechs}
+              onChange={(e) => {
+                setBillableTechsTouched(true);
+                updateForm('billableTechs', Math.max(0, Number(e.target.value) || 0));
+              }}
+              title="How many techs to bill the customer for. Set lower than techs-onsite when a new hire is shadowing/training."
+            />
+          </Field>
+
+          {/* Time on site summary — shows the full equation when departure time is filled */}
+          {timeOnSite !== null && form.departureTime && (
+            <div className="col-span-2 sm:col-span-4 -mt-1 flex flex-wrap items-center justify-end gap-2 px-1">
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                Time On Site
+              </span>
+              <span className="mono-font text-sm font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md">
+                {timeOnSite.toFixed(2)} hr
+              </span>
+              <span className="text-slate-400">×</span>
+              <span className="mono-font text-sm font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md">
+                {form.billableTechs} {Number(form.billableTechs) === 1 ? 'tech' : 'techs'}
+              </span>
+              <span className="text-slate-400">=</span>
+              <span className="mono-font text-base font-bold text-slate-900 bg-orange-50 border border-orange-200 px-3 py-1 rounded-md">
+                {(timeOnSite * (Number(form.billableTechs) || 0)).toFixed(2)} billable hr
+              </span>
+            </div>
+          )}
         </div>
       </Section>
 
