@@ -16,7 +16,7 @@ export default function Layout({ children }) {
               <Flame className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="display-font font-bold text-base leading-none">RELIABLE OILFIELD</div>
+              <div className="display-font font-bold text-base leading-none">RELIABLETRACK</div>
               <div className="text-xs text-slate-400 mt-0.5">
                 {profile?.full_name}
                 {!isCloudMode && <span className="ml-2 px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px] font-bold uppercase tracking-wider">Local</span>}
@@ -26,12 +26,20 @@ export default function Layout({ children }) {
 
           <div className="flex items-center gap-2">
             {!isFormView && (
-              <Link
-                to="/form"
-                className="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-md flex items-center gap-1.5 transition"
-              >
-                <Plus className="w-4 h-4" /> New PM
-              </Link>
+              <>
+                <Link
+                  to="/form?type=pm"
+                  className="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold rounded-md flex items-center gap-1.5 transition"
+                >
+                  <Plus className="w-4 h-4" /> PM
+                </Link>
+                <Link
+                  to="/form?type=sc"
+                  className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-md flex items-center gap-1.5 transition"
+                >
+                  <Plus className="w-4 h-4" /> Service Call
+                </Link>
+              </>
             )}
             {isCloudMode && (
               <button

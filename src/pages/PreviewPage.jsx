@@ -21,7 +21,7 @@ export default function PreviewPage() {
 
   const {
     pmNumber, form, siteSignPhoto, completedPhotos, equipment, parts,
-    partsCost, mileageCost, laborCost, totalCost,
+    partsCost, mileageCost, laborCost, baseCost, totalCost,
   } = payload;
 
   return (
@@ -52,13 +52,18 @@ export default function PreviewPage() {
               <div>
                 <div className="display-font font-bold text-2xl text-slate-900 tracking-wide">RELIABLE OILFIELD SERVICES</div>
                 <div className="text-xs text-slate-500 tracking-wider mt-0.5">
-                  PREVENTIVE MAINTENANCE REPORT · reliable-oilfield-services.com
+                  {form.jobType === 'PM' ? 'PM' : 'SERVICE CALL'} REPORT · reliable-oilfield-services.com
                 </div>
               </div>
             </div>
             <div className="text-right">
               <div className="text-xs text-slate-500 uppercase tracking-wider">No.</div>
               <div className="display-font font-bold text-3xl text-slate-900 mono-font">#{pmNumber}</div>
+              {form.warrantyWork && (
+                <div className="mt-1 inline-block px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-400 text-[10px] uppercase tracking-widest font-bold rounded">
+                  Warranty
+                </div>
+              )}
             </div>
           </div>
 
@@ -179,10 +184,30 @@ export default function PreviewPage() {
               </div>
             </div>
             <div className="h-px bg-white/20 my-3" />
-            <div className="flex justify-between items-baseline">
-              <span className="display-font text-base tracking-wider">TOTAL</span>
-              <span className="display-font text-2xl text-orange-400 font-bold">{fmt(totalCost)}</span>
-            </div>
+            {form.warrantyWork ? (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-300">Standard Total</span>
+                  <span>{fmt(baseCost)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-300">Warranty Discount</span>
+                  <span className="text-amber-300">-{fmt(baseCost)}</span>
+                </div>
+                <div className="h-px bg-white/20 my-3" />
+                <div className="flex justify-between items-baseline">
+                  <span className="display-font text-base tracking-wider">
+                    TOTAL <span className="text-amber-400 text-xs">(WARRANTY)</span>
+                  </span>
+                  <span className="display-font text-2xl text-orange-400 font-bold">{fmt(0)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between items-baseline">
+                <span className="display-font text-base tracking-wider">TOTAL</span>
+                <span className="display-font text-2xl text-orange-400 font-bold">{fmt(totalCost)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

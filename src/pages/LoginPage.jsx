@@ -32,8 +32,9 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Flame className="w-9 h-9 text-white" />
           </div>
-          <h1 className="display-font font-bold text-2xl text-white tracking-wider">RELIABLE OILFIELD</h1>
-          <p className="text-slate-400 text-sm mt-1">Field Documentation</p>
+          <h1 className="display-font font-bold text-2xl text-white tracking-wider">RELIABLETRACK</h1>
+          <p className="text-slate-400 text-sm mt-1">Field Operations</p>
+          <p className="text-slate-500 text-xs mt-1">by Reliable Oilfield Services</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-2xl p-6 space-y-4">

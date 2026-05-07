@@ -17,12 +17,20 @@ export default function SubmissionsListPage() {
               : 'Local mode — submissions are not yet persisted.'}
           </p>
         </div>
-        <Link
-          to="/form"
-          className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-md flex items-center gap-2 transition shadow"
-        >
-          <Plus className="w-4 h-4" /> New PM
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/form?type=pm"
+            className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-md flex items-center gap-2 transition shadow"
+          >
+            <Plus className="w-4 h-4" /> PM
+          </Link>
+          <Link
+            to="/form?type=sc"
+            className="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-md flex items-center gap-2 transition shadow"
+          >
+            <Plus className="w-4 h-4" /> Service Call
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-12 text-center">
@@ -30,15 +38,23 @@ export default function SubmissionsListPage() {
         <h2 className="display-font font-bold text-lg text-slate-700 tracking-wider mb-2">NO SUBMISSIONS YET</h2>
         <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
           {isCloudMode
-            ? 'Tap New PM to start your first preventive maintenance report. Saved submissions will appear here.'
+            ? 'Pick a job type below to start your first field report. Saved submissions will appear here.'
             : 'In local mode, submissions exist only during the current session. Switch to cloud mode (see WEEK1_BACKEND.md) to enable saved submissions.'}
         </p>
-        <Link
-          to="/form"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-700 text-white font-bold rounded-md transition"
-        >
-          <FileText className="w-4 h-4" /> Start a New PM
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            to="/form?type=pm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-md transition shadow"
+          >
+            <FileText className="w-4 h-4" /> Start a PM
+          </Link>
+          <Link
+            to="/form?type=sc"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-700 text-white font-bold rounded-md transition"
+          >
+            <FileText className="w-4 h-4" /> Start a Service Call
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6 text-xs text-slate-400 text-center">

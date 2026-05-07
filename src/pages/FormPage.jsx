@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Camera, Plus, X, Truck, Building2, Package, Trash2,
   ClipboardList, Eye, ChevronRight, CheckCircle2, Flame, DollarSign,
@@ -16,9 +16,13 @@ import { compressImage, fileToDataURL } from '../lib/imageCompress.js';
 
 export default function FormPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialJobType = searchParams.get('type') === 'sc' ? 'Service Call' : 'PM';
 
-  const [pmNumber] = useState(() => Math.floor(9000 + Math.random() * 1000).toString());
+  const [pmNumber] = useState(() => Math.floor(9136 + Math.random() * 864).toString());
   const [form, setForm] = useState({
+    jobType: initialJobType, // 'PM' or 'Service Call' — set from ?type= query param
+    warrantyWork: false,     // when true, totalCost is forced to $0.00
     customer: 'Diamondback',
     location: '',
     glCode: 'N/A',
@@ -53,8 +57,19 @@ export default function FormPage() {
     return { id: uuid(), url, caption: '' };
   }
 
+  const MAX_COMPLETED_PHOTOS = 20;
+
   async function addCompletedPhotos(files) {
-    const newPhotos = await Promise.all([...files].map(processPhoto));
+    const remaining = MAX_COMPLETED_PHOTOS - completedPhotos.length;
+    if (remaining <= 0) {
+      alert(`You've reached the ${MAX_COMPLETED_PHOTOS}-photo limit for this section. Remove a photo to add a new one.`);
+      return;
+    }
+    const incoming = [...files].slice(0, remaining);
+    if (files.length > remaining) {
+      alert(`Only added ${remaining} photo(s) — section limit is ${MAX_COMPLETED_PHOTOS}.`);
+    }
+    const newPhotos = await Promise.all(incoming.map(processPhoto));
     setCompletedPhotos((p) => [...p, ...newPhotos]);
   }
 
@@ -103,7 +118,9 @@ export default function FormPage() {
   const partsCost = parts.reduce((s, p) => s + (Number(p.price) || 0) * (Number(p.qty) || 0), 0);
   const mileageCost = (Number(form.miles) || 0) * (Number(form.costPerMile) || 0);
   const laborCost = (Number(form.laborHours) || 0) * (Number(form.laborRate) || 0);
-  const totalCost = partsCost + mileageCost + laborCost;
+  // Underlying cost is always tracked. Warranty zeroes out the customer-facing total only.
+  const baseCost = partsCost + mileageCost + laborCost;
+  const totalCost = form.warrantyWork ? 0 : baseCost;
 
   // ----- Site sign -----
   const siteSignRef = useRef();
@@ -121,7 +138,7 @@ export default function FormPage() {
   // ----- Submit / Preview -----
   // In Week 2, this saves to Supabase. For now it stashes in sessionStorage so Preview can read it.
   function goToPreview() {
-    const payload = {
+    sessionStorage.setItem('ros_preview_payload', JSON.stringify({
       pmNumber,
       form,
       siteSignPhoto,
@@ -131,9 +148,9 @@ export default function FormPage() {
       partsCost,
       mileageCost,
       laborCost,
+      baseCost,
       totalCost,
-    };
-    sessionStorage.setItem('ros_preview_payload', JSON.stringify(payload));
+    }));
     navigate('/preview');
   }
 
@@ -142,11 +159,47 @@ export default function FormPage() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="display-font font-bold text-xl sm:text-2xl text-slate-900 tracking-wider">
-            NEW PREVENTIVE MAINTENANCE
+            {form.jobType === 'PM' ? 'PM' : 'SERVICE CALL'}
+            {form.warrantyWork && (
+              <span className="ml-3 inline-block px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-300 text-xs rounded uppercase tracking-wide align-middle">
+                Warranty
+              </span>
+            )}
           </h1>
-          <p className="text-xs text-slate-500 mono-font mt-0.5">PM #{pmNumber}</p>
+          <p className="text-xs text-slate-500 mono-font mt-0.5">{form.jobType === 'PM' ? 'PM' : 'SC'} #{pmNumber}</p>
         </div>
       </div>
+
+      {/* Job Type & Warranty */}
+      <Section icon={ClipboardList} title="Job Details">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+          <Field label="Job Type">
+            <select
+              className="ros-input"
+              value={form.jobType}
+              onChange={(e) => updateForm('jobType', e.target.value)}
+            >
+              <option value="PM">PM (Preventive Maintenance)</option>
+              <option value="Service Call">Service Call</option>
+            </select>
+          </Field>
+          <Field label="Warranty Work">
+            <label className="flex items-center gap-2 ros-input cursor-pointer select-none" style={{ paddingTop: '10px', paddingBottom: '10px' }}>
+              <input
+                type="checkbox"
+                className="w-5 h-5 accent-orange-600 cursor-pointer"
+                checked={form.warrantyWork}
+                onChange={(e) => updateForm('warrantyWork', e.target.checked)}
+              />
+              <span className="text-sm">
+                {form.warrantyWork
+                  ? 'Yes — billed at $0.00 (parts/labor still tracked)'
+                  : 'No (standard billing)'}
+              </span>
+            </label>
+          </Field>
+        </div>
+      </Section>
 
       {/* Customer Info */}
       <Section icon={Building2} title="Customer Information">
@@ -220,11 +273,21 @@ export default function FormPage() {
               />
             </Field>
             <Field label="Start Time">
-              <input
-                className="ros-input mono-font"
-                value={form.startTime}
-                onChange={(e) => updateForm('startTime', e.target.value)}
-              />
+              <div className="flex gap-2">
+                <input
+                  className="ros-input mono-font flex-1"
+                  value={form.startTime}
+                  onChange={(e) => updateForm('startTime', e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => updateForm('startTime', nowTime())}
+                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-800 text-xs font-bold rounded-md uppercase tracking-wider transition flex-shrink-0"
+                  title="Set to current time"
+                >
+                  Now
+                </button>
+              </div>
             </Field>
           </div>
         </div>
@@ -299,7 +362,11 @@ export default function FormPage() {
       </Section>
 
       {/* Completed Work Photos */}
-      <Section icon={Camera} title="Completed Work Photos" subtitle="Captioned multi-photo gallery">
+      <Section
+        icon={Camera}
+        title="Completed Work Photos"
+        subtitle={`Captioned multi-photo gallery — ${completedPhotos.length}/${MAX_COMPLETED_PHOTOS}`}
+      >
         <div className="photo-grid">
           {completedPhotos.map((p) => (
             <div key={p.id} className="space-y-1.5">
@@ -321,14 +388,21 @@ export default function FormPage() {
               />
             </div>
           ))}
-          <button
-            onClick={() => completedRef.current?.click()}
-            className="photo-cell border-2 border-dashed border-slate-300 hover:border-orange-500 flex flex-col items-center justify-center text-slate-500 hover:text-orange-600 transition cursor-pointer bg-white"
-          >
-            <Plus className="w-8 h-8 mb-1" />
-            <span className="text-xs font-bold uppercase tracking-wider">Add Photo</span>
-          </button>
+          {completedPhotos.length < MAX_COMPLETED_PHOTOS && (
+            <button
+              onClick={() => completedRef.current?.click()}
+              className="photo-cell border-2 border-dashed border-slate-300 hover:border-orange-500 flex flex-col items-center justify-center text-slate-500 hover:text-orange-600 transition cursor-pointer bg-white"
+            >
+              <Plus className="w-8 h-8 mb-1" />
+              <span className="text-xs font-bold uppercase tracking-wider">Add Photo</span>
+            </button>
+          )}
         </div>
+        {completedPhotos.length >= MAX_COMPLETED_PHOTOS && (
+          <p className="text-xs text-slate-500 mt-3 text-center">
+            {MAX_COMPLETED_PHOTOS}-photo limit reached. Remove a photo to add another.
+          </p>
+        )}
         <input
           ref={completedRef}
           type="file"
@@ -431,7 +505,22 @@ export default function FormPage() {
             <input type="number" step="0.01" className="ros-input mono-font" value={form.laborRate} onChange={(e) => updateForm('laborRate', e.target.value)} />
           </Field>
           <Field label="Departure Time">
-            <input className="ros-input mono-font" placeholder="e.g. 09:00 AM" value={form.departureTime} onChange={(e) => updateForm('departureTime', e.target.value)} />
+            <div className="flex gap-2">
+              <input
+                className="ros-input mono-font flex-1"
+                placeholder="e.g. 09:00 AM"
+                value={form.departureTime}
+                onChange={(e) => updateForm('departureTime', e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => updateForm('departureTime', nowTime())}
+                className="px-3 py-2 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-800 text-xs font-bold rounded-md uppercase tracking-wider transition flex-shrink-0"
+                title="Set to current time"
+              >
+                Now
+              </button>
+            </div>
           </Field>
         </div>
       </Section>
@@ -443,10 +532,24 @@ export default function FormPage() {
           <Row label="Mileage Cost" value={fmt(mileageCost)} />
           <Row label="Labor Cost" value={fmt(laborCost)} />
           <div className="h-px bg-white/20 my-3" />
-          <div className="flex justify-between items-baseline">
-            <span className="display-font text-lg tracking-wider">TOTAL</span>
-            <span className="display-font text-3xl text-orange-400 font-bold">{fmt(totalCost)}</span>
-          </div>
+          {form.warrantyWork ? (
+            <>
+              <Row label="Standard Total" value={fmt(baseCost)} />
+              <Row label="Warranty Discount" value={`-${fmt(baseCost)}`} />
+              <div className="h-px bg-white/20 my-3" />
+              <div className="flex justify-between items-baseline">
+                <span className="display-font text-lg tracking-wider">
+                  TOTAL <span className="text-amber-400 text-sm">(WARRANTY)</span>
+                </span>
+                <span className="display-font text-3xl text-orange-400 font-bold">{fmt(0)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between items-baseline">
+              <span className="display-font text-lg tracking-wider">TOTAL</span>
+              <span className="display-font text-3xl text-orange-400 font-bold">{fmt(totalCost)}</span>
+            </div>
+          )}
         </div>
       </Section>
 
