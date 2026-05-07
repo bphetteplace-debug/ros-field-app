@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from './supabase.js';
 
 export async function getNextPmNumber() {
   const { data, error } = await supabase
@@ -11,6 +11,8 @@ export async function getNextPmNumber() {
 }
 
 export async function saveSubmission(formData, userId) {
+  if (!supabase) throw new Error('Supabase client not available - check env vars');
+
   const {
     pmNumber, jobType, warrantyWork, customerName, truckNumber,
     locationName, customerContact, customerWorkOrder, typeOfWork,
@@ -19,68 +21,62 @@ export async function saveSubmission(formData, userId) {
     laborHours, hourlyRate, billableTechs,
   } = formData;
 
-  // parts should include {sku, name, qty, price}
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.34);
   const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
   const laborTotal = warrantyWork ? 0 :
     parseFloat(laborHours || 0) * parseFloat(hourlyRate || 123.62) * effectiveBillable;
 
-  // Insert without .select().single() to avoid RLS SELECT blocking the return
-  const { error: insertError } = await supabase
-    .from('submissions')
-    .insert({
-      created_by: userId,
-      status: 'submitted',
-      template: 'flare_combustor',
-      customer_name: customerName,
-      truck_number: truckNumber,
-      location_name: locationName,
-      contact: customerContact,
-      work_order: customerWorkOrder,
-      work_type: typeOfWork,
-      gl_code: glCode,
-      asset_tag: assetTag,
-      work_area: workArea,
-      date: date,
-      start_time: startTime,
-      departure_time: departureTime,
-      summary: description,
-      miles: parseFloat(miles || 0),
-      cost_per_mile: parseFloat(costPerMile || 1.34),
-      labor_hours: parseFloat(laborHours || 0),
-      labor_rate: parseFloat(hourlyRate || 123.62),
-      submitted_at: new Date().toISOString(),
-      data: {
-        job_type: jobType,
-        warranty_work: warrantyWork,
-        techs,
-        equipment,
-        parts,
-        billable_techs: effectiveBillable,
-        parts_total: partsTotal,
-        mileage_total: mileageTotal,
-        labor_total: laborTotal,
-        grand_total: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
-      },
-    });
+  const insertPayload = {
+    created_by: userId,
+    status: 'submitted',
+    template: 'flare_combustor',
+    customer_name: customerName,
+    truck_number: truckNumber,
+    location_name: locationName,
+    contact: customerContact,
+    work_order: customerWorkOrder,
+    work_type: typeOfWork,
+    gl_code: glCode,
+    asset_tag: assetTag,
+    work_area: workArea,
+    date: date,
+    start_time: startTime,
+    departure_time: departureTime,
+    summary: description,
+    miles: parseFloat(miles || 0),
+    cost_per_mile: parseFloat(costPerMile || 1.34),
+    labor_hours: parseFloat(laborHours || 0),
+    labor_rate: parseFloat(hourlyRate || 123.62),
+    submitted_at: new Date().toISOString(),
+    data: {
+      job_type: jobType,
+      warranty_work: warrantyWork,
+      techs,
+      equipment,
+      parts,
+      billable_techs: effectiveBillable,
+      parts_total: partsTotal,
+      mileage_total: mileageTotal,
+      labor_total: laborTotal,
+      grand_total: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
+    },
+  };
 
-  if (insertError) throw insertError;
+  // Add timeout to prevent indefinite hang
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Save timed out - check network connection')), 15000)
+  );
 
-  // Fetch the newly inserted submission (RLS SELECT should allow this since created_by = auth.uid())
-  const { data, error: selectError } = await supabase
-    .from('submissions')
-    .select('*')
-    .eq('created_by', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  const insertOp = supabase.from('submissions').insert(insertPayload).select('id, pm_number').single();
 
-  if (selectError) throw selectError;
+  const { data, error } = await Promise.race([insertOp, timeout]);
+  if (error) throw error;
   return data;
 }
 
 export async function uploadPhotos(submissionId, photos, section = 'work') {
+  if (!supabase) return [];
   const uploaded = [];
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
@@ -110,6 +106,7 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
 }
 
 export function getPhotoUrl(storagePath) {
+  if (!supabase) return '';
   const { data } = supabase.storage
     .from('submission-photos')
     .getPublicUrl(storagePath);
@@ -117,6 +114,7 @@ export function getPhotoUrl(storagePath) {
 }
 
 export async function fetchSubmissions(userId) {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from('submissions')
     .select('id, pm_number, work_type, customer_name, location_name, date, status, data, created_at, submitted_at')
@@ -127,6 +125,7 @@ export async function fetchSubmissions(userId) {
 }
 
 export async function fetchSubmission(id) {
+  if (!supabase) throw new Error('Not connected');
   const { data, error } = await supabase
     .from('submissions')
     .select('*, photos (id, storage_path, caption, display_order, section)')
@@ -134,4 +133,4 @@ export async function fetchSubmission(id) {
     .single();
   if (error) throw error;
   return data;
-        }
+}
