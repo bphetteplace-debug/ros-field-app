@@ -19,14 +19,15 @@ export async function saveSubmission(formData, userId) {
     laborHours, hourlyRate, billableTechs,
   } = formData;
 
-  // parts must include {sku, name, qty, price}
+  // parts should include {sku, name, qty, price}
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.34);
   const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
   const laborTotal = warrantyWork ? 0 :
     parseFloat(laborHours || 0) * parseFloat(hourlyRate || 123.62) * effectiveBillable;
 
-  const { data, error } = await supabase
+  // Insert without .select().single() to avoid RLS SELECT blocking the return
+  const { error: insertError } = await supabase
     .from('submissions')
     .insert({
       created_by: userId,
@@ -62,11 +63,20 @@ export async function saveSubmission(formData, userId) {
         labor_total: laborTotal,
         grand_total: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
       },
-    })
-    .select()
+    });
+
+  if (insertError) throw insertError;
+
+  // Fetch the newly inserted submission (RLS SELECT should allow this since created_by = auth.uid())
+  const { data, error: selectError } = await supabase
+    .from('submissions')
+    .select('*')
+    .eq('created_by', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
 
-  if (error) throw error;
+  if (selectError) throw selectError;
   return data;
 }
 
@@ -124,4 +134,4 @@ export async function fetchSubmission(id) {
     .single();
   if (error) throw error;
   return data;
-      }
+        }
