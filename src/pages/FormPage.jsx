@@ -456,25 +456,57 @@ export default function FormPage() {
         {parts.length > 0 && (
           <div className="space-y-2 mt-4">
             {parts.map((p) => (
-              <div key={p.id} className="bg-slate-50 rounded-md p-3 flex items-center gap-3">
+              <div key={p.id} className="bg-slate-50 rounded-md p-3 flex items-center gap-2 sm:gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="mono-font text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 font-semibold">{p.code}</span>
-                    <span className="text-sm text-slate-500">{fmt(p.price)} each</span>
+                    <span className="text-xs text-slate-500">{fmt(p.price)} ea</span>
                   </div>
                   <div className="text-sm font-medium text-slate-900 truncate">{p.desc}</div>
                 </div>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={p.qty}
-                  onChange={(e) => updatePart(p.id, 'qty', e.target.value)}
-                  className="ros-input w-20 mono-font text-center"
-                  style={{ padding: '6px 8px' }}
-                />
-                <div className="text-sm font-bold text-slate-900 mono-font w-20 text-right">{fmt(p.price * (p.qty || 0))}</div>
-                <button onClick={() => removePart(p.id)} className="text-slate-400 hover:text-red-600 transition">
+
+                {/* Thumb-friendly qty stepper. Big tap targets, but tech can also tap the number to type a value */}
+                <div className="flex items-center bg-white border border-slate-300 rounded-md overflow-hidden flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Number(p.qty) || 0;
+                      updatePart(p.id, 'qty', Math.max(0, cur - 1));
+                    }}
+                    className="w-10 h-11 sm:w-9 sm:h-10 flex items-center justify-center text-xl font-bold text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition"
+                    aria-label="Decrease quantity"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    inputMode="decimal"
+                    value={p.qty}
+                    onChange={(e) => updatePart(p.id, 'qty', e.target.value)}
+                    className="w-12 h-11 sm:w-12 sm:h-10 mono-font text-center text-base font-bold text-slate-900 bg-transparent border-x border-slate-300 focus:outline-none focus:bg-orange-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Number(p.qty) || 0;
+                      updatePart(p.id, 'qty', cur + 1);
+                    }}
+                    className="w-10 h-11 sm:w-9 sm:h-10 flex items-center justify-center text-xl font-bold text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition"
+                    aria-label="Increase quantity"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div className="hidden sm:block text-sm font-bold text-slate-900 mono-font w-20 text-right">{fmt(p.price * (p.qty || 0))}</div>
+                <button
+                  type="button"
+                  onClick={() => removePart(p.id)}
+                  className="w-10 h-11 sm:w-9 sm:h-10 flex items-center justify-center text-slate-400 hover:text-red-600 active:text-red-700 transition flex-shrink-0"
+                  aria-label="Remove part"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
