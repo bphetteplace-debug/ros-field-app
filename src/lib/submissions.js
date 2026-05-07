@@ -1,18 +1,50 @@
 import { supabase } from './supabase.js';
 
+// Get Supabase URL and key from the environment (injected by Vite)
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Helper: get auth token from localStorage
+function getAuthToken() {
+  const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+  if (!key) return null;
+  try {
+    return JSON.parse(localStorage.getItem(key))?.access_token;
+  } catch {
+    return null;
+  }
+}
+
+// Direct REST API helper (bypasses supabase-js client to avoid Promise hang)
+async function supaRest(method, path, body) {
+  const token = getAuthToken();
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || 'Request failed: ' + res.status);
+  return text ? JSON.parse(text) : null;
+}
+
 export async function getNextPmNumber() {
-  const { data, error } = await supabase
-    .from('submissions')
-    .select('pm_number')
-    .order('pm_number', { ascending: false })
-    .limit(1);
-  if (error || !data || data.length === 0) return 9136;
-  return (data[0].pm_number || 9135) + 1;
+  try {
+    const data = await supaRest('GET', 'submissions?select=pm_number&order=pm_number.desc&limit=1');
+    if (!data || data.length === 0) return 9136;
+    return (data[0].pm_number || 9135) + 1;
+  } catch {
+    return 9136;
+  }
 }
 
 export async function saveSubmission(formData, userId) {
-  if (!supabase) throw new Error('Supabase client not available - check env vars');
-
   const {
     pmNumber, jobType, warrantyWork, customerName, truckNumber,
     locationName, customerContact, customerWorkOrder, typeOfWork,
@@ -27,7 +59,7 @@ export async function saveSubmission(formData, userId) {
   const laborTotal = warrantyWork ? 0 :
     parseFloat(laborHours || 0) * parseFloat(hourlyRate || 123.62) * effectiveBillable;
 
-  const insertPayload = {
+  const payload = {
     created_by: userId,
     status: 'submitted',
     template: 'flare_combustor',
@@ -63,16 +95,9 @@ export async function saveSubmission(formData, userId) {
     },
   };
 
-  // Add timeout to prevent indefinite hang
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Save timed out - check network connection')), 15000)
-  );
-
-  const insertOp = supabase.from('submissions').insert(insertPayload).select('id, pm_number').single();
-
-  const { data, error } = await Promise.race([insertOp, timeout]);
-  if (error) throw error;
-  return data;
+  const result = await supaRest('POST', 'submissions', payload);
+  if (!result || result.length === 0) throw new Error('Save returned no data');
+  return Array.isArray(result) ? result[0] : result;
 }
 
 export async function uploadPhotos(submissionId, photos, section = 'work') {
@@ -90,7 +115,7 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
         .from('submission-photos')
         .upload(path, blob, { contentType: blob.type, upsert: true });
       if (uploadError) { console.error('Upload error:', uploadError); continue; }
-      await supabase.from('photos').insert({
+      await supaRest('POST', 'photos', {
         submission_id: submissionId,
         section,
         storage_path: path,
@@ -114,23 +139,18 @@ export function getPhotoUrl(storagePath) {
 }
 
 export async function fetchSubmissions(userId) {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('submissions')
-    .select('id, pm_number, work_type, customer_name, location_name, date, status, data, created_at, submitted_at')
-    .eq('created_by', userId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data;
+  const data = await supaRest('GET',
+    'submissions?select=id,pm_number,work_type,customer_name,location_name,date,status,data,created_at,submitted_at' +
+    '&created_by=eq.' + userId +
+    '&order=created_at.desc'
+  );
+  return data || [];
 }
 
 export async function fetchSubmission(id) {
-  if (!supabase) throw new Error('Not connected');
-  const { data, error } = await supabase
-    .from('submissions')
-    .select('*, photos (id, storage_path, caption, display_order, section)')
-    .eq('id', id)
-    .single();
-  if (error) throw error;
-  return data;
-}
+  const data = await supaRest('GET',
+    'submissions?select=*,photos(id,storage_path,caption,display_order,section)&id=eq.' + id
+  );
+  if (!data || data.length === 0) throw new Error('Submission not found');
+  return data[0];
+                                          }
