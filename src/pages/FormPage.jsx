@@ -46,6 +46,8 @@ export default function FormPage() {
   const [hourlyRate, setHourlyRate] = useState('115.00')
   const [billableTechs, setBillableTechs] = useState('')
   const [photos, setPhotos] = useState([])
+  const [photoCaptions, setPhotoCaptions] = useState({})
+  const [partPhotos, setPartPhotos] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [partSearch, setPartSearch] = useState('')
@@ -316,6 +318,11 @@ export default function FormPage() {
                 <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center', color: '#222' }}>{p.qty}</span>
                 <button onClick={() => updatePartQty(p.sku, p.qty + 1)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e65c00', background: '#e65c00', color: '#fff', fontSize: 18, cursor: 'pointer' }}>+</button>
                 <span style={{ fontWeight: 700, minWidth: 60, textAlign: 'right', color: '#222' }}>${(p.price * p.qty).toFixed(2)}</span>
+                <label title="Add photo for this part" style={{ cursor: 'pointer', color: partPhotos[p.sku] ? '#e65c00' : '#aaa', fontSize: 18 }}>
+                  📷
+                  <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                    onChange={e => { if (e.target.files[0]) setPartPhotos(prev => ({ ...prev, [p.sku]: e.target.files[0] })) }} />
+                </label>
               </div>
             </div>
           ))}
@@ -352,6 +359,48 @@ export default function FormPage() {
         </div>
       )}
 
+      {/* PHOTOS */}
+      <div style={{ margin: '0 0 12px' }}>
+        <div style={sectionHeader}>📷 Photos</div>
+        <div style={sectionBody}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {photos.map((file, idx) => (
+              <div key={idx} style={{ position: 'relative', width: 90, flexShrink: 0 }}>
+                <img src={URL.createObjectURL(file)} alt="" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid #ddd', display: 'block' }} />
+                <button onClick={() => setPhotos(photos.filter((_, i) => i !== idx))}
+                  style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', lineHeight: '18px', padding: 0 }}>✕</button>
+                <input
+                  placeholder="Caption..."
+                  value={photoCaptions[idx] || ''}
+                  onChange={e => setPhotoCaptions(prev => ({ ...prev, [idx]: e.target.value }))}
+                  style={{ marginTop: 4, width: '100%', fontSize: 11, padding: '2px 4px', border: '1px solid #ddd', borderRadius: 4, boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+          </div>
+          {photos.length < 20 && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ flex: 1, padding: '10px', borderRadius: 8, border: '2px dashed #e65c00', background: '#fff8f5', color: '#e65c00', fontWeight: 600, textAlign: 'center', cursor: 'pointer', fontSize: 14 }}>
+                📷 Take Photo
+                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} multiple={false}
+                  onChange={e => { if (e.target.files[0] && photos.length < 20) setPhotos([...photos, e.target.files[0]]) }} />
+              </label>
+              <label style={{ flex: 1, padding: '10px', borderRadius: 8, border: '2px dashed #aaa', background: '#fafafa', color: '#555', fontWeight: 600, textAlign: 'center', cursor: 'pointer', fontSize: 14 }}>
+                🖼 Choose File
+                <input type="file" accept="image/*" style={{ display: 'none' }} multiple
+                  onChange={e => {
+                    const files = Array.from(e.target.files)
+                    const remaining = 20 - photos.length
+                    setPhotos([...photos, ...files.slice(0, remaining)])
+                  }} />
+              </label>
+            </div>
+          )}
+          {photos.length >= 20 && <p style={{ color: '#888', fontSize: 12, textAlign: 'center' }}>Maximum 20 photos reached.</p>}
+          <p style={{ color: '#aaa', fontSize: 11, marginTop: 8, textAlign: 'center' }}>{photos.length}/20 photos</p>
+        </div>
+      </div>
+
       {/* COST SUMMARY */}
       <div style={{ margin: '0 0 12px' }}>
         <div style={sectionHeader}>💰 Cost Summary</div>
@@ -371,7 +420,7 @@ export default function FormPage() {
               {warrantyWork ? 'WARRANTY — NO CHARGE' : '$' + grandTotal.toFixed(2)}
             </span>
           </div>
-        </div>
+        </div>h
       </div>
 
       {/* SAVE BUTTON */}
