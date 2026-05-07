@@ -9,7 +9,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Local mode: skip auth, simulate a logged-in tech for the UX
     if (!isCloudMode()) {
       setUser({ id: 'local-user', email: 'local@ros.dev' });
       setProfile({ full_name: 'Local Mode', role: 'admin', truck_number: '0003' });
@@ -17,14 +16,18 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Cloud mode: hydrate session from Supabase
-  supabase.auth.getSession().catch(() => ({ data: { session: null } })).then(async ({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        await loadProfile(session.user.id);
-      }
-      setLoading(false);
-    });
+    const timeout = setTimeout(() => setLoading(false), 4000);
+
+    supabase.auth.getSession()
+      .catch(() => ({ data: { session: null } }))
+      .then(async ({ data: { session } }) => {
+        clearTimeout(timeout);
+        if (session?.user) {
+          setUser(session.user);
+          await loadProfile(session.user.id);
+        }
+        setLoading(false);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
@@ -36,7 +39,10 @@ export function AuthProvider({ children }) {
       }
     });
 
-    return () => subscription.subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   async function loadProfile(userId) {
@@ -81,4 +87,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
-}
+            }
