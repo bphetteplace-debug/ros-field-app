@@ -114,6 +114,8 @@ export default function FormPage() {
       if (photos.length > 0) {
         await uploadPhotos(submission.id, photos, 'work')
       }
+      // Fire-and-forget: email PDF report (don't await so nav isn't blocked)
+      fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: submission.id }) }).catch(e => console.warn('Report email error:', e))
       navigate('/view/' + submission.id)
     } catch (err) {
       console.error('Save error:', err)
