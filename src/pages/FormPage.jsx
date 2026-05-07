@@ -64,12 +64,16 @@ export default function FormPage() {
   const grandTotal = warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal
 
   function addPart(catalogItem) {
-    const existing = parts.find(p => p.sku === catalogItem.sku)
+    // catalog uses {code, desc, price, category} — map to {sku, name, qty, price}
+    const sku = catalogItem.sku || catalogItem.code
+    const name = catalogItem.name || catalogItem.desc
+    const price = catalogItem.price
+
+    const existing = parts.find(p => p.sku === sku)
     if (existing) {
-      setParts(parts.map(p => p.sku === catalogItem.sku ? { ...p, qty: p.qty + 1 } : p))
+      setParts(parts.map(p => p.sku === sku ? { ...p, qty: p.qty + 1 } : p))
     } else {
-      // Store sku, name, qty, price so view page can display them
-      setParts([...parts, { sku: catalogItem.sku, name: catalogItem.name, qty: 1, price: catalogItem.price }])
+      setParts([...parts, { sku, name, qty: 1, price }])
     }
     setShowCatalog(false)
     setPartSearch('')
@@ -118,10 +122,14 @@ export default function FormPage() {
     }
   }
 
-  const filteredParts = PARTS_CATALOG.filter(p =>
-    !partSearch || p.name.toLowerCase().includes(partSearch.toLowerCase()) ||
-    p.sku.toLowerCase().includes(partSearch.toLowerCase())
-  ).slice(0, 50)
+  // catalog filter: supports both {name,sku} and {desc,code} formats
+  const filteredParts = PARTS_CATALOG.filter(p => {
+    if (!partSearch) return true
+    const search = partSearch.toLowerCase()
+    const name = (p.name || p.desc || '').toLowerCase()
+    const sku = (p.sku || p.code || '').toLowerCase()
+    return name.includes(search) || sku.includes(search)
+  }).slice(0, 50)
 
   const s = { fontFamily: 'system-ui, sans-serif', maxWidth: 640, margin: '0 auto', padding: '0 0 100px 0', background: '#f0f2f5', minHeight: '100vh' }
   const sectionHeader = { background: '#1a2332', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }
@@ -146,7 +154,7 @@ export default function FormPage() {
       )}
 
       {/* JOB DETAILS */}
-      <div style={{ margin: '0 0 12px', padding: '0 0' }}>
+      <div style={{ margin: '0 0 12px' }}>
         <div style={sectionHeader}>📋 Job Details</div>
         <div style={sectionBody}>
           <div style={row2}>
@@ -298,14 +306,14 @@ export default function FormPage() {
           {parts.map(p => (
             <div key={p.sku} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#222' }}>{p.name}</div>
                 <div style={{ color: '#888', fontSize: 12 }}>{p.sku} · ${p.price.toFixed(2)} ea</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button onClick={() => updatePartQty(p.sku, p.qty - 1)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #ddd', background: '#fff', fontSize: 18, cursor: 'pointer' }}>−</button>
-                <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center' }}>{p.qty}</span>
+                <span style={{ fontWeight: 700, minWidth: 24, textAlign: 'center', color: '#222' }}>{p.qty}</span>
                 <button onClick={() => updatePartQty(p.sku, p.qty + 1)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e65c00', background: '#e65c00', color: '#fff', fontSize: 18, cursor: 'pointer' }}>+</button>
-                <span style={{ fontWeight: 700, minWidth: 60, textAlign: 'right' }}>${(p.price * p.qty).toFixed(2)}</span>
+                <span style={{ fontWeight: 700, minWidth: 60, textAlign: 'right', color: '#222' }}>${(p.price * p.qty).toFixed(2)}</span>
               </div>
             </div>
           ))}
@@ -324,15 +332,19 @@ export default function FormPage() {
               <button onClick={() => { setShowCatalog(false); setPartSearch('') }} style={{ padding: '0 14px', borderRadius: 8, border: '1px solid #ddd', background: '#f5f5f5', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ overflow: 'auto', flex: 1 }}>
-              {filteredParts.map(item => (
-                <button key={item.sku} onClick={() => addPart(item)} style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #f0f0f0', background: '#fff', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{item.name}</div>
-                    <div style={{ color: '#888', fontSize: 12 }}>{item.sku}</div>
-                  </div>
-                  <div style={{ color: '#e65c00', fontWeight: 700 }}>${item.price.toFixed(2)}</div>
-                </button>
-              ))}
+              {filteredParts.map(item => {
+                const itemName = item.name || item.desc || ''
+                const itemSku = item.sku || item.code || ''
+                return (
+                  <button key={itemSku} onClick={() => addPart(item)} style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #f0f0f0', background: '#fff', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#222', fontSize: 14 }}>{itemName}</div>
+                      <div style={{ color: '#888', fontSize: 12 }}>{itemSku}</div>
+                    </div>
+                    <div style={{ color: '#e65c00', fontWeight: 700, marginLeft: 12 }}>${item.price.toFixed(2)}</div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -343,13 +355,13 @@ export default function FormPage() {
         <div style={sectionHeader}>💰 Cost Summary</div>
         <div style={sectionBody}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-            <span>Parts Cost</span><span>${partsTotal.toFixed(2)}</span>
+            <span style={{ color: '#333' }}>Parts Cost</span><span style={{ color: '#333' }}>${partsTotal.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-            <span>Mileage Cost</span><span>${mileageTotal.toFixed(2)}</span>
+            <span style={{ color: '#333' }}>Mileage Cost</span><span style={{ color: '#333' }}>${mileageTotal.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-            <span>Labor Cost</span><span>${laborTotal.toFixed(2)}</span>
+            <span style={{ color: '#333' }}>Labor Cost</span><span style={{ color: '#333' }}>${laborTotal.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', fontWeight: 700, fontSize: 16 }}>
             <span>TOTAL</span>
