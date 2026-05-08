@@ -28,7 +28,7 @@ module.exports = async function handler(req, res) {
     // Fetch submission + photos
     const r = await fetch(
       SUPA_URL + '/rest/v1/submissions?id=eq.' + submissionId +
-      '&select=*,photos(id,storage_path,caption,display_order,section)&order=photos.display_order.asc',
+      '&select=*,photos(id,storage_path,caption,display_order,section)',
       { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } }
     )
     if (!r.ok) {
