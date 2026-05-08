@@ -16,7 +16,7 @@ function getAuthToken() {
 }
 
 // Direct REST API helper (bypasses supabase-js client to avoid Promise hang)
-// Added 30-second timeout via AbortController to prevent save from stalling
+// 30-second timeout via AbortController to prevent save from stalling
 async function supaRest(method, path, body) {
   const token = getAuthToken();
   const headers = {
@@ -25,10 +25,8 @@ async function supaRest(method, path, body) {
     'Prefer': 'return=representation',
   };
   if (token) headers['Authorization'] = 'Bearer ' + token;
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
-
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
       method,
@@ -59,20 +57,22 @@ export async function getNextPmNumber() {
 
 export async function saveSubmission(formData, userId) {
   const {
-    pmNumber, jobType, warrantyWork, customerName, truckNumber,
-    locationName, customerContact, customerWorkOrder, typeOfWork,
-    glCode, assetTag, workArea, date, startTime, departureTime,
-    description, techs, equipment, parts, miles, costPerMile,
-    laborHours, hourlyRate, billableTechs,
+    pmNumber, jobType, warrantyWork,
+    customerName, truckNumber, locationName,
+    customerContact, customerWorkOrder, typeOfWork,
+    glCode, assetTag, workArea,
+    date, startTime, departureTime, lastServiceDate,
+    description, techs, equipment, parts,
+    miles, costPerMile, laborHours, hourlyRate, billableTechs,
     arrestors, flares, heaters,
   } = formData;
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
   const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
-  const laborTotal = warrantyWork ? 0 :
-    parseFloat(laborHours || 0) * parseFloat(hourlyRate || 115.00) * effectiveBillable;
+  const laborTotal = warrantyWork ? 0 : parseFloat(laborHours || 0) * parseFloat(hourlyRate || 115.00) * effectiveBillable;
 
+  // Only include columns that actually exist in the submissions table
   const payload = {
     created_by: userId,
     pm_number: pmNumber,
@@ -93,6 +93,7 @@ export async function saveSubmission(formData, userId) {
     summary: description,
     miles: parseFloat(miles || 0),
     labor_hours: parseFloat(laborHours || 0),
+    // All other data goes in the JSONB data column
     data: {
       jobType,
       warrantyWork,
@@ -105,19 +106,23 @@ export async function saveSubmission(formData, userId) {
       hourlyRate,
       billableTechs: effectiveBillable,
       description,
-      glCode, assetTag, workArea,
-      startTime, departureTime,
-      typeOfWork, customerWorkOrder, customerContact,
+      glCode,
+      assetTag,
+      workArea,
+      lastServiceDate,
+      startTime,
+      departureTime,
+      typeOfWork,
+      customerWorkOrder,
+      customerContact,
+      partsTotal,
+      mileageTotal,
+      laborTotal,
+      grandTotal: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
       arrestors: jobType === 'PM' ? (arrestors || []) : [],
       flares: jobType === 'PM' ? (flares || []) : [],
       heaters: jobType === 'PM' ? (heaters || []) : [],
     },
-    parts,
-    billable_techs: effectiveBillable,
-    parts_total: partsTotal,
-    mileage_total: mileageTotal,
-    labor_total: laborTotal,
-    grand_total: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
   };
 
   const result = await supaRest('POST', 'submissions', payload);
@@ -149,7 +154,6 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       const token = getAuthToken();
       const headers = { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = 'Bearer ' + token;
-
       const metaRes = await fetch(SUPA_URL + '/rest/v1/photos', {
         method: 'POST',
         headers: { ...headers, 'Prefer': 'return=representation' },
