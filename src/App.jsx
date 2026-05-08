@@ -6,9 +6,10 @@ import FormPage from './pages/FormPage.jsx';
 import PreviewPage from './pages/PreviewPage.jsx';
 import SubmissionsListPage from './pages/SubmissionsListPage.jsx';
 import ViewSubmissionPage from './pages/ViewSubmissionPage.jsx';
+import AdminPage from './pages/AdminPage.jsx';
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/form" element={<FormPage />} />
         <Route path="/preview" element={<PreviewPage />} />
         <Route path="/view/:id" element={<ViewSubmissionPage />} />
+        <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/submissions" replace />} />
         <Route path="/login" element={<Navigate to="/submissions" replace />} />
         <Route path="*" element={<Navigate to="/submissions" replace />} />
       </Routes>
