@@ -189,3 +189,14 @@ export async function fetchSubmissionById(id) {
     return null;
   }
 }
+
+// Alias for backward compatibility with ViewSubmissionPage
+export async function fetchSubmission(id) {
+  return fetchSubmissionById(id);
+}
+
+// Generate public URL for a photo in Supabase Storage
+export function getPhotoUrl(storagePath) {
+  if (!storagePath) return null;
+  return SUPA_URL + '/storage/v1/object/public/submission-photos/' + storagePath;
+}
