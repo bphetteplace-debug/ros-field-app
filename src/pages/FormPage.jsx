@@ -265,6 +265,7 @@ export default function FormPage() {
       {/* STICKY HEADER */}
       <div style={{ background:'#1a2332', padding:'12px 16px', position:'sticky', top:0, zIndex:100, marginBottom:12 }}>
         <div style={{ color:'#e65c00', fontWeight:800, fontSize:17 }}>ReliableTrack</div>
+          <div style={{ color:'#aaa', fontSize:10, fontWeight:400, letterSpacing:0.3 }}>Built for Reliable Oilfield Services</div>
         <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} #{pmNumber||'...'} - {jobType}</div>
       </div>
 
