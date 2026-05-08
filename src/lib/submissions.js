@@ -219,3 +219,15 @@ export function getPhotoUrl(storagePath) {
   if (!storagePath) return null;
   return SUPA_URL + '/storage/v1/object/public/submission-photos/' + storagePath;
 }
+
+
+// Fetch ALL submissions (admin only) — no user filter
+export async function fetchAllSubmissions() {
+  try {
+    const data = await supaRest('GET', 'submissions?select=*,profiles(full_name)&order=created_at.desc');
+    return data || [];
+  } catch (e) {
+    console.error('Fetch all submissions error:', e);
+    return [];
+  }
+}
