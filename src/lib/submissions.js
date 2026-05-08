@@ -54,13 +54,14 @@ export async function saveSubmission(formData, userId) {
   } = formData;
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
-  const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.34);
+  const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
   const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
   const laborTotal = warrantyWork ? 0 :
-    parseFloat(laborHours || 0) * parseFloat(hourlyRate || 123.62) * effectiveBillable;
+    parseFloat(laborHours || 0) * parseFloat(hourlyRate || 115.00) * effectiveBillable;
 
   const payload = {
     created_by: userId,
+    pm_number: pmNumber,
     status: 'submitted',
     template: 'flare_combustor',
     customer_name: customerName,
@@ -77,9 +78,9 @@ export async function saveSubmission(formData, userId) {
     departure_time: departureTime,
     summary: description,
     miles: parseFloat(miles || 0),
-    cost_per_mile: parseFloat(costPerMile || 1.34),
+    cost_per_mile: parseFloat(costPerMile || 1.50),
     labor_hours: parseFloat(laborHours || 0),
-    labor_rate: parseFloat(hourlyRate || 123.62),
+    labor_rate: parseFloat(hourlyRate || 115.00),
     submitted_at: new Date().toISOString(),
     data: {
       job_type: jobType,
