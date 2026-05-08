@@ -16,6 +16,7 @@ function getAuthToken() {
 }
 
 // Direct REST API helper (bypasses supabase-js client to avoid Promise hang)
+// Added 30-second timeout via AbortController to prevent save from stalling
 async function supaRest(method, path, body) {
   const token = getAuthToken();
   const headers = {
@@ -24,14 +25,26 @@ async function supaRest(method, path, body) {
     'Prefer': 'return=representation',
   };
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(text || 'Request failed: ' + res.status);
-  return text ? JSON.parse(text) : null;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const text = await res.text();
+    if (!res.ok) throw new Error(text || 'Request failed: ' + res.status);
+    return text ? JSON.parse(text) : null;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error('Save timed out after 30s - check connection');
+    throw err;
+  }
 }
 
 export async function getNextPmNumber() {
@@ -51,6 +64,7 @@ export async function saveSubmission(formData, userId) {
     glCode, assetTag, workArea, date, startTime, departureTime,
     description, techs, equipment, parts, miles, costPerMile,
     laborHours, hourlyRate, billableTechs,
+    arrestors, flares, heaters,
   } = formData;
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
@@ -73,27 +87,37 @@ export async function saveSubmission(formData, userId) {
     gl_code: glCode,
     asset_tag: assetTag,
     work_area: workArea,
-    date: date,
+    date,
     start_time: startTime,
     departure_time: departureTime,
     summary: description,
     miles: parseFloat(miles || 0),
-    cost_per_mile: parseFloat(costPerMile || 1.50),
     labor_hours: parseFloat(laborHours || 0),
-    labor_rate: parseFloat(hourlyRate || 115.00),
-    submitted_at: new Date().toISOString(),
     data: {
-      job_type: jobType,
-      warranty_work: warrantyWork,
+      jobType,
+      warrantyWork,
       techs,
       equipment,
       parts,
-      billable_techs: effectiveBillable,
-      parts_total: partsTotal,
-      mileage_total: mileageTotal,
-      labor_total: laborTotal,
-      grand_total: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
+      miles,
+      costPerMile,
+      laborHours,
+      hourlyRate,
+      billableTechs: effectiveBillable,
+      description,
+      glCode, assetTag, workArea,
+      startTime, departureTime,
+      typeOfWork, customerWorkOrder, customerContact,
+      arrestors: jobType === 'PM' ? (arrestors || []) : [],
+      flares: jobType === 'PM' ? (flares || []) : [],
+      heaters: jobType === 'PM' ? (heaters || []) : [],
     },
+    parts,
+    billable_techs: effectiveBillable,
+    parts_total: partsTotal,
+    mileage_total: mileageTotal,
+    labor_total: laborTotal,
+    grand_total: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
   };
 
   const result = await supaRest('POST', 'submissions', payload);
@@ -112,51 +136,56 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       if (photo.file instanceof Blob) {
         blob = photo.file;
       } else if (photo.dataUrl) {
-        const res = await fetch(photo.dataUrl);
-        blob = await res.blob();
+        blob = await fetch(photo.dataUrl).then(r => r.blob());
       } else continue;
-      const ext = blob.type.includes('png') ? 'png' : 'jpg';
-      const path = `${submissionId}/${section}-${i}.${ext}`;
-      const { error: uploadError } = await supabase.storage
+
+      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+      const path = submissionId + '/' + section + '-' + i + '.' + ext;
+      const { error: upErr } = await supabase.storage
         .from('submission-photos')
         .upload(path, blob, { contentType: blob.type, upsert: true });
-      if (uploadError) { console.error('Upload error:', uploadError); continue; }
-      await supaRest('POST', 'photos', {
-        submission_id: submissionId,
-        section,
-        storage_path: path,
-        caption: photo.caption || '',
-        display_order: uploaded.length,
+      if (upErr) { console.warn('Upload err:', upErr); continue; }
+
+      const token = getAuthToken();
+      const headers = { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+
+      const metaRes = await fetch(SUPA_URL + '/rest/v1/photos', {
+        method: 'POST',
+        headers: { ...headers, 'Prefer': 'return=representation' },
+        body: JSON.stringify({
+          submission_id: submissionId,
+          storage_path: path,
+          caption: photo.caption || '',
+          display_order: i,
+          section,
+        }),
       });
-      uploaded.push(path);
-    } catch (err) {
-      console.error('Photo error:', err);
+      const metaText = await metaRes.text();
+      if (metaRes.ok) uploaded.push(metaText ? JSON.parse(metaText)[0] : null);
+    } catch (e) {
+      console.warn('Photo upload error:', e);
     }
   }
   return uploaded;
 }
 
-export function getPhotoUrl(storagePath) {
-  if (!supabase) return '';
-  const { data } = supabase.storage
-    .from('submission-photos')
-    .getPublicUrl(storagePath);
-  return data.publicUrl;
-}
-
 export async function fetchSubmissions(userId) {
-  const data = await supaRest('GET',
-    'submissions?select=id,pm_number,work_type,customer_name,location_name,date,status,data,created_at,submitted_at' +
-    '&created_by=eq.' + userId +
-    '&order=created_at.desc'
-  );
-  return data || [];
+  try {
+    const data = await supaRest('GET', 'submissions?select=*&order=created_at.desc&created_by=eq.' + userId);
+    return data || [];
+  } catch (e) {
+    console.error('Fetch submissions error:', e);
+    return [];
+  }
 }
 
-export async function fetchSubmission(id) {
-  const data = await supaRest('GET',
-    'submissions?select=*,photos(id,storage_path,caption,display_order,section)&id=eq.' + id
-  );
-  if (!data || data.length === 0) throw new Error('Submission not found');
-  return data[0];
-                                          }
+export async function fetchSubmissionById(id) {
+  try {
+    const data = await supaRest('GET', 'submissions?id=eq.' + id + '&select=*,photos(*)');
+    return data && data.length > 0 ? data[0] : null;
+  } catch (e) {
+    console.error('Fetch submission error:', e);
+    return null;
+  }
+}
