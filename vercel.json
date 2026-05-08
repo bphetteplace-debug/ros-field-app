@@ -1,8 +1,6 @@
 {
   "functions": {
-    "api/send-report.cjs": {
-      "runtime": "@vercel/node@3.2.7"
-    }
+    "api/send-report.cjs": {}
   },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
