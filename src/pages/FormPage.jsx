@@ -39,7 +39,7 @@ function SignaturePad({ techName, onSave }) {
   const clear = () => { const ctx = canvasRef.current.getContext('2d'); ctx.clearRect(0,0,300,80); onSave(null) }
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Sign here — {techName}</div>
+      <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Sign here â {techName}</div>
       <canvas ref={canvasRef} width={300} height={80}
         style={{ border: '1px solid #ccc', borderRadius: 6, background: '#fafafa', touchAction: 'none', display: 'block', width: '100%', maxWidth: 360 }}
         onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
@@ -238,7 +238,7 @@ export default function FormPage() {
       {/* STICKY HEADER */}
       <div style={{ background:'#1a2332', padding:'12px 16px', position:'sticky', top:0, zIndex:100, marginBottom:12 }}>
         <div style={{ color:'#e65c00', fontWeight:800, fontSize:17 }}>ReliableTrack</div>
-        <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} #{pmNumber||'...'} — {jobType}</div>
+        <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} #{pmNumber||'...'} â {jobType}</div>
       </div>
 
       {saveError && <div style={{ margin:'0 16px 10px', background:'#fee', border:'1px solid #faa', borderRadius:6, padding:'8px 12px', color:'#c00', fontSize:13 }}>{saveError}</div>}
@@ -296,7 +296,7 @@ export default function FormPage() {
           {techs.map(t => <SignaturePad key={t} techName={t} onSave={dataUrl=>setSignatures(s=>({...s,[t]:dataUrl}))} />)}
           {techs.length > 0 && (
             <div style={{ marginTop:12 }}>
-              <label style={lbl}>Billable Techs (override — leave blank to charge all {techs.length})</label>
+              <label style={lbl}>Billable Techs (override â leave blank to charge all {techs.length})</label>
               <input type="number" style={{...inp,width:80,marginTop:4}} min={0} max={10} value={billableTechs} onChange={e=>setBillableTechs(e.target.value)} placeholder={techs.length} />
             </div>
           )}
@@ -334,7 +334,7 @@ export default function FormPage() {
         </div>
       </div>
 
-      {/* ══ PM-ONLY SECTIONS ══════════════════════════════════════════════ */}
+      {/* ââ PM-ONLY SECTIONS ââââââââââââââââââââââââââââââââââââââââââââââ */}
       {jobType === 'PM' && (
         <>
           {/* FLAME ARRESTORS */}
@@ -360,10 +360,10 @@ export default function FormPage() {
                   <div style={{ marginBottom:8 }}><label style={lbl}>Notes</label>
                     <input style={inp} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder="Notes..." /></div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <PhotoPicker label="Before — Photo 1" value={a.before1} onChange={v=>updArr(i,'before1',v)} />
-                    <PhotoPicker label="Before — Photo 2" value={a.before2} onChange={v=>updArr(i,'before2',v)} />
-                    <PhotoPicker label="After — Photo 1"  value={a.after1}  onChange={v=>updArr(i,'after1',v)} />
-                    <PhotoPicker label="After — Photo 2"  value={a.after2}  onChange={v=>updArr(i,'after2',v)} />
+                    <PhotoPicker label="Before â Photo 1" value={a.before1} onChange={v=>updArr(i,'before1',v)} />
+                    <PhotoPicker label="Before â Photo 2" value={a.before2} onChange={v=>updArr(i,'before2',v)} />
+                    <PhotoPicker label="After â Photo 1"  value={a.after1}  onChange={v=>updArr(i,'after1',v)} />
+                    <PhotoPicker label="After â Photo 2"  value={a.after2}  onChange={v=>updArr(i,'after2',v)} />
                   </div>
                 </div>
               ))}
@@ -484,7 +484,7 @@ export default function FormPage() {
                 <div key={p.sku} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid #f0f0f0' }}>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:600 }}>{p.name}</div>
-                    <div style={{ fontSize:11, color:'#888' }}>{p.sku}</div>
+                    <div style={{ fontSize:11, color:'#888' }}>{p.sku} · ${(p.price||0).toFixed(2)}/ea</div>
                   </div>
                   <button type="button" onClick={()=>qtyChange(p.sku,-1)} style={{ width:30,height:30,borderRadius:'50%',border:'1px solid #ddd',background:'#f5f5f5',cursor:'pointer',fontSize:16,fontWeight:700 }}>-</button>
                   <span style={{ width:24,textAlign:'center',fontWeight:700 }}>{p.qty}</span>
