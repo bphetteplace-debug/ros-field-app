@@ -1,8 +1,10 @@
 {
-  "functions": {
-    "api/send-report.cjs": {}
-  },
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
+    "functions": {
+          "api/send-report.cjs": {
+                  "maxDuration": 30
+          }
+    },
+    "rewrites": [
+          { "source": "/((?!api/).*)", "destination": "/index.html" }
+    ]
 }
