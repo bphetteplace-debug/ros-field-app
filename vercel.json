@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/send-report.cjs": {
+      "runtime": "@vercel/node@3.2.7"
+    }
+  },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
