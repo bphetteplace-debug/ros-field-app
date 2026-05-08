@@ -1,6 +1,6 @@
-import { supabase } from './supabase.js';
+// No supabase-js client import needed — we use direct REST/Storage API for everything
+// This avoids the silent Promise hang bug in supabase-js
 
-// Get Supabase URL and key from the environment (injected by Vite)
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -15,22 +15,26 @@ function getAuthToken() {
   }
 }
 
-// Direct REST API helper (bypasses supabase-js client to avoid Promise hang)
-// 30-second timeout via AbortController to prevent save from stalling
-async function supaRest(method, path, body) {
+// Build auth headers for Supabase REST API
+function authHeaders(extra = {}) {
   const token = getAuthToken();
-  const headers = {
+  const h = {
     'apikey': SUPA_KEY,
     'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
+    ...extra,
   };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  return h;
+}
+
+// Direct REST API helper with 30s timeout
+async function supaRest(method, path, body) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
       method,
-      headers,
+      headers: { ...authHeaders(), 'Prefer': 'return=representation' },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
@@ -40,7 +44,39 @@ async function supaRest(method, path, body) {
     return text ? JSON.parse(text) : null;
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('Save timed out after 30s - check connection');
+    if (err.name === 'AbortError') throw new Error('Request timed out after 30s');
+    throw err;
+  }
+}
+
+// Direct Storage upload helper with 30s timeout (replaces supabase.storage.upload which hangs)
+async function storageUpload(path, blob) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch(
+      SUPA_URL + '/storage/v1/object/submission-photos/' + path,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': 'Bearer ' + (getAuthToken() || SUPA_KEY),
+          'Content-Type': blob.type || 'image/jpeg',
+          'x-upsert': 'true',
+        },
+        body: blob,
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error('Storage upload failed: ' + res.status + ' ' + t.substring(0, 200));
+    }
+    return path;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error('Photo upload timed out after 30s');
     throw err;
   }
 }
@@ -72,7 +108,6 @@ export async function saveSubmission(formData, userId) {
   const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
   const laborTotal = warrantyWork ? 0 : parseFloat(laborHours || 0) * parseFloat(hourlyRate || 115.00) * effectiveBillable;
 
-  // Only include columns that actually exist in the submissions table
   const payload = {
     created_by: userId,
     pm_number: pmNumber,
@@ -93,31 +128,14 @@ export async function saveSubmission(formData, userId) {
     summary: description,
     miles: parseFloat(miles || 0),
     labor_hours: parseFloat(laborHours || 0),
-    // All other data goes in the JSONB data column
     data: {
-      jobType,
-      warrantyWork,
-      techs,
-      equipment,
-      parts,
-      miles,
-      costPerMile,
-      laborHours,
-      hourlyRate,
+      jobType, warrantyWork, techs, equipment, parts,
+      miles, costPerMile, laborHours, hourlyRate,
       billableTechs: effectiveBillable,
-      description,
-      glCode,
-      assetTag,
-      workArea,
-      lastServiceDate,
-      startTime,
-      departureTime,
-      typeOfWork,
-      customerWorkOrder,
-      customerContact,
-      partsTotal,
-      mileageTotal,
-      laborTotal,
+      description, glCode, assetTag, workArea, lastServiceDate,
+      startTime, departureTime, typeOfWork,
+      customerWorkOrder, customerContact,
+      partsTotal, mileageTotal, laborTotal,
       grandTotal: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
       arrestors: jobType === 'PM' ? (arrestors || []) : [],
       flares: jobType === 'PM' ? (flares || []) : [],
@@ -131,7 +149,6 @@ export async function saveSubmission(formData, userId) {
 }
 
 export async function uploadPhotos(submissionId, photos, section = 'work') {
-  if (!supabase) return [];
   const uploaded = [];
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
@@ -146,17 +163,14 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
 
       const ext = blob.type === 'image/png' ? 'png' : 'jpg';
       const path = submissionId + '/' + section + '-' + i + '.' + ext;
-      const { error: upErr } = await supabase.storage
-        .from('submission-photos')
-        .upload(path, blob, { contentType: blob.type, upsert: true });
-      if (upErr) { console.warn('Upload err:', upErr); continue; }
 
-      const token = getAuthToken();
-      const headers = { 'apikey': SUPA_KEY, 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = 'Bearer ' + token;
+      // Use direct Storage REST API (NOT supabase-js which hangs silently)
+      await storageUpload(path, blob);
+
+      // Insert photo metadata via REST
       const metaRes = await fetch(SUPA_URL + '/rest/v1/photos', {
         method: 'POST',
-        headers: { ...headers, 'Prefer': 'return=representation' },
+        headers: { ...authHeaders(), 'Prefer': 'return=representation' },
         body: JSON.stringify({
           submission_id: submissionId,
           storage_path: path,
@@ -168,7 +182,8 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       const metaText = await metaRes.text();
       if (metaRes.ok) uploaded.push(metaText ? JSON.parse(metaText)[0] : null);
     } catch (e) {
-      console.warn('Photo upload error:', e);
+      console.warn('Photo upload error:', e.message);
+      // Don't throw — skip bad photos, keep going
     }
   }
   return uploaded;
@@ -194,7 +209,7 @@ export async function fetchSubmissionById(id) {
   }
 }
 
-// Alias for backward compatibility with ViewSubmissionPage
+// Alias for backward compatibility
 export async function fetchSubmission(id) {
   return fetchSubmissionById(id);
 }
