@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Flame, LogOut } from 'lucide-react';
+import { Flame, LogOut, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../lib/auth.jsx';
 
 export default function Layout({ children }) {
-  const { profile, signOut, isCloudMode } = useAuth();
+  const { profile, signOut, isCloudMode, isAdmin } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -22,15 +23,31 @@ export default function Layout({ children }) {
             </div>
           </Link>
 
-          {isCloudMode && (
-            <button
-              onClick={signOut}
-              className="p-2 text-slate-400 hover:text-white transition"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold transition ${
+                  location.pathname === '/admin'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+                }`}
+                title="Admin View"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Admin
+              </Link>
+            )}
+            {isCloudMode && (
+              <button
+                onClick={signOut}
+                className="p-2 text-slate-400 hover:text-white transition"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </header>
       {children}
