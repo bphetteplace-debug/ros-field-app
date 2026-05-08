@@ -103,6 +103,7 @@ export default function FormPage() {
   const [customerSig, setCustomerSig] = useState(null)
   const [equipment, setEquipment] = useState('')
   const [parts, setParts] = useState([])
+  const [partPhotos, setPartPhotos] = useState({})
   const [miles, setMiles] = useState('')
   const [costPerMile, setCostPerMile] = useState('1.50')
   const [laborHours, setLaborHours] = useState('')
@@ -150,7 +151,9 @@ export default function FormPage() {
     setShowCatalog(false)
   }
   const qtyChange = (sku, d) => setParts(ps => ps.map(x=>x.sku===sku?{...x,qty:Math.max(0,x.qty+d)}:x).filter(x=>x.qty>0))
-  const removePart = (sku) => setParts(ps => ps.filter(x=>x.sku!==sku))
+  const removePart = (sku) => { setParts(ps => ps.filter(x=>x.sku!==sku)); setPartPhotos(pp => { const n={...pp}; delete n[sku]; return n; }) }
+  const addPartPhoto = (sku, files) => { const arr = Array.from(files); setPartPhotos(pp => ({ ...pp, [sku]: [...(pp[sku]||[]), ...arr].slice(0,3) })) }
+  const removePartPhoto = (sku, idx) => setPartPhotos(pp => ({ ...pp, [sku]: (pp[sku]||[]).filter((_,i)=>i!==idx) }))
   const addPhoto = (files) => { const arr = Array.from(files); setPhotos(ps => [...ps,...arr].slice(0,20)) }
 
   const handleSubmit = async () => {
@@ -173,6 +176,14 @@ export default function FormPage() {
       if (photos.length > 0) {
         const photoObjs = photos.map((f,i) => ({ dataUrl: null, file: f, caption: photoCaptions[i]||'' }))
         await uploadPhotos(submission.id, photoObjs, 'work')
+      }
+
+      // Upload part photos
+      for (const p of parts) {
+        const pf = (partPhotos[p.sku]||[]);
+        if (pf.length > 0) {
+          await uploadPhotos(submission.id, pf.map((f,i)=>({ file:f, caption:'Part '+p.name+' Photo '+(i+1) })), 'part-'+p.sku);
+        }
       }
 
       // Upload tech signatures
@@ -501,15 +512,36 @@ export default function FormPage() {
           {parts.length > 0 && (
             <div style={{ marginBottom:10 }}>
               {parts.map(p => (
-                <div key={p.sku} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid #f0f0f0' }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:600 }}>{p.name}</div>
-                    <div style={{ fontSize:11, color:'#888' }}>{p.sku} - ${(p.price||0).toFixed(2)}/ea</div>
+                <div key={p.sku} style={{ padding:'6px 0', borderBottom:'1px solid #f0f0f0' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:600 }}>{p.name}</div>
+                      <div style={{ fontSize:11, color:'#888' }}>{p.sku} - ${(p.price||0).toFixed(2)}/ea</div>
+                    </div>
+                    <button type="button" onClick={()=>qtyChange(p.sku,-1)} style={{ width:30,height:30,borderRadius:'50%',border:'1px solid #ddd',background:'#f5f5f5',cursor:'pointer',fontSize:16,color:'#333' }}>-</button>
+                    <span style={{ width:24,textAlign:'center',fontWeight:700 }}>{p.qty}</span>
+                    <button type="button" onClick={()=>qtyChange(p.sku,1)} style={{ width:30,height:30,borderRadius:'50%',border:'1px solid #ddd',background:'#f5f5f5',cursor:'pointer',fontSize:16,color:'#333' }}>+</button>
+                    <button type="button" onClick={()=>removePart(p.sku)} style={{ color:'#c00',background:'none',border:'none',cursor:'pointer',fontSize:18,padding:'0 4px' }}>x</button>
                   </div>
-                  <button type="button" onClick={()=>qtyChange(p.sku,-1)} style={{ width:30,height:30,borderRadius:'50%',border:'1px solid #ddd',background:'#f5f5f5',cursor:'pointer',fontSize:16,color:'#333' }}>-</button>
-                  <span style={{ width:24,textAlign:'center',fontWeight:700 }}>{p.qty}</span>
-                  <button type="button" onClick={()=>qtyChange(p.sku,1)} style={{ width:30,height:30,borderRadius:'50%',border:'1px solid #ddd',background:'#f5f5f5',cursor:'pointer',fontSize:16,color:'#333' }}>+</button>
-                  <button type="button" onClick={()=>removePart(p.sku)} style={{ color:'#c00',background:'none',border:'none',cursor:'pointer',fontSize:18,padding:'0 4px',color:'#c00' }}>x</button>
+                  {/* Part photos */}
+                  <div style={{ marginTop:6 }}>
+                    {(partPhotos[p.sku]||[]).length > 0 && (
+                      <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
+                        {(partPhotos[p.sku]||[]).map((ph,pi) => (
+                          <div key={pi} style={{ position:'relative', width:60 }}>
+                            <img src={URL.createObjectURL(ph)} alt="" style={{ width:60, height:60, objectFit:'cover', borderRadius:4, display:'block' }} />
+                            <button type="button" onClick={()=>removePartPhoto(p.sku,pi)} style={{ position:'absolute',top:1,right:1,background:'rgba(0,0,0,0.6)',color:'#fff',border:'none',borderRadius:'50%',width:16,height:16,fontSize:10,cursor:'pointer',padding:0,lineHeight:'16px',textAlign:'center' }}>x</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(partPhotos[p.sku]||[]).length < 3 && (
+                      <label style={{ display:'inline-flex',alignItems:'center',gap:4,fontSize:11,color:'#e65c00',cursor:'pointer',padding:'3px 8px',border:'1px solid #e65c00',borderRadius:4 }}>
+                        + Photo
+                        <input type="file" accept="image/*" capture="environment" multiple style={{ display:'none' }} onChange={e=>addPartPhoto(p.sku,e.target.files)} />
+                      </label>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
