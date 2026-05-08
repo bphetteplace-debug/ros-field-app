@@ -4,7 +4,10 @@
 const SUPA_URL   = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://idddbbvotykfairirmwn.supabase.co'
 const SUPA_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 const RESEND_KEY = process.env.RESEND_API_KEY
-const TO = ['bphetteplace@reliableoilfieldservices.net','cphetteplace@reliableoilfieldservices.net']
+// When domain is verified, restore both: bphetteplace + cphetteplace
+const TO = process.env.EMAIL_TO
+  ? process.env.EMAIL_TO.split(',')
+  : ['bphetteplace@reliableoilfieldservices.net']
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
