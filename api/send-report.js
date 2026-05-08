@@ -1,4 +1,114 @@
 // api/send-report.js - Vercel Serverless Function (ESM)
+// Sends a plain-text email notification via Resend (no PDF attachment yet)
+
+const SUPA_URL   = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://idddbbvotykfairirmwn.supabase.co'
+const SUPA_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+const RESEND_KEY = process.env.RESEND_API_KEY
+const TO = ['bphetteplace@reliableoilfieldservices.net','cphetteplace@reliableoilfieldservices.net']
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  const { submissionId } = req.body || {}
+  if (!submissionId) return res.status(400).json({ error: 'submissionId required' })
+  if (!RESEND_KEY) return res.status(500).json({ error: 'Missing RESEND_API_KEY' })
+  if (!SUPA_KEY)   return res.status(500).json({ error: 'Missing Supabase key' })
+
+  try {
+    // Fetch submission from Supabase
+    const r = await fetch(
+      SUPA_URL + '/rest/v1/submissions?id=eq.' + submissionId + '&select=*',
+      { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } }
+    )
+    if (!r.ok) {
+      const t = await r.text()
+      return res.status(500).json({ error: 'Supabase error: ' + r.status, detail: t.substring(0,200) })
+    }
+    const rows = await r.json()
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ error: 'Submission not found', submissionId })
+    }
+    const s = rows[0]
+    const d = s.data || {}
+
+    const jobType   = d.jobType || d.job_type || 'SC'
+    const pmNum     = s.pm_number || '????'
+    const customer  = s.customer_name || d.customerName || 'Unknown'
+    const location  = s.location_name || d.locationName || ''
+    const dateStr   = s.date || d.date || new Date().toISOString().slice(0,10)
+    const techs     = Array.isArray(d.techs) ? d.techs.join(', ') : 'N/A'
+    const parts     = Array.isArray(d.parts) ? d.parts : []
+    const isWarranty = d.warrantyWork || false
+    const partsTotal = parts.reduce((sum, p) => sum + (parseFloat(p.price)||0) * (parseInt(p.qty)||0), 0)
+    const laborHours = parseFloat(d.laborHours || 0)
+    const hourlyRate = parseFloat(d.hourlyRate || 115)
+    const billable   = parseInt(d.billableTechs || 0) || (Array.isArray(d.techs) ? d.techs.length : 0)
+    const miles      = parseFloat(d.miles || 0)
+    const costPerMile = parseFloat(d.costPerMile || 1.50)
+    const laborTotal = isWarranty ? 0 : laborHours * hourlyRate * billable
+    const mileTotal  = miles * costPerMile
+    const grandTotal = isWarranty ? 0 : partsTotal + laborTotal + mileTotal
+    const jobLabel   = jobType === 'PM' ? 'PM #' + pmNum : 'SC #' + pmNum
+
+    const partsHtml = parts.length > 0
+      ? '<table border="1" cellpadding="4" style="border-collapse:collapse;font-size:12px"><tr><th>SKU</th><th>Part</th><th>Qty</th><th>Unit</th><th>Total</th></tr>' +
+        parts.map(p => '<tr><td>' + (p.sku||p.code||'') + '</td><td>' + (p.name||'') + '</td><td>' + (p.qty||1) + '</td><td>$' + Number(p.price||0).toFixed(2) + '</td><td>$' + (Number(p.qty||1)*Number(p.price||0)).toFixed(2) + '</td></tr>').join('') +
+        '</table>'
+      : '<p>No parts used</p>'
+
+    const html = `<html><body style="font-family:Arial,sans-serif;max-width:600px">
+<div style="background:#1a2332;color:#fff;padding:16px;border-radius:4px 4px 0 0">
+  <h2 style="margin:0;color:#e65c00">RELIABLE OILFIELD SERVICES</h2>
+  <p style="margin:4px 0 0;font-size:13px">ReliableTrack Field Report — ${jobLabel}</p>
+</div>
+<div style="background:#f9f9f9;padding:16px;border:1px solid #ddd">
+  <h3 style="margin:0 0 12px;color:#1a2332">JOB INFORMATION</h3>
+  <table style="font-size:13px;border-collapse:collapse;width:100%">
+    <tr><td style="padding:4px;font-weight:bold;width:130px">Customer</td><td>${customer}</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Location</td><td>${location}</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Date</td><td>${dateStr}</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Job Type</td><td>${jobType === 'PM' ? 'Preventive Maintenance' : 'Service Call'}${d.typeOfWork ? ' - ' + d.typeOfWork : ''}</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Truck #</td><td>${d.truckNumber || s.truck_number || 'N/A'}</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Technicians</td><td>${techs}</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Labor Hours</td><td>${laborHours} hrs</td></tr>
+    <tr><td style="padding:4px;font-weight:bold">Mileage</td><td>${miles} mi</td></tr>
+    ${d.description ? '<tr><td style="padding:4px;font-weight:bold;vertical-align:top">Description</td><td>' + d.description + '</td></tr>' : ''}
+  </table>
+  
+  <h3 style="margin:16px 0 8px;color:#1a2332">PARTS USED</h3>
+  ${partsHtml}
+
+  <h3 style="margin:16px 0 8px;color:#1a2332">TOTALS</h3>
+  ${isWarranty 
+    ? '<p style="color:red;font-weight:bold;font-size:16px">WARRANTY - NO CHARGE</p>'
+    : '<table style="font-size:13px"><tr><td style="padding:4px;width:130px">Labor</td><td>$' + laborTotal.toFixed(2) + '</td></tr><tr><td style="padding:4px">Parts</td><td>$' + partsTotal.toFixed(2) + '</td></tr><tr><td style="padding:4px">Mileage</td><td>$' + mileTotal.toFixed(2) + '</td></tr><tr style="font-weight:bold;font-size:15px"><td style="padding:4px">TOTAL</td><td style="color:#e65c00">$' + grandTotal.toFixed(2) + '</td></tr></table>'}
+</div>
+<p style="font-size:10px;color:#888;margin:8px 0">Sent by ReliableTrack | ${new Date().toISOString()}</p>
+</body></html>`
+
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + RESEND_KEY },
+      body: JSON.stringify({
+        from: 'ReliableTrack <noreply@reliable-oilfield-services.com>',
+        to: TO,
+        subject: jobLabel + ' - ' + customer + ' - ' + location + ' (' + dateStr + ')',
+        html
+      })
+    })
+
+    if (!emailRes.ok) {
+      const errText = await emailRes.text()
+      return res.status(500).json({ error: 'Resend failed: ' + errText.substring(0,300) })
+    }
+    const emailData = await emailRes.json()
+    return res.status(200).json({ ok: true, emailId: emailData.id, note: 'PDF attachment coming soon' })
+
+  } catch (err) {
+    console.error('send-report error:', err.message, err.stack)
+    return res.status(500).json({ error: err.message })
+  }
+}
+// api/send-report.js - Vercel Serverless Function (ESM)
 // Generates a PDF report and emails it via Resend
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
