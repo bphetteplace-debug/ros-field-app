@@ -221,7 +221,7 @@ module.exports = async function handler(req, res) {
         'Authorization': `Bearer ${RESEND_KEY}`
       },
       body: JSON.stringify({
-        from: 'ReliableTrack <noreply@reliable-oilfield-services.com>',
+        from: process.env.RESEND_FROM || 'ReliableTrack <onboarding@resend.dev>',
         to: TO,
         subject,
         html
