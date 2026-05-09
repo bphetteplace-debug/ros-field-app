@@ -63,23 +63,26 @@ export default function ExpenseReportPage() {
     setSaving(true); setSaveError(null)
     try {
       const formData = {
-        pmNumber: null, jobType: 'Expense Report', warrantyWork: false,
-        customerName: 'Internal', truckNumber, locationName: techName,
-        customerContact: '', customerWorkOrder: '', typeOfWork: 'Expense Report',
-        glCode: '', assetTag: '', workArea: '', date, startTime: '', departureTime: '',
-        lastServiceDate: '', description: notes, techs: [techName],
-        equipment: '', parts: [], miles: 0, costPerMile: 0, laborHours: 0, hourlyRate: 0,
-        billableTechs: 1, arrestors: [], flares: [], heaters: [], scEquipment: [],
-        expenseItems: expenses.map(e => ({
-          category: e.category,
-          description: e.description,
-          amount: parseFloat(e.amount) || 0,
-          hasReceipt: !!e.receipt,
-          hasItemPhoto: !!e.itemPhoto,
-        })),
-        expenseTotal: grandTotal,
-      }
-      const submission = await saveSubmission(formData, user.id, 'expense_report')
+        // Standard fields that saveSubmission expects
+        truckNumber,
+        customerName: '',
+        locationName: '',
+        date,
+        techs: techName ? [techName] : [],
+        description: notes,
+        // Cost fields (zero for expense reports)
+        miles: 0,
+        costPerMile: 0,
+        laborHours: 0,
+        hourlyRate: 0,
+        parts: [],
+        billableTechs: 0,
+        warrantyWork: false,
+        // Expense-specific fields (go into data JSONB)
+        jobType: 'Expense Report',
+        expenseItems: expenses.map(function(e){return {category:e.category,description:e.description,amount:parseFloat(e.amount||0)}}),
+        expenseTotal: expenses.reduce(function(s,e){return s+parseFloat(e.amount||0)},0),
+      }      const submission = await saveSubmission(formData, user.id, 'expense_report')
 
       // Upload receipt and item photos for each expense
       for (let i = 0; i < expenses.length; i++) {
