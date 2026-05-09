@@ -259,3 +259,59 @@ export async function updateSubmissionStatus(id, status) {
     { status, updated_at: new Date().toISOString() }
   )
 }
+
+
+// ── DELETE SUBMISSION ──────────────────────────────────────────────────────────
+export async function deleteSubmission(id) {
+  // Also delete associated photos rows (storage objects remain but metadata is cleaned)
+  try { await supaRest('DELETE', 'photos?submission_id=eq.' + id) } catch(e) {}
+  return supaRest('DELETE', 'submissions?id=eq.' + id)
+}
+
+// ── UPDATE (EDIT) SUBMISSION ───────────────────────────────────────────────────
+// Patches top-level columns + replaces the data JSONB blob
+export async function updateSubmission(id, formData) {
+  const {
+    jobType, warrantyWork, customerName, truckNumber, locationName,
+    customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
+    date, startTime, departureTime, lastServiceDate, description, techs, equipment,
+    parts, miles, costPerMile, laborHours, hourlyRate, billableTechs,
+    arrestors, flares, heaters, scEquipment,
+  } = formData
+  const partsTotal = (parts||[]).reduce((s,p)=>s+(p.price||0)*(p.qty||0),0)
+  const mileageTotal = parseFloat(miles||0)*parseFloat(costPerMile||1.50)
+  const effBill = parseInt(billableTechs)||(techs||[]).length
+  const laborTotal = warrantyWork ? 0 : parseFloat(laborHours||0)*parseFloat(hourlyRate||115)*effBill
+  const grandTotal = warrantyWork ? 0 : partsTotal+mileageTotal+laborTotal
+  return supaRest('PATCH', 'submissions?id=eq.' + id, {
+    customer_name: customerName,
+    truck_number: truckNumber,
+    location_name: locationName,
+    contact: customerContact,
+    work_order: customerWorkOrder,
+    work_type: typeOfWork,
+    gl_code: glCode,
+    asset_tag: assetTag,
+    work_area: workArea,
+    date,
+    start_time: startTime,
+    departure_time: departureTime,
+    summary: description,
+    miles: parseFloat(miles||0),
+    cost_per_mile: parseFloat(costPerMile||1.50),
+    labor_hours: parseFloat(laborHours||0),
+    labor_rate: parseFloat(hourlyRate||115),
+    updated_at: new Date().toISOString(),
+    data: {
+      jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
+      laborHours, hourlyRate, billableTechs: effBill, description, glCode,
+      assetTag, workArea, startTime, departureTime, typeOfWork, lastServiceDate,
+      customerWorkOrder, customerContact,
+      partsTotal, mileageTotal, laborTotal, grandTotal,
+      arrestors: jobType==='PM' ? (arrestors||[]) : [],
+      flares: jobType==='PM' ? (flares||[]) : [],
+      heaters: jobType==='PM' ? (heaters||[]) : [],
+      scEquipment: jobType==='Service Call' ? (scEquipment||[]) : [],
+    },
+  })
+}
