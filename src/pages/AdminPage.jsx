@@ -8,11 +8,13 @@ function getTypeLabel(s) {
   if (s.template === 'service_call') return 'SC'
   if (s.template === 'expense_report') return 'EXP'
   if (s.template === 'daily_inspection') return 'INSP'
+  if (s.template === 'jha') return 'JHA'
   const jt = s.data?.jobType || ''
   if (jt === 'PM') return 'PM'
   if (jt === 'Service Call') return 'SC'
   if (jt === 'Expense Report') return 'EXP'
   if (jt === 'Daily Inspection') return 'INSP'
+  if (jt === 'JHA/JSA') return 'JHA'
   return s.template || '?'
 }
 function getTypeColor(s) {
@@ -21,6 +23,7 @@ function getTypeColor(s) {
   if (lbl === 'SC') return '#2563eb'
   if (lbl === 'EXP') return '#7c3aed'
   if (lbl === 'INSP') return '#0891b2'
+  if (lbl === 'JHA') return '#059669'
   return '#888'
 }
 
@@ -278,6 +281,7 @@ export default function AdminPage() {
                   <option value="SC">SC Only</option>
                   <option value="EXP">Expenses</option>
                   <option value="INSP">Inspections</option>
+                <option value="JHA">JHA / JSA</option>
                 </select>
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
                   <option value="ALL">All Status</option>
