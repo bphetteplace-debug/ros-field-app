@@ -14,3 +14,21 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>
 );
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(reg => {
+        console.log('[SW] Registered, scope:', reg.scope);
+        // Listen for sync messages from the SW
+        navigator.serviceWorker.addEventListener('message', event => {
+          if (event.data && event.data.type === 'SYNC_QUEUE') {
+            // Dispatch a custom event so FormPage / SubmissionsListPage can handle it
+            window.dispatchEvent(new CustomEvent('ros-sync-queue'));
+          }
+        });
+      })
+      .catch(err => console.warn('[SW] Registration failed:', err));
+  });
+}
