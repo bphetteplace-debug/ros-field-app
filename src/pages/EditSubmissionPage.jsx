@@ -426,7 +426,7 @@ export default function EditSubmissionPage() {
                   <button key={p.code || p.sku} type="button" onClick={() => addPart(p)}
                     style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', borderBottom: '1px solid #f0f0f0', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.desc || p.name}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>{p.code || p.sku}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>{p.code || p.sku}{p.price ? ' — $' + Number(p.price).toFixed(2) : ''}</div>
                   </button>
                 ))}
               </div>
