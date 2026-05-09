@@ -184,6 +184,21 @@ export default function FormPage() {
   }, [DRAFT_KEY])
 
 
+  // Apply copy-prefill from sessionStorage (set by ViewSubmissionPage "Copy" button)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('ros_copy_prefill')
+      if (!raw) return
+      sessionStorage.removeItem('ros_copy_prefill')
+      const prefill = JSON.parse(raw)
+      loadDraft(prefill)
+    } catch(e) {
+      console.warn('Copy prefill failed:', e)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+
   const toggleTech = (t) => setTechs(ts => ts.includes(t) ? ts.filter(x=>x!==t) : [...ts,t])
   const addPart = (p) => {
     const sku = p.code||p.sku
