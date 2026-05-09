@@ -82,8 +82,9 @@ export default function SubmissionsListPage() {
 
   const handleLogout = async () => {
     setLoggingOut(true)
+    // Clear Supabase session (may fail silently on mobile — that's OK)
     try { await signOut() } catch(e) {}
-    // Belt-and-suspenders: clear any remaining sb- tokens in localStorage
+    // Hard-clear all sb- auth tokens from localStorage
     try {
       Object.keys(localStorage).forEach(function(k) {
         if (k.startsWith('sb-') && (k.endsWith('-auth-token') || k.includes('-auth-'))) {
@@ -91,7 +92,8 @@ export default function SubmissionsListPage() {
         }
       })
     } catch(e) {}
-    navigate('/login')
+    // Hard redirect — forces full page reload, bypasses React Router on mobile
+    window.location.replace('/login')
   }
 
   const filtered = submissions.filter(s => {
@@ -111,30 +113,19 @@ export default function SubmissionsListPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  // Nav button style — comfortable tap targets for mobile (min 36px tall)
-  const navBtnBase = {
-    padding: '7px 12px',
+  // Shared button style for nav — solid tap targets
+  const btnStyle = {
+    padding: '8px 14px',
     borderRadius: 6,
     textDecoration: 'none',
     fontSize: 13,
     fontWeight: 700,
     lineHeight: '1',
-    minHeight: 34,
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     whiteSpace: 'nowrap',
-  }
-
-  const navBar = {
-    background: '#1a2332',
-    padding: '0 12px',
-    height: 52,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100
+    minHeight: 36,
   }
 
   return (
@@ -157,22 +148,26 @@ export default function SubmissionsListPage() {
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
 
-      {/* NAV */}
-      <div style={navBar}>
-        <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16, flexShrink: 0, marginRight: 8 }}>📋 ReliableTrack</span>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <Link to="/form?type=pm"  style={{ ...navBtnBase, background: '#e65c00', color: '#fff' }}>+ PM</Link>
-          <Link to="/form?type=sc"  style={{ ...navBtnBase, background: '#2563eb', color: '#fff' }}>+ SC</Link>
-          <Link to="/expense"       style={{ ...navBtnBase, background: '#7c3aed', color: '#fff' }}>+ Expense</Link>
-          <Link to="/inspection"    style={{ ...navBtnBase, background: '#0891b2', color: '#fff' }}>+ Inspect</Link>
-          <Link to="/jha"           style={{ ...navBtnBase, background: '#059669', color: '#fff' }}>+ JHA</Link>
+      {/* NAV — two rows so buttons never overflow on small screens */}
+      <div style={{ background: '#1a2332', position: 'sticky', top: 0, zIndex: 100, padding: '8px 12px 10px' }}>
+        {/* Row 1: logo + logout */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ color: '#e65c00', fontWeight: 800, fontSize: 16 }}>📋 ReliableTrack</span>
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            style={{ ...navBtnBase, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', cursor: loggingOut ? 'not-allowed' : 'pointer', opacity: loggingOut ? 0.7 : 1 }}
+            style={{ ...btnStyle, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', cursor: loggingOut ? 'not-allowed' : 'pointer', opacity: loggingOut ? 0.6 : 1, padding: '6px 12px', fontSize: 12 }}
           >
-            {loggingOut ? '...' : '🚪 Logout'}
+            {loggingOut ? 'Logging out...' : '🚪 Logout'}
           </button>
+        </div>
+        {/* Row 2: new form buttons — flex-wrap as last resort but should fit on any phone */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <Link to="/form?type=pm"  style={{ ...btnStyle, background: '#e65c00', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ PM</Link>
+          <Link to="/form?type=sc"  style={{ ...btnStyle, background: '#2563eb', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ SC</Link>
+          <Link to="/expense"       style={{ ...btnStyle, background: '#7c3aed', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Expense</Link>
+          <Link to="/inspection"    style={{ ...btnStyle, background: '#0891b2', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Inspect</Link>
+          <Link to="/jha"           style={{ ...btnStyle, background: '#059669', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ JHA</Link>
         </div>
       </div>
 
@@ -276,10 +271,8 @@ export default function SubmissionsListPage() {
         {/* PAGINATION */}
         {totalPages > 1 && (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-            <button onClick={() => setPage(1)} disabled={page === 1}
-              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>«</button>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>‹ Prev</button>
+            <button onClick={() => setPage(1)} disabled={page === 1} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>‹ Prev</button>
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               let p
               if (totalPages <= 7) p = i + 1
@@ -287,14 +280,11 @@ export default function SubmissionsListPage() {
               else if (page >= totalPages - 3) p = totalPages - 6 + i
               else p = page - 3 + i
               return (
-                <button key={p} onClick={() => setPage(p)}
-                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid ' + (p === page ? '#e65c00' : '#ddd'), background: p === page ? '#e65c00' : '#fff', color: p === page ? '#fff' : '#333', cursor: 'pointer', fontWeight: p === page ? 700 : 400, fontSize: 13 }}>{p}</button>
+                <button key={p} onClick={() => setPage(p)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid ' + (p === page ? '#e65c00' : '#ddd'), background: p === page ? '#e65c00' : '#fff', color: p === page ? '#fff' : '#333', cursor: 'pointer', fontWeight: p === page ? 700 : 400, fontSize: 13 }}>{p}</button>
               )
             })}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>Next ›</button>
-            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
-              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>»</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>Next ›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>»</button>
           </div>
         )}
       </div>
