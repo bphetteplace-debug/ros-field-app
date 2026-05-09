@@ -16,7 +16,7 @@ export default function ViewSubmissionPage() {
   
   const [deleting, setDeleting] = useState(false)
   const [deleteMsg, setDeleteMsg] = useState('')
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
 
   const handleResend = async () => {
     if (!sub) return
@@ -162,6 +162,12 @@ export default function ViewSubmissionPage() {
           </button>
 
           {/* Resend — admin only */}
+          {/* Edit button — visible to submission owner OR admin */}
+          {(isAdmin || (sub && user && sub.created_by === user.id)) && (
+            <button onClick={() => navigate('/edit/' + sub.id)} style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              ✏️ Edit Submission
+            </button>
+          )}
           {isAdmin && (
             <>
               <button
@@ -177,11 +183,6 @@ export default function ViewSubmissionPage() {
                 </span>
               )}
             
-              {/* Edit button */}
-              <button onClick={() => navigate('/edit/' + sub.id)}
-                style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                ✏️ Edit Submission
-              </button>
               {/* Delete button */}
               <button onClick={handleDelete} disabled={deleting}
                 style={{ background: deleting ? '#fef2f2' : '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: deleting ? 'not-allowed' : 'pointer' }}>
