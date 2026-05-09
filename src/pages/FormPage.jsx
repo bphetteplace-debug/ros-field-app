@@ -163,14 +163,6 @@ export default function FormPage() {
     } catch(e) {}
   }, [DRAFT_KEY])
 
-  // Auto-save draft on field changes (debounced 2s)
-  useEffect(() => {
-    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
-    draftTimerRef.current = setTimeout(saveDraft, 2000)
-    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  }, [warrantyWork, customerName, truckNumber, locationName, customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea, date, startTime, departureTime, lastServiceDate, description, techs, equipment, miles, costPerMile, laborHours, hourlyRate, billableTechs, parts, arrestors, flares, heaters, saveDraft])
-
-
 
   const toggleTech = (t) => setTechs(ts => ts.includes(t) ? ts.filter(x=>x!==t) : [...ts,t])
   const addPart = (p) => {
@@ -204,6 +196,13 @@ export default function FormPage() {
       setTimeout(() => setDraftSaved(false), 2000)
     } catch(e) { console.warn('Draft save failed:', e) }
   }, [DRAFT_KEY, getDraftData])
+
+  // Auto-save draft on field changes (debounced 2s)
+  useEffect(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(saveDraft, 2000)
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  }, [warrantyWork, customerName, truckNumber, locationName, customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea, date, startTime, departureTime, lastServiceDate, description, techs, equipment, miles, costPerMile, laborHours, hourlyRate, billableTechs, parts, arrestors, flares, heaters, saveDraft])
 
   const loadDraft = useCallback((d) => {
     if (d.warrantyWork !== undefined) setWarrantyWork(d.warrantyWork)
