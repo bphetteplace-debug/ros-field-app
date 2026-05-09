@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchSubmission, getPhotoUrl } from '../lib/submissions'
+import { useAuth } from '../lib/auth'
 
 const COND_COLOR = { Good: '#16a34a', Fair: '#d97706', Poor: '#dc2626', Replaced: '#7c3aed' }
 
@@ -10,6 +11,27 @@ export default function ViewSubmissionPage() {
   const [sub, setSub]         = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
+  const { isAdmin } = useAuth()
+
+  const handleResend = async () => {
+    if (!sub) return
+    setResending(true)
+    setResendMsg('')
+    try {
+      const res = await fetch('/api/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId: sub.id }),
+      })
+      const data = await res.json()
+      if (res.ok) { setResendMsg('Report sent!') }
+      else { setResendMsg('Error: ' + (data.error || res.status)) }
+    } catch (e) { setResendMsg('Error: ' + e.message) }
+    setResending(false)
+    setTimeout(() => setResendMsg(''), 4000)
+  }
 
   useEffect(() => {
     fetchSubmission(id)
@@ -75,6 +97,16 @@ export default function ViewSubmissionPage() {
         <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{sub.customer_name} — {sub.location_name}</div>
         <div style={{ color: '#aaa', fontSize: 13 }}>{fmtDate(sub.date)}</div>
         {sub.submitted_at && <div style={{ color: '#aaa', fontSize: 12 }}>Submitted {new Date(sub.submitted_at).toLocaleString()}</div>}
+        {isAdmin && (
+          <div style={{ marginTop: 12 }}>
+            <button onClick={handleResend} disabled={resending}
+              style={{ background: resending ? '#aaa' : '#e65c00', color: '#fff', border: 'none',
+                borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: resending ? 'not-allowed' : 'pointer' }}>
+              {resending ? 'Sending...' : '📧 Resend Report'}
+            </button>
+            {resendMsg && <span style={{ marginLeft: 12, fontSize: 13, color: resendMsg.startsWith('Error') ? '#fca5a5' : '#86efac', fontWeight: 700 }}>{resendMsg}</span>}
+          </div>
+        )}
       </div>
 
       {/* JOB DETAILS */}
