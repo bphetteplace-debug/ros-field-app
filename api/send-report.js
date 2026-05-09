@@ -307,8 +307,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   // SC Video Links in PDF
   const scVideos = photos.filter(function(p) { return p.section === 'arrival-video' || p.section === 'departure-video'; });
   if (!isPM && scVideos.length > 0) {
-    if (y < 120) { addPage(pdfDoc); y = 720; }
-    page.drawText('ARRIVAL & DEPARTURE VIDEOS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
+    if (y < 80) { y = 80; }
+    page.drawText('ARRIVAL AND DEPARTURE VIDEOS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
     y -= 14;
     page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
     y -= 14;
