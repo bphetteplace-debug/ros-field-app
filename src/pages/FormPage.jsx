@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, getNextPmNumber } from '../lib/submissions'
@@ -114,6 +114,12 @@ export default function FormPage() {
   const [photos, setPhotos] = useState([])
   const [photoCaptions, setPhotoCaptions] = useState({})
   const [saving, setSaving] = useState(false)
+  // Draft saving
+  const DRAFT_KEY = 'ros_draft_' + jobTypeParam
+  const [draftSaved, setDraftSaved] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
+  const draftTimerRef = useRef(null)
+
   const [saveError, setSaveError] = useState(null)
 
   // PM equipment state
@@ -143,6 +149,28 @@ export default function FormPage() {
   })
 
   useEffect(() => { getNextPmNumber().then(setPmNumber).catch(() => setPmNumber(9136)) }, [])
+  // Check for draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const d = JSON.parse(raw)
+        // Only offer resume if there's meaningful content
+        if (d.locationName || d.description || (d.parts && d.parts.length > 0)) {
+          setHasDraft(true)
+        }
+      }
+    } catch(e) {}
+  }, [DRAFT_KEY])
+
+  // Auto-save draft on field changes (debounced 2s)
+  useEffect(() => {
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(saveDraft, 2000)
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  }, [warrantyWork, customerName, truckNumber, locationName, customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea, date, startTime, departureTime, lastServiceDate, description, techs, equipment, miles, costPerMile, laborHours, hourlyRate, billableTechs, parts, arrestors, flares, heaters, saveDraft])
+
+
 
   const toggleTech = (t) => setTechs(ts => ts.includes(t) ? ts.filter(x=>x!==t) : [...ts,t])
   const addPart = (p) => {
@@ -155,6 +183,56 @@ export default function FormPage() {
   const addPartPhoto = (sku, files) => { const arr = Array.from(files); setPartPhotos(pp => ({ ...pp, [sku]: [...(pp[sku]||[]), ...arr].slice(0,3) })) }
   const removePartPhoto = (sku, idx) => setPartPhotos(pp => ({ ...pp, [sku]: (pp[sku]||[]).filter((_,i)=>i!==idx) }))
   const addPhoto = (files) => { const arr = Array.from(files); setPhotos(ps => [...ps,...arr].slice(0,20)) }
+
+
+  // Collect all serializable form state into an object
+  const getDraftData = useCallback(() => ({
+    warrantyWork, customerName, truckNumber, locationName, customerContact,
+    customerWorkOrder, typeOfWork, glCode, assetTag, workArea, date,
+    startTime, departureTime, lastServiceDate, description, techs,
+    equipment, miles, costPerMile, laborHours, hourlyRate, billableTechs,
+    parts,
+    arrestors: arrestors.map(a => ({ arrestorId: a.arrestorId, condition: a.condition, filterChanged: a.filterChanged, notes: a.notes })),
+    flares: flares.map(f => ({ flareId: f.flareId, pilotLit: f.pilotLit, lastIgnition: f.lastIgnition, condition: f.condition, notes: f.notes })),
+    heaters: heaters.map(h => ({ heaterId: h.heaterId, lastCleanDate: h.lastCleanDate, condition: h.condition, notes: h.notes, firetubes: h.firetubes.map(ft => ({ condition: ft.condition })) })),
+  }), [warrantyWork, customerName, truckNumber, locationName, customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea, date, startTime, departureTime, lastServiceDate, description, techs, equipment, miles, costPerMile, laborHours, hourlyRate, billableTechs, parts, arrestors, flares, heaters])
+
+  const saveDraft = useCallback(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...getDraftData(), savedAt: new Date().toISOString() }))
+      setDraftSaved(true)
+      setTimeout(() => setDraftSaved(false), 2000)
+    } catch(e) { console.warn('Draft save failed:', e) }
+  }, [DRAFT_KEY, getDraftData])
+
+  const loadDraft = useCallback((d) => {
+    if (d.warrantyWork !== undefined) setWarrantyWork(d.warrantyWork)
+    if (d.customerName) setCustomerName(d.customerName)
+    if (d.truckNumber) setTruckNumber(d.truckNumber)
+    if (d.locationName !== undefined) setLocationName(d.locationName)
+    if (d.customerContact !== undefined) setCustomerContact(d.customerContact)
+    if (d.customerWorkOrder !== undefined) setCustomerWorkOrder(d.customerWorkOrder)
+    if (d.typeOfWork) setTypeOfWork(d.typeOfWork)
+    if (d.glCode !== undefined) setGlCode(d.glCode)
+    if (d.assetTag !== undefined) setAssetTag(d.assetTag)
+    if (d.workArea !== undefined) setWorkArea(d.workArea)
+    if (d.date) setDate(d.date)
+    if (d.startTime) setStartTime(d.startTime)
+    if (d.departureTime) setDepartureTime(d.departureTime)
+    if (d.lastServiceDate !== undefined) setLastServiceDate(d.lastServiceDate)
+    if (d.description !== undefined) setDescription(d.description)
+    if (d.techs) setTechs(d.techs)
+    if (d.equipment !== undefined) setEquipment(d.equipment)
+    if (d.parts) setParts(d.parts)
+    if (d.miles !== undefined) setMiles(d.miles)
+    if (d.costPerMile !== undefined) setCostPerMile(d.costPerMile)
+    if (d.laborHours !== undefined) setLaborHours(d.laborHours)
+    if (d.hourlyRate !== undefined) setHourlyRate(d.hourlyRate)
+    if (d.billableTechs !== undefined) setBillableTechs(d.billableTechs)
+    if (d.arrestors && d.arrestors.length > 0) setArrestors(d.arrestors.map(a => ({ ...mkArr(), ...a })))
+    if (d.flares && d.flares.length > 0) setFlares(d.flares.map(f => ({ ...mkFlare(), ...f })))
+    if (d.heaters && d.heaters.length > 0) setHeaters(d.heaters.map(h => ({ ...mkHT(), ...h, firetubes: (h.firetubes||[{condition:'Good'}]).map(ft => ({ ...mkFT(), ...ft })) })))
+  }, [])
 
   const handleSubmit = async () => {
     if (!customerName || !locationName) { setSaveError('Customer and location are required'); return }
@@ -245,7 +323,8 @@ export default function FormPage() {
         }).catch(()=>{})
       } catch(_) {}
 
-      navigate('/submissions')
+      localStorage.removeItem(DRAFT_KEY)
+    navigate('/submissions')
     } catch(e) {
       setSaveError(e.message || 'Save failed')
     } finally {
@@ -270,6 +349,18 @@ export default function FormPage() {
       </div>
 
       {saveError && <div style={{ margin:'0 16px 10px', background:'#fee', border:'1px solid #faa', borderRadius:6, padding:'8px 12px', color:'#c00', fontSize:13 }}>{saveError}</div>}
+      {hasDraft && (
+        <div style={{ margin:'0 16px 10px', background:'#fffbe6', border:'1px solid #f0c040', borderRadius:6, padding:'10px 12px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+          <span style={{ fontSize:13, color:'#7a5c00', fontWeight:600 }}>📝 You have an unsaved draft. Resume where you left off?</span>
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+            <button type="button" onClick={() => { try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY)); loadDraft(d); } catch(e){} setHasDraft(false) }} style={{ padding:'5px 12px', background:'#e65c00', color:'#fff', border:'none', borderRadius:5, fontWeight:700, fontSize:12, cursor:'pointer' }}>Resume</button>
+            <button type="button" onClick={() => { localStorage.removeItem(DRAFT_KEY); setHasDraft(false) }} style={{ padding:'5px 10px', background:'#f5f5f5', color:'#555', border:'1px solid #ddd', borderRadius:5, fontSize:12, cursor:'pointer' }}>Discard</button>
+          </div>
+        </div>
+      )}
+      {draftSaved && (
+        <div style={{ margin:'0 16px 6px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:5, padding:'5px 10px', fontSize:12, color:'#15803d', fontWeight:600 }}>✓ Draft saved</div>
+      )}
 
       {/* JOB INFORMATION */}
       <div style={{ margin:'0 0 10px' }}>
