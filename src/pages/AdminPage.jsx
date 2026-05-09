@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { fetchAllSubmissions } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus } from '../lib/submissions'
 
 export default function AdminPage() {
   const { isAdmin, loading: authLoading } = useAuth()
@@ -13,6 +13,15 @@ export default function AdminPage() {
   const [filterTech, setFilterTech] = useState('ALL')
   const [filterStatus, setFilterStatus] = useState('ALL')
 
+
+  const handleStatusChange = async (id, newStatus) => {
+    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
+    try {
+      await updateSubmissionStatus(id, newStatus)
+    } catch(e) {
+      console.error('Status update failed:', e)
+    }
+  }
   useEffect(() => {
     if (authLoading) return
     if (!isAdmin) return
@@ -200,14 +209,21 @@ export default function AdminPage() {
                     </div>
                     <div style={{ fontSize: 12, color: '#555' }}>{techs.join(', ') || '—'}</div>
                     <div style={{ fontSize: 12, color: '#555' }}>{s.date || '—'}</div>
-                    <div>
-                      <span style={{
-                        fontSize: 11, padding: '2px 7px', borderRadius: 10, fontWeight: 600,
-                        background: s.status === 'submitted' ? '#dcfce7' : s.status === 'approved' ? '#dbeafe' : '#fef3c7',
-                        color: s.status === 'submitted' ? '#16a34a' : s.status === 'approved' ? '#1d4ed8' : '#92400e'
-                      }}>
-                        {s.status || 'draft'}
-                      </span>
+                    <div onClick={e => e.stopPropagation()}>
+                      <select
+                        value={s.status || 'submitted'}
+                        onChange={e => handleStatusChange(s.id, e.target.value)}
+                        style={{
+                          fontSize: 11, padding: '2px 4px', borderRadius: 5, fontWeight: 700, cursor: 'pointer', outline: 'none',
+                          border: '1.5px solid ' + ((s.status === 'submitted' || !s.status) ? '#16a34a' : s.status === 'reviewed' ? '#d97706' : '#7c3aed'),
+                          background: (s.status === 'submitted' || !s.status) ? '#dcfce7' : s.status === 'reviewed' ? '#fef3c7' : '#f5f3ff',
+                          color: (s.status === 'submitted' || !s.status) ? '#16a34a' : s.status === 'reviewed' ? '#92400e' : '#5b21b6',
+                        }}
+                      >
+                        <option value="submitted">Submitted</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="invoiced">Invoiced</option>
+                      </select>
                     </div>
                     <div style={{ fontSize: 12, color: '#555' }}>{submittedBy}</div>
                     <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: isWarranty ? '#888' : '#1a2332' }}>
