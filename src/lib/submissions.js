@@ -246,7 +246,7 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       } else if (photo.dataUrl) {
         blob = await fetch(photo.dataUrl).then(r => r.blob());
       } else continue;
-      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'video/mp4' ? 'mp4' : blob.type === 'video/webm' ? 'webm' : blob.type === 'video/quicktime' ? 'mov' : blob.type.startsWith('video/') ? 'mp4' : 'jpg';
       const path = submissionId + '/' + section + '-' + i + '.' + ext;
       const token = getAuthToken();
       const storageHeaders = {
