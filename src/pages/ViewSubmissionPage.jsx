@@ -44,9 +44,6 @@ export default function ViewSubmissionPage() {
   const handleCopy = () => {
     if (!sub) return
     const d = sub.data || {}
-  const isJHA       = (d.jobType === 'JHA/JSA') || (sub.work_type || '').includes('JHA')
-  const isExpense    = (d.jobType === 'Expense') || (sub.work_type || '').includes('Expense')
-  const isInspection = (d.jobType === 'Daily Inspection') || (sub.work_type || '').includes('Inspect')
     const isPM = (d.jobType || sub.work_type || '').toString().toUpperCase().includes('PM') ||
                  (d.jobType === 'PM')
     const formType = isPM ? 'pm' : 'sc'
@@ -102,6 +99,9 @@ export default function ViewSubmissionPage() {
   if (!sub)    return null
 
   const d = sub.data || {}
+  const isJHA       = (d.jobType === 'JHA/JSA') || (sub.work_type || '').includes('JHA')
+  const isExpense    = (d.jobType === 'Expense') || (sub.work_type || '').includes('Expense')
+  const isInspection = (d.jobType === 'Daily Inspection') || (sub.work_type || '').includes('Inspect')
   const parts      = d.parts      || []
   const techs      = d.techs      || []
   const isWarranty = d.warrantyWork || false
