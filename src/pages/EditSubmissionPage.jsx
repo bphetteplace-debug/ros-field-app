@@ -20,8 +20,7 @@ const SC_EQUIP_TYPES = [
 export default function EditSubmissionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
-
+  const { user, isAdmin } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -113,9 +112,14 @@ export default function EditSubmissionPage() {
     }).catch(e => { setSaveError(e.message); setLoading(false) })
   }, [id])
 
-  if (!isAdmin) return <div style={{ padding: 40 }}>Access denied.</div>
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
+  // Access control: admin OR the tech who created it
+  const canEdit = isAdmin || (sub && user && sub.created_by === user.id)
 
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
+  if (!canEdit) return <div style={{ padding: 40, textAlign: 'center', color: '#c00' }}>Access denied — you can only edit your own submissions.</div>
+  const template = sub?.template || ''
+  const isExpense = template === 'expense_report'
+  const isInspection = template === 'daily_inspection'
   const isPM = jobType === 'PM'
   const partsTotal = parts.reduce((s, p) => s + (p.price || 0) * (p.qty || 0), 0)
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50)
@@ -136,7 +140,6 @@ export default function EditSubmissionPage() {
   const mkArr = () => ({ arrestorId: '', condition: 'Good', filterChanged: false, notes: '' })
   const mkFlare = () => ({ flareId: '', pilotLit: true, lastIgnition: '', condition: 'Good', notes: '' })
   const mkHT = () => ({ heaterId: '', lastCleanDate: '', condition: 'Good', notes: '', firetubes: [] })
-
   const filteredParts = PARTS_CATALOG.filter(p => {
     if (!partSearch) return true
     const q = partSearch.toLowerCase()
@@ -144,25 +147,22 @@ export default function EditSubmissionPage() {
   })
 
   const handleSave = async () => {
-    if (!customerName || !locationName) { setSaveError('Customer and location are required'); return }
     setSaving(true); setSaveError('')
     try {
       await updateSubmission(id, {
         jobType, warrantyWork, customerName, truckNumber, locationName,
-        customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
-        date, startTime, departureTime, lastServiceDate, description, techs, equipment,
-        parts, miles, costPerMile, laborHours, hourlyRate, billableTechs,
+        customerContact, customerWorkOrder, typeOfWork, glCode, assetTag,
+        workArea, date, startTime, departureTime, lastServiceDate,
+        description, techs, equipment, parts, miles, costPerMile,
+        laborHours, hourlyRate, billableTechs,
         arrestors: isPM ? arrestors : [],
         flares: isPM ? flares : [],
         heaters: isPM ? heaters.map(h => ({ ...h, firetubeCnt: h.firetubes?.length || 0 })) : [],
         scEquipment: !isPM ? scEquipment : [],
       })
       navigate('/view/' + id)
-    } catch(e) {
-      setSaveError('Save failed: ' + e.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch(e) { setSaveError('Save failed: ' + e.message) }
+    finally { setSaving(false) }
   }
 
   const sHdr = { background: '#1a2332', color: '#fff', padding: '8px 12px', fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', borderRadius: '6px 6px 0 0' }
@@ -172,6 +172,48 @@ export default function EditSubmissionPage() {
   const inp = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, width: '100%', boxSizing: 'border-box' }
   const row = { display: 'flex', gap: 12, marginBottom: 10 }
 
+  // ── EXPENSE / INSPECTION: simplified edit (notes + date + truck only) ──────────
+  if (isExpense || isInspection) {
+    return (
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 0 60px', fontFamily: 'system-ui,sans-serif' }}>
+        <div style={{ background: '#1a2332', padding: '14px 16px', position: 'sticky', top: 0, zIndex: 100, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ color: '#e65c00', fontWeight: 800, fontSize: 17 }}>✏️ Edit {isExpense ? 'Expense Report' : 'Inspection'}</div>
+              <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>#{sub?.pm_number} — {sub?.date}</div>
+            </div>
+            <button onClick={() => navigate('/view/' + id)} style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+        {saveError && <div style={{ margin: '0 0 10px', background: '#fee', border: '1px solid #faa', borderRadius: 6, padding: '8px 12px', color: '#c00', fontSize: 13 }}>{saveError}</div>}
+        <div style={{ margin: '0 0 10px' }}>
+          <div style={sHdr}>Basic Info</div>
+          <div style={sBody}>
+            <div style={row}>
+              <div style={fld}><label style={lbl}>Date</label><input type="date" style={inp} value={date} onChange={e => setDate(e.target.value)} /></div>
+              <div style={fld}><label style={lbl}>Truck #</label>
+                <select style={inp} value={truckNumber} onChange={e => setTruckNumber(e.target.value)}>
+                  <option value="">-- Select --</option>
+                  {TRUCKS.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ margin: '0 0 10px' }}>
+          <div style={sHdr}>Notes / Description</div>
+          <div style={sBody}>
+            <textarea style={{ ...inp, minHeight: 100, resize: 'vertical' }} value={description} onChange={e => setDescription(e.target.value)} placeholder="Add any corrections or notes..." />
+          </div>
+        </div>
+        <button type="button" onClick={handleSave} disabled={saving} style={{ width: '100%', padding: 14, background: saving ? '#ccc' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving Changes...' : '✅ Save Changes'}
+        </button>
+      </div>
+    )
+  }
+
+  // ── PM / SC: full edit form ───────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 0 60px', fontFamily: 'system-ui,sans-serif' }}>
       {/* HEADER */}
@@ -181,13 +223,9 @@ export default function EditSubmissionPage() {
             <div style={{ color: '#e65c00', fontWeight: 800, fontSize: 17 }}>✏️ Edit Submission</div>
             <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>{sub?.customer_name} — {sub?.location_name} | {isPM ? 'PM' : 'SC'} #{sub?.pm_number}</div>
           </div>
-          <button onClick={() => navigate('/view/' + id)}
-            style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>
-            Cancel
-          </button>
+          <button onClick={() => navigate('/view/' + id)} style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
         </div>
       </div>
-
       {saveError && <div style={{ margin: '0 0 10px', background: '#fee', border: '1px solid #faa', borderRadius: 6, padding: '8px 12px', color: '#c00', fontSize: 13 }}>{saveError}</div>}
 
       {/* JOB INFO */}
@@ -272,7 +310,6 @@ export default function EditSubmissionPage() {
           </div>
         </div>
       </div>
-
       {/* DESCRIPTION */}
       <div style={{ margin: '0 0 10px' }}>
         <div style={sHdr}>Work Description</div>
@@ -293,7 +330,8 @@ export default function EditSubmissionPage() {
               {SC_EQUIP_TYPES.map(type => {
                 const active = scEquipment.some(e => e.type === type)
                 return (
-                  <button key={type} type="button" onClick={() => { if (active) setScEquipment(prev => prev.filter(e => e.type !== type)); else setScEquipment(prev => [...prev, { type, notes: '' }]) }}
+                  <button key={type} type="button"
+                    onClick={() => { if (active) setScEquipment(prev => prev.filter(e => e.type !== type)); else setScEquipment(prev => [...prev, { type, notes: '' }]) }}
                     style={{ padding: '6px 12px', borderRadius: 16, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '2px solid ' + (active ? '#1a2332' : '#ddd'), background: active ? '#1a2332' : '#fff', color: active ? '#fff' : '#333' }}>
                     {type}
                   </button>
@@ -310,7 +348,7 @@ export default function EditSubmissionPage() {
         </div>
       )}
 
-      {/* PM EQUIPMENT: FLAME ARRESTORS */}
+      {/* PM: FLAME ARRESTORS */}
       {isPM && (
         <div style={{ margin: '0 0 10px' }}>
           <div style={sHdr}>Flame Arrestors</div>
@@ -333,13 +371,12 @@ export default function EditSubmissionPage() {
                 <input style={inp} placeholder="Notes..." value={a.notes || ''} onChange={e => updArr(i, 'notes', e.target.value)} />
               </div>
             ))}
-            {arrestors.length < 5 && <button type="button" onClick={() => setArrestors(a => [...a, mkArr()])}
-              style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Add Arrestor</button>}
+            {arrestors.length < 5 && <button type="button" onClick={() => setArrestors(a => [...a, mkArr()])} style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Add Arrestor</button>}
           </div>
         </div>
       )}
 
-      {/* PM EQUIPMENT: FLARES */}
+      {/* PM: FLARES */}
       {isPM && (
         <div style={{ margin: '0 0 10px' }}>
           <div style={sHdr}>Flares</div>
@@ -362,13 +399,12 @@ export default function EditSubmissionPage() {
                 <input style={{ ...inp, marginTop: 6 }} placeholder="Notes..." value={f.notes || ''} onChange={e => updFlare(i, 'notes', e.target.value)} />
               </div>
             ))}
-            {flares.length < 3 && <button type="button" onClick={() => setFlares(f => [...f, mkFlare()])}
-              style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Add Flare</button>}
+            {flares.length < 3 && <button type="button" onClick={() => setFlares(f => [...f, mkFlare()])} style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Add Flare</button>}
           </div>
         </div>
       )}
 
-      {/* PM EQUIPMENT: HEATER TREATERS */}
+      {/* PM: HEATER TREATERS */}
       {isPM && (
         <div style={{ margin: '0 0 10px' }}>
           <div style={sHdr}>Heater Treaters</div>
@@ -388,12 +424,10 @@ export default function EditSubmissionPage() {
                 <input style={{ ...inp, marginBottom: 6 }} placeholder="Notes..." value={h.notes || ''} onChange={e => updHT(i, 'notes', e.target.value)} />
               </div>
             ))}
-            {heaters.length < 5 && <button type="button" onClick={() => setHeaters(h => [...h, mkHT()])}
-              style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Add Heater Treater</button>}
+            {heaters.length < 5 && <button type="button" onClick={() => setHeaters(h => [...h, mkHT()])} style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Add Heater Treater</button>}
           </div>
         </div>
       )}
-
       {/* PARTS */}
       <div style={{ margin: '0 0 10px' }}>
         <div style={sHdr}>Parts Used</div>
@@ -414,8 +448,7 @@ export default function EditSubmissionPage() {
               ))}
             </div>
           )}
-          <button type="button" onClick={() => setShowCatalog(!showCatalog)}
-            style={{ width: '100%', padding: 10, background: '#e65c00', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+          <button type="button" onClick={() => setShowCatalog(!showCatalog)} style={{ width: '100%', padding: 10, background: '#e65c00', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
             {showCatalog ? 'Close Catalog' : '+ Add Part from Catalog'}
           </button>
           {showCatalog && (
@@ -423,8 +456,7 @@ export default function EditSubmissionPage() {
               <input style={{ ...inp, marginBottom: 8 }} placeholder="Search by name or SKU..." value={partSearch} onChange={e => setPartSearch(e.target.value)} />
               <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 6 }}>
                 {filteredParts.slice(0, 60).map(p => (
-                  <button key={p.code || p.sku} type="button" onClick={() => addPart(p)}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', borderBottom: '1px solid #f0f0f0', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer' }}>
+                  <button key={p.code || p.sku} type="button" onClick={() => addPart(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', borderBottom: '1px solid #f0f0f0', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.desc || p.name}</div>
                     <div style={{ fontSize: 11, color: '#888' }}>{p.code || p.sku}{p.price ? ' — $' + Number(p.price).toFixed(2) : ''}</div>
                   </button>
@@ -452,9 +484,8 @@ export default function EditSubmissionPage() {
         </div>
       </div>
 
-      {/* SAVE BUTTON */}
-      <button type="button" onClick={handleSave} disabled={saving}
-        style={{ width: '100%', padding: 14, background: saving ? '#ccc' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
+      {/* SAVE */}
+      <button type="button" onClick={handleSave} disabled={saving} style={{ width: '100%', padding: 14, background: saving ? '#ccc' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
         {saving ? 'Saving Changes...' : '✅ Save Changes'}
       </button>
     </div>
