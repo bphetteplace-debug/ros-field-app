@@ -250,3 +250,12 @@ export async function fetchAllSubmissions() {
     return data || [];
   } catch (e) { console.error('Fetch all submissions error:', e); return []; }
 }
+
+
+// ── STATUS UPDATE ─────────────────────────────────────────────────────────────
+export async function updateSubmissionStatus(id, status) {
+  return supaRest('PATCH',
+    'submissions?id=eq.' + id,
+    { status, updated_at: new Date().toISOString() }
+  )
+}
