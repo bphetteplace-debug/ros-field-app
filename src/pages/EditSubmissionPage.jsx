@@ -17,6 +17,43 @@ const SC_EQUIP_TYPES = [
   'Solar / Battery','Thermocouple / Thermowell','Valve','Wiring / Electrical','Other'
 ]
 
+const INSP_ITEMS_EDIT = [
+  { id: 'lights_head', label: 'Headlights (Hi & Low Beam)', section: 'Lights' },
+  { id: 'lights_tail', label: 'Taillights & Brake Lights', section: 'Lights' },
+  { id: 'lights_turn', label: 'Turn Signals & Hazards', section: 'Lights' },
+  { id: 'lights_work', label: 'Work / Auxiliary Lights', section: 'Lights' },
+  { id: 'tires_front', label: 'Front Tires — Pressure & Tread', section: 'Tires & Wheels' },
+  { id: 'tires_rear', label: 'Rear Tires — Pressure & Tread', section: 'Tires & Wheels' },
+  { id: 'tires_spare', label: 'Spare Tire Present & Inflated', section: 'Tires & Wheels' },
+  { id: 'wheels_lugs', label: 'Lug Nuts Tight / No Missing', section: 'Tires & Wheels' },
+  { id: 'brakes_parking', label: 'Parking Brake Functional', section: 'Brakes' },
+  { id: 'brakes_service', label: 'Service Brakes Responsive', section: 'Brakes' },
+  { id: 'fluid_oil', label: 'Engine Oil Level', section: 'Fluids' },
+  { id: 'fluid_coolant', label: 'Coolant Level', section: 'Fluids' },
+  { id: 'fluid_washer', label: 'Windshield Washer Fluid', section: 'Fluids' },
+  { id: 'fluid_power', label: 'Power Steering Fluid', section: 'Fluids' },
+  { id: 'fluid_brake', label: 'Brake Fluid Level', section: 'Fluids' },
+  { id: 'body_wipers', label: 'Windshield Wipers', section: 'Body & Glass' },
+  { id: 'body_mirrors', label: 'Mirrors — Clean & Adjusted', section: 'Body & Glass' },
+  { id: 'body_glass', label: 'Windshield / Glass — No Cracks', section: 'Body & Glass' },
+  { id: 'body_horn', label: 'Horn Functional', section: 'Body & Glass' },
+  { id: 'body_doors', label: 'Doors Open / Close / Lock', section: 'Body & Glass' },
+  { id: 'safety_extinguisher', label: 'Fire Extinguisher Present & Charged', section: 'Safety Equipment' },
+  { id: 'safety_triangle', label: 'Reflective Triangles / Flares', section: 'Safety Equipment' },
+  { id: 'safety_firstaid', label: 'First Aid Kit Present', section: 'Safety Equipment' },
+  { id: 'safety_seatbelt', label: 'Seatbelts Functional', section: 'Safety Equipment' },
+  { id: 'safety_ppe', label: 'PPE Onboard (Hard Hat, Vest, Gloves)', section: 'Safety Equipment' },
+  { id: 'engine_noises', label: 'No Unusual Engine Noises', section: 'Engine & Drivetrain' },
+  { id: 'engine_gauges', label: 'Gauges Normal (Oil Pressure, Temp)', section: 'Engine & Drivetrain' },
+  { id: 'engine_exhaust', label: 'No Excessive Exhaust Smoke', section: 'Engine & Drivetrain' },
+  { id: 'engine_leaks', label: 'No Visible Leaks (Oil, Fuel, Coolant)', section: 'Engine & Drivetrain' },
+  { id: 'cargo_secured', label: 'Cargo / Equipment Secured', section: 'Cargo & Trailer' },
+  { id: 'cargo_straps', label: 'Tie-Downs / Straps in Good Condition', section: 'Cargo & Trailer' },
+  { id: 'cargo_weight', label: 'Load Within Rated Capacity', section: 'Cargo & Trailer' },
+]
+const INSP_SECTIONS_EDIT = [...new Set(INSP_ITEMS_EDIT.map(i => i.section))]
+const PASS_FAIL_NA_EDIT = ['Pass', 'Fail', 'N/A']
+
 export default function EditSubmissionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -24,6 +61,7 @@ export default function EditSubmissionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [inspChecks, setInspChecks] = useState({})
   const [sub, setSub] = useState(null)
 
   // Dynamic lists
@@ -108,6 +146,14 @@ export default function EditSubmissionPage() {
       setFlares(Array.isArray(d.flares) ? d.flares : [])
       setHeaters(Array.isArray(d.heaters) ? d.heaters.map(h => ({ ...h, firetubes: Array.isArray(h.firetubes) ? h.firetubes : [] })) : [])
       setScEquipment(Array.isArray(d.scEquipment) ? d.scEquipment : [])
+      // Load inspection checklist
+      if (data.template === 'daily_inspection' && Array.isArray(d.checkItems)) {
+        const checks = {}
+        for (const item of d.checkItems) {
+          checks[item.id] = item.result || 'Pass'
+        }
+        setInspChecks(checks)
+      }
       setLoading(false)
     }).catch(e => { setSaveError(e.message); setLoading(false) })
   }, [id])
@@ -159,6 +205,13 @@ export default function EditSubmissionPage() {
         flares: isPM ? flares : [],
         heaters: isPM ? heaters.map(h => ({ ...h, firetubeCnt: h.firetubes?.length || 0 })) : [],
         scEquipment: !isPM ? scEquipment : [],
+        // Inspection checklist
+        checkItems: isInspection ? INSP_ITEMS_EDIT.map(item => ({
+          id: item.id, label: item.label, section: item.section,
+          result: inspChecks[item.id] || 'Pass'
+        })) : undefined,
+        failCount: isInspection ? Object.values(inspChecks).filter(v => v === 'Fail').length : undefined,
+        allPass: isInspection ? Object.values(inspChecks).every(v => v !== 'Fail') : undefined,
       })
       navigate('/view/' + id)
     } catch(e) { setSaveError('Save failed: ' + e.message) }
@@ -172,14 +225,14 @@ export default function EditSubmissionPage() {
   const inp = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 14, width: '100%', boxSizing: 'border-box' }
   const row = { display: 'flex', gap: 12, marginBottom: 10 }
 
-  // ── EXPENSE / INSPECTION: simplified edit (notes + date + truck only) ──────────
-  if (isExpense || isInspection) {
+  // ── EXPENSE: simplified edit ────────────────────────────────────────────────
+  if (isExpense) {
     return (
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 0 60px', fontFamily: 'system-ui,sans-serif' }}>
         <div style={{ background: '#1a2332', padding: '14px 16px', position: 'sticky', top: 0, zIndex: 100, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ color: '#e65c00', fontWeight: 800, fontSize: 17 }}>✏️ Edit {isExpense ? 'Expense Report' : 'Inspection'}</div>
+              <div style={{ color: '#e65c00', fontWeight: 800, fontSize: 17 }}>✏️ Edit Expense Report</div>
               <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>#{sub?.pm_number} — {sub?.date}</div>
             </div>
             <button onClick={() => navigate('/view/' + id)} style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
@@ -208,6 +261,88 @@ export default function EditSubmissionPage() {
         </div>
         <button type="button" onClick={handleSave} disabled={saving} style={{ width: '100%', padding: 14, background: saving ? '#ccc' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
           {saving ? 'Saving Changes...' : '✅ Save Changes'}
+        </button>
+      </div>
+    )
+  }
+
+  // ── INSPECTION: full checklist edit ──────────────────────────────────────────
+  if (isInspection) {
+    const failCount = Object.values(inspChecks).filter(v => v === 'Fail').length
+    const allPass = failCount === 0
+    const setCheck = (id, val) => setInspChecks(c => ({ ...c, [id]: val }))
+    return (
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 0 60px', fontFamily: 'system-ui,sans-serif' }}>
+        <div style={{ background: '#1a2332', padding: '14px 16px', position: 'sticky', top: 0, zIndex: 100, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ color: '#e65c00', fontWeight: 800, fontSize: 17 }}>✏️ Edit Inspection</div>
+              <div style={{ color: '#aaa', fontSize: 12, marginTop: 2 }}>#{sub?.pm_number} — {sub?.date}</div>
+            </div>
+            <button onClick={() => navigate('/view/' + id)} style={{ background: 'none', border: '1px solid #555', color: '#aaa', borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+        {saveError && <div style={{ margin: '0 0 10px', background: '#fee', border: '1px solid #faa', borderRadius: 6, padding: '8px 12px', color: '#c00', fontSize: 13 }}>{saveError}</div>}
+        {/* Basic info */}
+        <div style={{ margin: '0 0 10px' }}>
+          <div style={sHdr}>Basic Info</div>
+          <div style={sBody}>
+            <div style={row}>
+              <div style={fld}><label style={lbl}>Date</label><input type="date" style={inp} value={date} onChange={e => setDate(e.target.value)} /></div>
+              <div style={fld}><label style={lbl}>Truck #</label>
+                <select style={inp} value={truckNumber} onChange={e => setTruckNumber(e.target.value)}>
+                  <option value="">-- Select --</option>
+                  {TRUCKS.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Fail status banner */}
+        {failCount > 0 && (
+          <div style={{ margin: '0 0 10px', background: '#fee2e2', border: '2px solid #dc2626', borderRadius: 6, padding: '8px 12px', color: '#991b1b', fontWeight: 700, fontSize: 13, textAlign: 'center' }}>
+            ⚠️ {failCount} ITEM{failCount !== 1 ? 'S' : ''} FAILED
+          </div>
+        )}
+        {/* Checklist */}
+        {INSP_SECTIONS_EDIT.map(section => {
+          const items = INSP_ITEMS_EDIT.filter(i => i.section === section)
+          const sectionFails = items.filter(item => inspChecks[item.id] === 'Fail').length
+          return (
+            <div key={section} style={{ margin: '0 0 10px' }}>
+              <div style={{ ...sHdr, background: sectionFails > 0 ? '#991b1b' : '#1a2332' }}>
+                {section} {sectionFails > 0 ? '⚠️ ' + sectionFails + ' FAIL' : ''}
+              </div>
+              <div style={sBody}>
+                {items.map(item => (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <div style={{ fontSize: 13, color: inspChecks[item.id] === 'Fail' ? '#dc2626' : '#333', fontWeight: inspChecks[item.id] === 'Fail' ? 700 : 400, flex: 1 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      {PASS_FAIL_NA_EDIT.map(opt => (
+                        <button key={opt} type="button" onClick={() => setCheck(item.id, opt)} style={{ padding: '4px 10px', borderRadius: 5, border: '1.5px solid ' + (inspChecks[item.id] === opt ? (opt === 'Pass' ? '#16a34a' : opt === 'Fail' ? '#dc2626' : '#6b7280') : '#ddd'), background: inspChecks[item.id] === opt ? (opt === 'Pass' ? '#dcfce7' : opt === 'Fail' ? '#fee2e2' : '#f3f4f6') : '#fff', color: inspChecks[item.id] === opt ? (opt === 'Pass' ? '#16a34a' : opt === 'Fail' ? '#dc2626' : '#374151') : '#888', fontSize: 11, fontWeight: inspChecks[item.id] === opt ? 700 : 400, cursor: 'pointer' }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+        {/* Notes */}
+        <div style={{ margin: '0 0 10px' }}>
+          <div style={{ ...sHdr, background: failCount > 0 ? '#991b1b' : '#1a2332' }}>
+            Defects / Notes {failCount > 0 ? '(REQUIRED)' : '(Optional)'}
+          </div>
+          <div style={sBody}>
+            <textarea style={{ ...inp, minHeight: 80, resize: 'vertical', border: failCount > 0 && !description ? '2px solid #dc2626' : '1px solid #ddd' }} value={description} onChange={e => setDescription(e.target.value)} placeholder={failCount > 0 ? 'REQUIRED: Describe all failed items...' : 'Any notes or observations...'} />
+          </div>
+        </div>
+        <button type="button" onClick={handleSave} disabled={saving || (failCount > 0 && !description)} style={{ width: '100%', padding: 14, background: saving ? '#ccc' : failCount > 0 && !description ? '#aaa' : allPass ? '#16a34a' : '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: (saving || (failCount > 0 && !description)) ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : failCount > 0 && !description ? 'Describe Defects to Save' : allPass ? '✅ Save — All Pass' : '⚠️ Save with ' + failCount + ' Defect' + (failCount !== 1 ? 's' : '')}
         </button>
       </div>
     )
