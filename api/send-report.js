@@ -320,7 +320,8 @@ module.exports = async function handler(req, res) {
               if (!imgRes.ok) continue
               const buf = await imgRes.arrayBuffer()
               const ct = (imgRes.headers.get('content-type') || '')
-              const em = ct.includes('png') ? await doc.embedPng(buf) : await doc.embedJpg(buf)
+              const isPng = ct.includes('png') || (photo.storage_path || '').endsWith('.png')
+              const em = isPng ? await doc.embedPng(buf) : await doc.embedJpg(buf)
               // Small thumbnail: max 155x120 so 3 fit across
               const sc = em.scaleToFit(155, 120)
               const xp = col === 0 ? ML : col === 1 ? ML + 170 : ML + 340
@@ -369,7 +370,8 @@ module.exports = async function handler(req, res) {
           if (!imgRes.ok) continue
           const buf = await imgRes.arrayBuffer()
           const ct = (imgRes.headers.get('content-type') || '')
-          const em = ct.includes('png') ? await doc.embedPng(buf) : await doc.embedJpg(buf)
+          const isPng = ct.includes('png') || (photo.storage_path || '').endsWith('.png')
+          const em = isPng ? await doc.embedPng(buf) : await doc.embedJpg(buf)
           const sc = em.scaleToFit(250, 190)
           const xp = col === 0 ? ML : ML + 265
           if (col === 0) { gap(sc.height + 35); rowH = sc.height }
@@ -412,7 +414,8 @@ module.exports = async function handler(req, res) {
           if (imgRes.ok) {
             const buf = await imgRes.arrayBuffer()
             const ct = imgRes.headers.get('content-type') || ''
-            const img = ct.includes('png') ? await doc.embedPng(buf) : await doc.embedJpg(buf)
+            const isPng = ct.includes('png') || (sig.storage_path || '').endsWith('.png')
+            const img = isPng ? await doc.embedPng(buf) : await doc.embedJpg(buf)
             const sc = img.scaleToFit(250, 60)
             page.drawImage(img, { x: ML, y: y - sc.height, width: sc.width, height: sc.height })
             y -= sc.height + 8
