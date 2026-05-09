@@ -44,6 +44,9 @@ export default function ViewSubmissionPage() {
   const handleCopy = () => {
     if (!sub) return
     const d = sub.data || {}
+  const isJHA       = (d.jobType === 'JHA/JSA') || (sub.work_type || '').includes('JHA')
+  const isExpense    = (d.jobType === 'Expense') || (sub.work_type || '').includes('Expense')
+  const isInspection = (d.jobType === 'Daily Inspection') || (sub.work_type || '').includes('Inspect')
     const isPM = (d.jobType || sub.work_type || '').toString().toUpperCase().includes('PM') ||
                  (d.jobType === 'PM')
     const formType = isPM ? 'pm' : 'sc'
@@ -104,7 +107,7 @@ export default function ViewSubmissionPage() {
   const isWarranty = d.warrantyWork || false
   const jobType    = d.jobType || (sub.work_type && sub.work_type.toLowerCase().includes('pm') ? 'PM' : 'Service Call')
   const isPM   = jobType === 'PM'
-  const prefix = isPM ? 'PM' : 'SC'
+  const prefix = isJHA ? 'JHA/JSA' : isPM ? 'PM' : 'SC'
 
   const arrestors   = isPM && Array.isArray(d.arrestors)  ? d.arrestors  : []
   const flares      = isPM && Array.isArray(d.flares)     ? d.flares     : []
@@ -144,7 +147,7 @@ export default function ViewSubmissionPage() {
       {/* Header */}
       <div style={{ background: '#1a2332', color: '#fff', padding: '20px 16px', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <div style={{ background: isPM ? '#e65c00' : '#2563eb', color: '#fff', fontWeight: 700, padding: '4px 10px', borderRadius: 6, fontSize: 13 }}>{prefix}</div>
+          <div style={{ background: isJHA ? '#059669' : isPM ? '#e65c00' : '#2563eb', color: '#fff', fontWeight: 700, padding: '4px 10px', borderRadius: 6, fontSize: 13 }}>{prefix}</div>
           <div style={{ fontWeight: 700, fontSize: 22 }}>{prefix} #{sub.pm_number}</div>
         </div>
         <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{sub.customer_name} — {sub.location_name}</div>
@@ -193,6 +196,8 @@ export default function ViewSubmissionPage() {
         </div>
       </div>
 
+      {!isJHA && (
+      <>
       {/* JOB DETAILS */}
       <div style={{ margin: '0 12px 12px' }}>
         <div style={sHdr}>Job Details</div>
@@ -396,6 +401,70 @@ export default function ViewSubmissionPage() {
       </div>
 
       {/* PHOTOS */}
+      </>
+      )}
+
+      {/* JHA-SPECIFIC SECTIONS */}
+      {isJHA && (
+        <div style={{ margin: '0 12px 12px' }}>
+          <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ background: '#1a2332', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>JHA Overview</div>
+            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Job / Location</div><div style={{ fontWeight: 600 }}>{sub.customer_name || d.customerName || '-'}</div></div>
+              <div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Date</div><div style={{ fontWeight: 600 }}>{sub.date || '-'}</div></div>
+              <div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Supervisor</div><div style={{ fontWeight: 600 }}>{d.jhaSupervisor || d.supervisor || '-'}</div></div>
+              <div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Truck #</div><div style={{ fontWeight: 600 }}>{sub.truck_number || d.truckNumber || '-'}</div></div>
+              <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Crew Members</div><div style={{ fontWeight: 600 }}>{d.jhaCrewMembers || d.crewMembers || '-'}</div></div>
+              {d.description && (<div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Job Description</div><div style={{ fontWeight: 600 }}>{d.description}</div></div>)}
+            </div>
+          </div>
+          {d.jhaSteps && d.jhaSteps.length > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ background: '#1a2332', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>Hazard Steps ({d.jhaSteps.length})</div>
+              <div style={{ padding: 8 }}>
+                {d.jhaSteps.map(function(step, i) {
+                  var riskColor = step.risk === 'High' ? '#dc2626' : step.risk === 'Medium' ? '#d97706' : '#16a34a';
+                  var riskBg = step.risk === 'High' ? '#fef2f2' : step.risk === 'Medium' ? '#fffbeb' : '#f0fdf4';
+                  return (
+                    <div key={i} style={{ padding: '10px 12px', marginBottom: 8, background: '#f8f9fa', borderRadius: 6, borderLeft: '4px solid ' + riskColor }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>Step {i + 1}</div>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>{step.task || step.step || '-'}</div>
+                          {step.hazard && <div style={{ fontSize: 13, color: '#555', marginBottom: 4 }}><strong>Hazard:</strong> {step.hazard}</div>}
+                          {step.control && <div style={{ fontSize: 13, color: '#555' }}><strong>Control:</strong> {step.control}</div>}
+                        </div>
+                        {step.risk && <div style={{ padding: '2px 8px', borderRadius: 4, background: riskBg, color: riskColor, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{step.risk}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {d.jhaPPE && d.jhaPPE.length > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ background: '#1a2332', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>PPE Required</div>
+              <div style={{ padding: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {d.jhaPPE.map(function(item, i) { return (
+                  <span key={i} style={{ padding: '4px 10px', background: '#e0f2fe', color: '#0369a1', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>✓ {item}</span>
+                ); })}
+              </div>
+            </div>
+          )}
+          {(d.jhaEmergencyContact || d.jhaNearestHospital || d.jhaMeetingPoint || d.jhaAdditionalHazards) && (
+            <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ background: '#dc2626', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' }}>Emergency Info</div>
+              <div style={{ padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {d.jhaEmergencyContact && (<div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Emergency Contact</div><div style={{ fontWeight: 600 }}>{d.jhaEmergencyContact}</div></div>)}
+                {d.jhaNearestHospital && (<div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Nearest Hospital</div><div style={{ fontWeight: 600 }}>{d.jhaNearestHospital}</div></div>)}
+                {d.jhaMeetingPoint && (<div><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Meeting Point</div><div style={{ fontWeight: 600 }}>{d.jhaMeetingPoint}</div></div>)}
+                {d.jhaAdditionalHazards && (<div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Additional Hazards</div><div style={{ fontWeight: 600 }}>{d.jhaAdditionalHazards}</div></div>)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {sub.photos && sub.photos.length > 0 && (
         <div style={{ margin: '0 12px 12px' }}>
           <div style={sHdr}>Photos</div>
