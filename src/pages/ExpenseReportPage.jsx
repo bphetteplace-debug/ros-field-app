@@ -5,7 +5,7 @@ import { saveSubmission, uploadPhotos, fetchSettings, DEFAULT_TRUCKS, DEFAULT_TE
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
-function PhotoPicker({ label, value, onChange }) {
+function PhotoPicker({ label, value, onChange, capture }) {
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>
@@ -16,8 +16,8 @@ function PhotoPicker({ label, value, onChange }) {
         </div>
       ) : (
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '5px 8px', background: '#f2f2f2', border: '1px dashed #bbb', borderRadius: 5, cursor: 'pointer', fontSize: 12, color: '#555' }}>
-          + Receipt
-          <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => onChange(e.target.files[0] || null)} />
+          📷 {label}
+          <input type="file" accept="image/*" capture={capture || 'environment'} style={{ display: 'none' }} onChange={e => onChange(e.target.files[0] || null)} />
         </label>
       )}
     </div>
@@ -27,10 +27,8 @@ function PhotoPicker({ label, value, onChange }) {
 export default function ExpenseReportPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
-
   const [TRUCKS, setTRUCKS] = useState(DEFAULT_TRUCKS)
   const [TECHS_LIST, setTECHS_LIST] = useState(DEFAULT_TECHS)
-
   const [techName, setTechName] = useState('')
   const [truckNumber, setTruckNumber] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -39,9 +37,7 @@ export default function ExpenseReportPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
-  function mkExp() {
-    return { category: EXPENSE_CATEGORIES[0], description: '', amount: '', receipt: null }
-  }
+  function mkExp() { return { category: EXPENSE_CATEGORIES[0], description: '', amount: '', receipt: null, itemPhoto: null } }
 
   useEffect(() => {
     fetchSettings().then(s => {
@@ -59,7 +55,6 @@ export default function ExpenseReportPage() {
   const updExp = (i, k, v) => setExpenses(es => es.map((e, idx) => idx === i ? { ...e, [k]: v } : e))
   const removeExp = (i) => setExpenses(es => es.filter((_, idx) => idx !== i))
   const addExp = () => setExpenses(es => [...es, mkExp()])
-
   const grandTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
 
   const handleSubmit = async () => {
@@ -68,46 +63,35 @@ export default function ExpenseReportPage() {
     setSaving(true); setSaveError(null)
     try {
       const formData = {
-        pmNumber: null,
-        jobType: 'Expense Report',
-        warrantyWork: false,
-        customerName: 'Internal',
-        truckNumber,
-        locationName: techName,
-        customerContact: '',
-        customerWorkOrder: '',
-        typeOfWork: 'Expense Report',
-        glCode: '',
-        assetTag: '',
-        workArea: '',
-        date,
-        startTime: '',
-        departureTime: '',
-        lastServiceDate: '',
-        description: notes,
-        techs: [techName],
-        equipment: '',
-        parts: [],
-        miles: 0,
-        costPerMile: 0,
-        laborHours: 0,
-        hourlyRate: 0,
-        billableTechs: 1,
-        arrestors: [],
-        flares: [],
-        heaters: [],
-        scEquipment: [],
-        expenseItems: expenses.map(e => ({ category: e.category, description: e.description, amount: parseFloat(e.amount) || 0 })),
+        pmNumber: null, jobType: 'Expense Report', warrantyWork: false,
+        customerName: 'Internal', truckNumber, locationName: techName,
+        customerContact: '', customerWorkOrder: '', typeOfWork: 'Expense Report',
+        glCode: '', assetTag: '', workArea: '', date, startTime: '', departureTime: '',
+        lastServiceDate: '', description: notes, techs: [techName],
+        equipment: '', parts: [], miles: 0, costPerMile: 0, laborHours: 0, hourlyRate: 0,
+        billableTechs: 1, arrestors: [], flares: [], heaters: [], scEquipment: [],
+        expenseItems: expenses.map(e => ({
+          category: e.category,
+          description: e.description,
+          amount: parseFloat(e.amount) || 0,
+          hasReceipt: !!e.receipt,
+          hasItemPhoto: !!e.itemPhoto,
+        })),
         expenseTotal: grandTotal,
       }
       const submission = await saveSubmission(formData, user.id, 'expense_report')
-      // Upload receipt photos
+
+      // Upload receipt and item photos for each expense
       for (let i = 0; i < expenses.length; i++) {
         const exp = expenses[i]
-        if (exp.receipt) {
-          await uploadPhotos(submission.id, [{ file: exp.receipt, caption: exp.category + (exp.description ? ' - ' + exp.description : '') }], 'receipt-' + i)
+        const photos = []
+        if (exp.receipt) photos.push({ file: exp.receipt, caption: 'Receipt: ' + exp.category + (exp.description ? ' - ' + exp.description : '') })
+        if (exp.itemPhoto) photos.push({ file: exp.itemPhoto, caption: 'Item: ' + exp.category + (exp.description ? ' - ' + exp.description : '') })
+        if (photos.length > 0) {
+          await uploadPhotos(submission.id, photos, 'expense-' + i)
         }
       }
+
       // Fire email
       try {
         const token = Object.keys(localStorage).map(k => k.startsWith('sb-') && k.endsWith('-auth-token') ? JSON.parse(localStorage.getItem(k))?.access_token : null).find(Boolean)
@@ -120,7 +104,6 @@ export default function ExpenseReportPage() {
       setSaving(false)
     }
   }
-
   const sHdr = { background: '#1a2332', color: '#fff', padding: '8px 12px', fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', borderRadius: '6px 6px 0 0' }
   const sBody = { background: '#fff', padding: '12px', border: '1px solid #e0e0e0', borderTop: 'none', borderRadius: '0 0 6px 6px' }
   const fld = { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }
@@ -194,7 +177,11 @@ export default function ExpenseReportPage() {
                 <label style={lbl}>Description / Vendor</label>
                 <input style={inp} value={exp.description} onChange={e => updExp(i, 'description', e.target.value)} placeholder="e.g. Shell Station, McDonald's, Hampton Inn..." />
               </div>
-              <PhotoPicker label="Receipt Photo" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} />
+              {/* DUAL PHOTO PICKERS */}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                <PhotoPicker label="Receipt Photo" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} capture="environment" />
+                <PhotoPicker label="Item / Purchase Photo" value={exp.itemPhoto} onChange={v => updExp(i, 'itemPhoto', v)} capture="environment" />
+              </div>
             </div>
           ))}
           <button type="button" onClick={addExp} style={{ width: '100%', padding: 8, background: '#f5f5f5', border: '1px dashed #ccc', borderRadius: 6, cursor: 'pointer', color: '#333', fontSize: 13 }}>
