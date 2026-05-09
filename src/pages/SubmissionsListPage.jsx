@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { fetchSubmissions } from '../lib/submissions'
+import { getQueueCount, processOfflineQueue } from '../lib/offlineSync'
 
 export default function SubmissionsListPage() {
   const { user } = useAuth()
@@ -10,6 +11,10 @@ export default function SubmissionsListPage() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('ALL')
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [queueCount, setQueueCount] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -52,6 +57,25 @@ export default function SubmissionsListPage() {
 
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
+      {/* OFFLINE BANNER */}
+      {!isOnline && (
+        <div style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
+          You are offline. Fill out forms normally - they will sync automatically when connection is restored.
+          {queueCount > 0 && <span style={{ marginLeft: 8 }}>({queueCount} pending)</span>}
+        </div>
+      )}
+      {isOnline && queueCount > 0 && (
+        <div style={{ background: '#2563eb', color: '#fff', padding: '8px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          {queueCount} submission{queueCount !== 1 ? 's' : ''} pending sync
+          <button onClick={handleSync} disabled={syncing}
+            style={{ background: '#fff', color: '#2563eb', border: 'none', borderRadius: 4, padding: '2px 10px', fontSize: 12, fontWeight: 700, cursor: syncing ? 'not-allowed' : 'pointer' }}>
+            {syncing ? 'Syncing...' : 'Sync Now'}
+          </button>
+        </div>
+      )}
+      {syncMsg && (
+        <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
+      )}
       {/* NAV */}
       <div style={navBar}>
         <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16 }}>📋 ReliableTrack</span>
