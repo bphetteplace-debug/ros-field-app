@@ -43,24 +43,27 @@ module.exports = async function handler(req, res) {
     const d = s.data || {}
 
     // Normalize fields
-    const workType  = s.work_type || d.typeOfWork || 'Billable Service'
-    const jobType   = d.jobType || (workType.toLowerCase().includes('pm') ? 'PM' : 'SC')
-    const pmNum     = s.pm_number || '????'
-    const customer  = s.customer_name || d.customerName || 'Unknown'
-    const location  = s.location_name || d.locationName || ''
-    const dateStr   = s.date || new Date().toISOString().slice(0, 10)
-    const techs     = Array.isArray(d.techs) ? d.techs : []
-    const parts     = Array.isArray(d.parts) ? d.parts : []
-    const isWarranty = !!d.warrantyWork
-    const partsTotal  = parts.reduce((sum, p) => sum + (parseFloat(p.price) || 0) * (parseInt(p.qty) || 0), 0)
-    const laborHours  = parseFloat(d.laborHours || s.labor_hours || 0)
-    const hourlyRate  = parseFloat(d.hourlyRate || s.labor_rate || 115)
-    const billable    = parseInt(d.billableTechs || 0) || techs.length
-    const miles       = parseFloat(d.miles || s.miles || 0)
-    const cpm         = parseFloat(d.costPerMile || s.cost_per_mile || 1.5)
-    const laborTotal  = isWarranty ? 0 : laborHours * hourlyRate * billable
-    const mileTotal   = miles * cpm
-    const grandTotal  = isWarranty ? 0 : partsTotal + laborTotal + mileTotal
+    const workType      = s.work_type  || d.typeOfWork       || 'Billable Service'
+    const jobType       = d.jobType    || (workType.toLowerCase().includes('pm') ? 'PM' : 'SC')
+    const pmNum         = s.pm_number  || '????'
+    const customer      = s.customer_name || d.customerName  || 'Unknown'
+    const location      = s.location_name || d.locationName  || ''
+    const dateStr       = s.date       || new Date().toISOString().slice(0, 10)
+    const techs         = Array.isArray(d.techs) ? d.techs   : []
+    const parts         = Array.isArray(d.parts) ? d.parts   : []
+    const isWarranty    = !!d.warrantyWork
+    const assetTag      = s.asset_tag  || d.assetTag         || ''
+    const workArea      = s.work_area  || d.workArea          || ''
+    const lastSvcDate   = d.lastServiceDate                   || ''
+    const partsTotal    = parts.reduce((sum, p) => sum + (parseFloat(p.price) || 0) * (parseInt(p.qty) || 0), 0)
+    const laborHours    = parseFloat(d.laborHours  || s.labor_hours  || 0)
+    const hourlyRate    = parseFloat(d.hourlyRate  || s.labor_rate   || 115)
+    const billable      = parseInt(d.billableTechs || 0) || techs.length
+    const miles         = parseFloat(d.miles       || s.miles        || 0)
+    const cpm           = parseFloat(d.costPerMile || s.cost_per_mile || 1.5)
+    const laborTotal    = isWarranty ? 0 : laborHours * hourlyRate * billable
+    const mileTotal     = miles * cpm
+    const grandTotal    = isWarranty ? 0 : partsTotal + laborTotal + mileTotal
 
     // PM equipment data
     const arrestors = jobType === 'PM' && Array.isArray(d.arrestors) ? d.arrestors : []
@@ -112,22 +115,25 @@ module.exports = async function handler(req, res) {
     txt('ReliableTrack - Built for Reliable Oilfield Services', ML, H - 38, { size: 9, color: rgb(0.8, 0.8, 0.8) })
     txt(docTitle, ML, H - 52, { size: 9, color: rgb(0.7, 0.7, 0.7) })
     txt(jobLabel, MR - 70, H - 20, { font: fontBold, size: 14, color: white })
-    txt(dateStr, MR - 70, H - 36, { size: 9, color: rgb(0.8, 0.8, 0.8) })
+    txt(dateStr,  MR - 70, H - 36, { size: 9, color: rgb(0.8, 0.8, 0.8) })
     y = H - 80
 
     // ── JOB INFO ────────────────────────────────────────────────────────────────
     section('JOB INFORMATION')
-    row('Customer', customer)
-    row('Location', location)
-    row('Date', dateStr)
-    row('Job Type', jobType === 'PM' ? 'Preventive Maintenance' : 'Service Call')
-    if (workType) row('Type of Work', workType)
-    if (s.truck_number || d.truckNumber) row('Truck #', s.truck_number || d.truckNumber)
-    if (s.contact || d.customerContact) row('Contact', s.contact || d.customerContact)
-    if (s.work_order || d.customerWorkOrder) row('Cust. WO #', s.work_order || d.customerWorkOrder)
-    if (s.gl_code || d.glCode) row('GL Code', s.gl_code || d.glCode)
-    if (s.start_time || d.startTime) row('Start Time', s.start_time || d.startTime)
-    if (s.departure_time || d.departureTime) row('Departure', s.departure_time || d.departureTime)
+    row('Customer',   customer)
+    row('Location',   location)
+    row('Date',       dateStr)
+    row('Job Type',   jobType === 'PM' ? 'Preventive Maintenance' : 'Service Call')
+    if (workType)                            row('Type of Work',      workType)
+    if (s.truck_number || d.truckNumber)     row('Truck #',           s.truck_number || d.truckNumber)
+    if (s.contact || d.customerContact)      row('Contact',           s.contact || d.customerContact)
+    if (s.work_order || d.customerWorkOrder) row('Cust. WO #',        s.work_order || d.customerWorkOrder)
+    if (s.gl_code || d.glCode)               row('GL Code',           s.gl_code || d.glCode)
+    if (assetTag)                            row('Asset Tag',         assetTag)
+    if (workArea)                            row('Work Area',         workArea)
+    if (s.start_time || d.startTime)         row('Start Time',        s.start_time || d.startTime)
+    if (s.departure_time || d.departureTime) row('Departure',         s.departure_time || d.departureTime)
+    if (lastSvcDate)                         row('Last Service Date', lastSvcDate)
     row('Technicians', techs.join(', ') || 'N/A')
     y -= 8
 
@@ -162,8 +168,8 @@ module.exports = async function handler(req, res) {
         gap(18)
         txt('Arrestor #' + (i + 1), ML, y, { font: fontBold, size: 10 })
         y -= 14
-        if (a.arrestorId) row('  ID / Tag', a.arrestorId)
-        row('  Condition', a.condition || 'Good')
+        if (a.arrestorId) row('  ID / Tag',      a.arrestorId)
+        row('  Condition',      a.condition || 'Good')
         row('  Filter Changed', a.filterChanged ? 'Yes' : 'No')
         if (a.notes) row('  Notes', a.notes)
         y -= 4
@@ -179,11 +185,11 @@ module.exports = async function handler(req, res) {
         gap(18)
         txt('Flare #' + (i + 1), ML, y, { font: fontBold, size: 10 })
         y -= 14
-        if (f.flareId) row('  ID / Tag', f.flareId)
-        row('  Condition', f.condition || 'Good')
-        row('  Pilot Lit on Departure', f.pilotLit ? 'Yes' : 'No')
-        if (f.lastIgnition) row('  Last Ignition', f.lastIgnition)
-        if (f.notes) row('  Notes', f.notes)
+        if (f.flareId)       row('  ID / Tag',            f.flareId)
+        row('  Condition',         f.condition || 'Good')
+        row('  Pilot Lit on Dep.', f.pilotLit ? 'Yes' : 'No')
+        if (f.lastIgnition)  row('  Last Ignition',       f.lastIgnition)
+        if (f.notes)         row('  Notes',               f.notes)
         y -= 4
       }
       y -= 4
@@ -197,12 +203,26 @@ module.exports = async function handler(req, res) {
         gap(18)
         txt('Heater Treater #' + (i + 1), ML, y, { font: fontBold, size: 10 })
         y -= 14
-        if (h.heaterId) row('  ID / Tag', h.heaterId)
-        row('  Condition', h.condition || 'Good')
-        if (h.lastCleanDate) row('  Last Tube Clean', h.lastCleanDate)
-        const ftCount = h.firetubeCnt || (Array.isArray(h.firetubes) ? h.firetubes.length : 1)
-        row('  Firetubes', ftCount)
-        if (h.notes) row('  Notes', h.notes)
+        if (h.heaterId)      row('  ID / Tag',         h.heaterId)
+        row('  Condition',       h.condition || 'Good')
+        if (h.lastCleanDate) row('  Last Tube Clean',  h.lastCleanDate)
+        if (h.notes)         row('  Notes',            h.notes)
+        // Individual firetube conditions
+        const fts = Array.isArray(h.firetubes) ? h.firetubes : []
+        if (fts.length > 0) {
+          gap(14)
+          txt('  Firetubes (' + fts.length + '):', ML, y, { font: fontBold, size: 9 })
+          y -= 12
+          for (let fi = 0; fi < fts.length; fi++) {
+            gap(12)
+            const ftCond = (fts[fi] && fts[fi].condition) ? fts[fi].condition : 'Good'
+            txt('    FT #' + (fi + 1) + ': ' + ftCond, ML + 8, y, { size: 9, color: ftCond === 'Replaced' ? rgb(0.8,0,0) : ftCond === 'Poor' ? rgb(0.7,0.3,0) : rgb(0,0,0) })
+            y -= 12
+          }
+        } else {
+          const ftCount = h.firetubeCnt || 1
+          row('  Firetubes', ftCount)
+        }
         y -= 4
       }
       y -= 4
@@ -221,11 +241,11 @@ module.exports = async function handler(req, res) {
       y -= 6
       for (const p of parts) {
         gap(14)
-        txt(p.sku || p.code || '',          ML,       y, { size: 9 })
-        txt(p.name || p.desc || '',         ML + 70,  y, { size: 9, maxWidth: 250 })
-        txt(String(p.qty || 1),             ML + 330, y, { size: 9 })
-        txt('$' + Number(p.price || 0).toFixed(2),   ML + 370, y, { size: 9 })
-        txt('$' + (Number(p.qty || 1) * Number(p.price || 0)).toFixed(2), ML + 430, y, { size: 9 })
+        txt(p.sku || p.code || '',                                              ML,       y, { size: 9 })
+        txt(p.name || p.desc || '',                                             ML + 70,  y, { size: 9, maxWidth: 250 })
+        txt(String(p.qty || 1),                                                 ML + 330, y, { size: 9 })
+        txt('$' + Number(p.price || 0).toFixed(2),                             ML + 370, y, { size: 9 })
+        txt('$' + (Number(p.qty || 1) * Number(p.price || 0)).toFixed(2),      ML + 430, y, { size: 9 })
         y -= 14
       }
       y -= 8
@@ -234,12 +254,12 @@ module.exports = async function handler(req, res) {
     // ── TOTALS ──────────────────────────────────────────────────────────────────
     section('COST SUMMARY')
     if (!isWarranty) {
-      row('Labor', '$' + laborTotal.toFixed(2) + ' (' + laborHours + ' hrs x $' + hourlyRate + '/hr x ' + billable + ' tech' + (billable !== 1 ? 's' : '') + ')')
-      row('Parts', '$' + partsTotal.toFixed(2))
+      row('Labor',   '$' + laborTotal.toFixed(2) + ' (' + laborHours + ' hrs x $' + hourlyRate + '/hr x ' + billable + ' tech' + (billable !== 1 ? 's' : '') + ')')
+      row('Parts',   '$' + partsTotal.toFixed(2))
       row('Mileage', '$' + mileTotal.toFixed(2) + ' (' + miles + ' mi x $' + cpm + '/mi)')
       gap(24)
       page.drawRectangle({ x: ML, y: y - 6, width: MR - ML, height: 22, color: rgb(0.95, 0.95, 0.95) })
-      txt('GRAND TOTAL:', ML + 4, y + 2, { font: fontBold, size: 13 })
+      txt('GRAND TOTAL:', ML + 4,  y + 2, { font: fontBold, size: 13 })
       txt('$' + grandTotal.toFixed(2), MR - 90, y + 2, { font: fontBold, size: 13, color: orange })
       y -= 30
     } else {
@@ -364,11 +384,16 @@ module.exports = async function handler(req, res) {
       if (heaters.length > 0) {
         pmEquipHtml += '<div style="margin-top:12px"><strong style="color:#1a2332">Heater Treaters</strong>'
           + '<table border="1" cellpadding="4" style="border-collapse:collapse;font-size:12px;margin:6px 0;width:100%">'
-          + '<tr style="background:#1a2332;color:#fff"><th>#</th><th>ID/Tag</th><th>Condition</th><th>Last Tube Clean</th><th>Firetubes</th><th>Notes</th></tr>'
+          + '<tr style="background:#1a2332;color:#fff"><th>#</th><th>ID/Tag</th><th>Condition</th><th>Last Tube Clean</th><th>Notes</th></tr>'
           + heaters.map((h, i) => {
-              const ftCount = h.firetubeCnt || (Array.isArray(h.firetubes) ? h.firetubes.length : 1)
+              const fts = Array.isArray(h.firetubes) ? h.firetubes : []
+              const ftSummary = fts.length > 0
+                ? fts.map((ft, fi) => 'FT' + (fi+1) + ': ' + ((ft && ft.condition) || 'Good')).join(', ')
+                : (h.firetubeCnt || 1) + ' firetube(s)'
               return '<tr><td>' + (i+1) + '</td><td>' + (h.heaterId || '') + '</td><td>' + (h.condition || 'Good')
-                + '</td><td>' + (h.lastCleanDate || '') + '</td><td>' + ftCount + '</td><td>' + (h.notes || '') + '</td></tr>'
+                + '</td><td>' + (h.lastCleanDate || '') + '</td><td>' + (h.notes || '') + '</td></tr>'
+                + (fts.length > 0 ? '<tr><td colspan="5" style="font-size:11px;color:#555;padding:3px 4px">'
+                  + '<em>Firetubes: ' + ftSummary + '</em></td></tr>' : '')
             }).join('')
           + '</table></div>'
       }
@@ -397,6 +422,9 @@ module.exports = async function handler(req, res) {
       + '<tr><td style="padding:5px 0;font-weight:bold;color:#1a2332">Technicians</td><td>' + techStr + '</td></tr>'
       + (s.contact || d.customerContact ? '<tr><td style="padding:5px 0;font-weight:bold;color:#1a2332">Contact</td><td>' + (s.contact || d.customerContact) + '</td></tr>' : '')
       + (s.work_order || d.customerWorkOrder ? '<tr><td style="padding:5px 0;font-weight:bold;color:#1a2332">Cust WO #</td><td>' + (s.work_order || d.customerWorkOrder) + '</td></tr>' : '')
+      + (assetTag ? '<tr><td style="padding:5px 0;font-weight:bold;color:#1a2332">Asset Tag</td><td>' + assetTag + '</td></tr>' : '')
+      + (workArea ? '<tr><td style="padding:5px 0;font-weight:bold;color:#1a2332">Work Area</td><td>' + workArea + '</td></tr>' : '')
+      + (lastSvcDate ? '<tr><td style="padding:5px 0;font-weight:bold;color:#1a2332">Last Service Date</td><td>' + lastSvcDate + '</td></tr>' : '')
       + '</table>'
       + pmEquipHtml
       + partsHtml
