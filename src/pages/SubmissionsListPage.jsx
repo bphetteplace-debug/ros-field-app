@@ -11,11 +11,13 @@ function getTypeLabel(s) {
   if (s.template === 'service_call') return 'SC'
   if (s.template === 'expense_report') return 'EXP'
   if (s.template === 'daily_inspection') return 'INSP'
+  if (s.template === 'jha') return 'JHA'
   const jt = s.data?.jobType || s.job_type || ''
   if (jt === 'PM') return 'PM'
   if (jt === 'Service Call') return 'SC'
   if (jt === 'Expense Report') return 'EXP'
   if (jt === 'Daily Inspection') return 'INSP'
+  if (jt === 'JHA/JSA') return 'JHA'
   return jt || '?'
 }
 function getTypeColor(s) {
@@ -24,6 +26,7 @@ function getTypeColor(s) {
   if (lbl === 'SC') return '#2563eb'
   if (lbl === 'EXP') return '#7c3aed'
   if (lbl === 'INSP') return '#0891b2'
+  if (lbl === 'JHA') return '#059669'
   return '#888'
 }
 
@@ -132,6 +135,7 @@ export default function SubmissionsListPage() {
           <Link to="/form?type=sc" style={{ background: '#2563eb', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ SC</Link>
           <Link to="/expense" style={{ background: '#7c3aed', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ Expense</Link>
           <Link to="/inspection" style={{ background: '#0891b2', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ Inspect</Link>
+          <Link to="/jha" style={{ background: '#059669', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ JHA</Link>
           <button onClick={handleLogout} disabled={loggingOut} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: loggingOut ? 'not-allowed' : 'pointer' }}>
             {loggingOut ? '...' : '🚪 Logout'}
           </button>
@@ -154,6 +158,7 @@ export default function SubmissionsListPage() {
             <option value="SC">Service Calls</option>
             <option value="EXP">Expenses</option>
             <option value="INSP">Inspections</option>
+                <option value="JHA">JHA / JSA</option>
           </select>
         </div>
 
