@@ -40,13 +40,10 @@ module.exports = async function handler(req, res) {
     if (template === 'daily_inspection') {
       return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
     }
-    //   if (template === 'jha') {
-    return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
-  }
     if (template === 'jha' || (d && d.jobType === 'JHA/JSA')) {
-    return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
-  }
-  Default: PM or SC
+      return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+    }
+    // Default: PM or SC
     return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
 
   } catch (err) {
