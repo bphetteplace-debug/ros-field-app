@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { saveSubmission, uploadPhotos, getNextPmNumber, fetchSettings, DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
+import { saveSubmission, uploadPhotos, getNextPmNumber, fetchSettings, DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS, queueOfflineSubmission } from '../lib/submissions'
 import { PARTS_CATALOG } from '../data/catalog'
 
 // Customers loaded dynamically from app_settings (fallback to DEFAULT_CUSTOMERS)
@@ -255,6 +255,30 @@ export default function FormPage() {
   const handleSubmit = async () => {
     if (!customerName || !locationName) { setSaveError('Customer and location are required'); return }
     setSaving(true); setSaveError(null)
+
+    // OFFLINE PATH: save to IndexedDB queue if no network
+    if (!navigator.onLine) {
+      try {
+        const formData = {
+          pmNumber, jobType, warrantyWork, customerName, truckNumber, locationName,
+          customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
+          date, startTime, departureTime, description, techs, equipment, parts,
+          miles, costPerMile, laborHours, hourlyRate, billableTechs,
+          arrestors: jobType==='PM' ? arrestors.map(a=>({arrestorId:a.arrestorId,condition:a.condition,filterChanged:a.filterChanged,notes:a.notes})) : [],
+          flares: jobType==='PM' ? flares.map(f=>({flareId:f.flareId,condition:f.condition,pilotLit:f.pilotLit,lastIgnition:f.lastIgnition,notes:f.notes})) : [],
+          heaters: jobType==='PM' ? heaters.map(h=>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length,firetubes:h.firetubes.map(ft=>({condition:ft.condition}))})) : [],
+          scEquipment: jobType==='Service Call' ? scEquipment : [],
+        }
+        await queueOfflineSubmission({ formData, userId: user.id })
+        localStorage.removeItem(DRAFT_KEY)
+        navigate('/submissions?offline=1')
+      } catch(e) {
+        setSaveError('Failed to save offline: ' + e.message)
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
     try {
       const formData = {
         pmNumber, jobType, warrantyWork, customerName, truckNumber,
@@ -366,6 +390,11 @@ export default function FormPage() {
         <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} #{pmNumber||'...'} - {jobType}</div>
       </div>
 
+      {!navigator.onLine && (
+        <div style={{ margin:'0 16px 10px', background:'#dc2626', color:'#fff', borderRadius:6, padding:'8px 12px', fontSize:13, fontWeight:700, textAlign:'center' }}>
+          You are offline — form will be saved locally and submitted when you're back online
+        </div>
+      )}
       {saveError && <div style={{ margin:'0 16px 10px', background:'#fee', border:'1px solid #faa', borderRadius:6, padding:'8px 12px', color:'#c00', fontSize:13 }}>{saveError}</div>}
       {hasDraft && (
         <div style={{ margin:'0 16px 10px', background:'#fffbe6', border:'1px solid #f0c040', borderRadius:6, padding:'10px 12px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
