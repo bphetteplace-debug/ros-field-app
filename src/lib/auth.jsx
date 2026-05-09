@@ -45,21 +45,20 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
- async function loadProfile(userId) {
-  const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-  const token = key ? JSON.parse(localStorage.getItem(key))?.access_token : null;
-  const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
-  const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  try {
-    const res = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=*&limit=1', {
-      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (token || SUPA_KEY) }
-    });
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
-  } catch (e) {
-    console.warn('loadProfile error:', e);
-  }
-}
+  async function loadProfile(userId) {
+    const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    const token = key ? JSON.parse(localStorage.getItem(key))?.access_token : null;
+    const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    try {
+      const res = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=*&limit=1', {
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (token || SUPA_KEY) }
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
+    } catch (e) {
+      console.warn('loadProfile error:', e);
+    }
   }
 
   async function signIn(email, password) {
@@ -95,4 +94,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
-            }
+}
