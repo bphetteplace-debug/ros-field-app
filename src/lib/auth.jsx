@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 // Admin email list — add/remove as needed
 const ADMIN_EMAILS = [
   'bphetteplace@reliableoilfieldservices.net',
-  'cphetteplace@reliableoilfieldservices.net',  // Caryl — update if email differs
+  'cphetteplace@reliableoilfieldservices.net', // Caryl — update if email differs
 ]
 
 export function AuthProvider({ children }) {
@@ -35,7 +35,10 @@ export function AuthProvider({ children }) {
         }
         setLoading(false);
       })
-      .catch(() => { clearTimeout(timeout); setLoading(false); });
+      .catch(() => {
+        clearTimeout(timeout);
+        setLoading(false);
+      });
 
     // Listen for auth state changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -49,7 +52,10 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    return () => { clearTimeout(timeout); subscription.unsubscribe(); };
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function loadProfile(userId) {
@@ -63,7 +69,9 @@ export function AuthProvider({ children }) {
       });
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
-    } catch (e) { console.warn('loadProfile error:', e); }
+    } catch (e) {
+      console.warn('loadProfile error:', e);
+    }
   }
 
   async function signIn(email, password) {
@@ -75,7 +83,21 @@ export function AuthProvider({ children }) {
 
   async function signOut() {
     if (!isCloudMode()) return;
-    await supabase.auth.signOut();
+    try {
+      // Attempt Supabase signOut (may fail if session already expired on mobile)
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('signOut error (non-fatal):', e);
+    }
+    // Always clear localStorage session tokens — critical for mobile
+    try {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('sb-') && (k.endsWith('-auth-token') || k.includes('-auth-'))) {
+          localStorage.removeItem(k);
+        }
+      });
+    } catch (e) {}
+    // Always clear React state
     setUser(null);
     setProfile(null);
   }
@@ -83,13 +105,9 @@ export function AuthProvider({ children }) {
   const isAdmin = profile?.role === 'admin' || ADMIN_EMAILS.includes(user?.email || '');
 
   const value = {
-    user,
-    profile,
-    loading,
+    user, profile, loading,
     isCloudMode: isCloudMode(),
-    signIn,
-    signOut,
-    isAdmin,
+    signIn, signOut, isAdmin,
     // Convenience: tech name from profile for auto-fill
     techName: profile?.full_name || null,
     truckNumber: profile?.truck_number || null,
