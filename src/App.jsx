@@ -9,6 +9,8 @@ import ViewSubmissionPage from './pages/ViewSubmissionPage.jsx';
 import EditSubmissionPage from './pages/EditSubmissionPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import ExpenseReportPage from './pages/ExpenseReportPage.jsx';
+import DailyInspectionPage from './pages/DailyInspectionPage.jsx';
 
 export default function App() {
   const { user, loading, isAdmin } = useAuth();
@@ -35,6 +37,8 @@ export default function App() {
       <Routes>
         <Route path="/submissions" element={<SubmissionsListPage />} />
         <Route path="/form" element={<FormPage />} />
+        <Route path="/expense" element={<ExpenseReportPage />} />
+        <Route path="/inspection" element={<DailyInspectionPage />} />
         <Route path="/preview" element={<PreviewPage />} />
         <Route path="/view/:id" element={<ViewSubmissionPage />} />
         <Route path="/edit/:id" element={isAdmin ? <EditSubmissionPage /> : <Navigate to="/submissions" replace />} />
