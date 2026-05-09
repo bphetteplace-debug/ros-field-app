@@ -430,9 +430,9 @@ export default function ViewSubmissionPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>Step {i + 1}</div>
-                          <div style={{ fontWeight: 600, marginBottom: 4 }}>{step.task || step.step || '-'}</div>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>{step.taskStep || step.task || step.step || '-'}</div>
                           {step.hazard && <div style={{ fontSize: 13, color: '#555', marginBottom: 4 }}><strong>Hazard:</strong> {step.hazard}</div>}
-                          {step.control && <div style={{ fontSize: 13, color: '#555' }}><strong>Control:</strong> {step.control}</div>}
+                          {(step.controls || step.control) && <div style={{ fontSize: 13, color: '#555' }}><strong>Control Measures:</strong> {step.controls || step.control}</div>}
                         </div>
                         {step.risk && <div style={{ padding: '2px 8px', borderRadius: 4, background: riskBg, color: riskColor, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{step.risk}</div>}
                       </div>
