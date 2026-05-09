@@ -350,6 +350,21 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack • Reliable Oilfield Services</div>'
     + '</div>';
 
+  // SC video links
+  var scVids2 = photos.filter(function(p) { return p.section === 'arrival-video' || p.section === 'departure-video'; });
+  var videoEmailHtml2 = '';
+  if (!isPM && scVids2.length > 0) {
+    var vRows2 = scVids2.map(function(v) {
+      var vLbl2 = v.section === 'arrival-video' ? 'Arrival - Before Work' : 'Departure - After Work';
+      var vLink2 = SUPA_URL + '/storage/v1/object/public/submission-photos/' + (v.storage_path || '');
+      return '<tr><td style="padding:8px;font-weight:bold;font-size:13px;width:200px">' + vLbl2 + '</td>'
+        + '<td style="padding:8px;font-size:13px"><a href="' + vLink2 + '" style="color:#1a56db">Download</a></td></tr>';
+    }).join('');
+    videoEmailHtml2 = '<h3 style="color:#102558;border-bottom:2px solid #ef6600;padding-bottom:6px">Arrival and Departure Videos</h3>'
+      + '<p style="font-size:12px;color:#666;margin-bottom:8px">Click links to download.</p>'
+      + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px">' + vRows2 + '</table>';
+  }
+
   const emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
@@ -357,7 +372,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
       from: FROM,
       to: TO,
       subject: label + ' - ' + (sub.customer_name||'') + ' - ' + fmtDate(sub.date),
-      html,
+      html: html + videoEmailHtml2,
       attachments: [{ filename: label.replace('#','').replace(' ','-') + '-report.pdf', content: pdfB64 }],
     }),
   });
