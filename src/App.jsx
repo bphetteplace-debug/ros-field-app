@@ -6,6 +6,7 @@ import FormPage from './pages/FormPage.jsx';
 import PreviewPage from './pages/PreviewPage.jsx';
 import SubmissionsListPage from './pages/SubmissionsListPage.jsx';
 import ViewSubmissionPage from './pages/ViewSubmissionPage.jsx';
+import EditSubmissionPage from './pages/EditSubmissionPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 
@@ -33,13 +34,14 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/submissions" element={<SubmissionsListPage />} />
-        <Route path="/form"        element={<FormPage />} />
-        <Route path="/preview"     element={<PreviewPage />} />
-        <Route path="/view/:id"    element={<ViewSubmissionPage />} />
-        <Route path="/admin"       element={isAdmin ? <AdminPage />    : <Navigate to="/submissions" replace />} />
-        <Route path="/settings"    element={isAdmin ? <SettingsPage /> : <Navigate to="/submissions" replace />} />
-        <Route path="/login"       element={<Navigate to="/submissions" replace />} />
-        <Route path="*"            element={<Navigate to="/submissions" replace />} />
+        <Route path="/form" element={<FormPage />} />
+        <Route path="/preview" element={<PreviewPage />} />
+        <Route path="/view/:id" element={<ViewSubmissionPage />} />
+        <Route path="/edit/:id" element={isAdmin ? <EditSubmissionPage /> : <Navigate to="/submissions" replace />} />
+        <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/submissions" replace />} />
+        <Route path="/settings" element={isAdmin ? <SettingsPage /> : <Navigate to="/submissions" replace />} />
+        <Route path="/login" element={<Navigate to="/submissions" replace />} />
+        <Route path="*" element={<Navigate to="/submissions" replace />} />
       </Routes>
     </Layout>
   );
