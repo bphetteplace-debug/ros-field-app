@@ -95,6 +95,8 @@ export async function saveSubmission(formData, userId, templateOverride) {
     expenseItems, expenseTotal,
     // Daily Inspection fields
     inspectionType, odometer, checkItems, failCount, allPass, defects,
+    // GPS location
+    gpsLat, gpsLng, gpsAccuracy,
   } = formData;
 
   // Always ensure pm_number is set — expense/inspection forms pass null, so auto-generate
@@ -164,6 +166,10 @@ export async function saveSubmission(formData, userId, templateOverride) {
       failCount: failCount || 0,
       allPass: allPass !== undefined ? allPass : true,
       defects: defects || '',
+      // GPS location
+      gpsLat: gpsLat || null,
+      gpsLng: gpsLng || null,
+      gpsAccuracy: gpsAccuracy || null,
     },
   };
 
