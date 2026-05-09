@@ -304,6 +304,27 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     await embedPhotosOnPage(pdfDoc, page, photos, 'work', rgb, 200, y);
   }
 
+  // SC Video Links in PDF
+  const scVideos = photos.filter(function(p) { return p.section === 'arrival-video' || p.section === 'departure-video'; });
+  if (!isPM && scVideos.length > 0) {
+    if (y < 120) { addPage(pdfDoc); y = 720; }
+    page.drawText('ARRIVAL & DEPARTURE VIDEOS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
+    y -= 14;
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
+    y -= 14;
+    page.drawText('Videos cannot be embedded in PDF. Download links below.', { x: 54, y: y, size: 8, font: regFont, color: GRAY });
+    y -= 14;
+    for (var vi = 0; vi < scVideos.length; vi++) {
+      var vid = scVideos[vi];
+      if (y < 80) break;
+      var vidLabel = vid.section === 'arrival-video' ? 'Arrival (Before Work):' : 'Departure (After Work):';
+      var vidUrl = SUPA_URL + '/storage/v1/object/public/submission-photos/' + vid.storage_path;
+      page.drawText(vidLabel + ' ' + vidUrl, { x: 54, y: y, size: 7, font: regFont, color: rgb(0.1, 0.3, 0.8) });
+      y -= 12;
+    }
+    y -= 6;
+  }
+
   const pdfBytes = await pdfDoc.save();
   const pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
@@ -350,6 +371,21 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack • Reliable Oilfield Services</div>'
     + '</div>';
 
+  // SC video links section
+  const scVideoPhotos = photos.filter(function(p) { return p.section === 'arrival-video' || p.section === 'departure-video'; });
+  let videoLinksHtml = '';
+  if (!isPM && scVideoPhotos.length > 0) {
+    const videoRows = scVideoPhotos.map(function(v) {
+      const vLabel = v.section === 'arrival-video' ? 'Arrival Video - Before Work' : 'Departure Video - After Work';
+      const vUrl = SUPA_URL + '/storage/v1/object/public/submission-photos/' + v.storage_path;
+      return '<tr><td style="padding:8px;background:#f0f4ff;font-weight:bold;font-size:13px;width:200px">' + vLabel + '</td>'
+        + '<td style="padding:8px;font-size:13px"><a href="' + vUrl + '" style="color:#1a56db">Download Video</a></td></tr>';
+    }).join('');
+    videoLinksHtml = '<h3 style="color:#102558;border-bottom:2px solid #ef6600;padding-bottom:6px">Arrival &amp; Departure Videos</h3>'
+      + '<p style="font-size:12px;color:#666;margin-bottom:8px">Videos are stored separately. Click a link to download or view.</p>'
+      + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">' + videoRows + '</table>';
+  }
+
   const emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
@@ -357,7 +393,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
       from: FROM,
       to: TO,
       subject: label + ' - ' + (sub.customer_name||'') + ' - ' + fmtDate(sub.date),
-      html,
+      html + videoLinksHtml,
       attachments: [{ filename: label.replace('#','').replace(' ','-') + '-report.pdf', content: pdfB64 }],
     }),
   });
