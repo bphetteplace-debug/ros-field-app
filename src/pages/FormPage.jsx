@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { saveSubmission, uploadPhotos, getNextPmNumber } from '../lib/submissions'
+import { saveSubmission, uploadPhotos, getNextPmNumber, fetchSettings, DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
 import { PARTS_CATALOG } from '../data/catalog'
 
-const CUSTOMERS = ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS']
-const TRUCKS = ['0001','0002','0003','0004','0005','0006','0007']
+// Customers loaded dynamically from app_settings (fallback to DEFAULT_CUSTOMERS)
+// Trucks loaded dynamically from app_settings (fallback to DEFAULT_TRUCKS)
 const WORK_TYPES = [
   'Billable Pm','Warranty Kalos','Warranty ROS','Material Drop Off Billable',
   'Install Billable','Billable Service','Billable Material Pickup',
   'PM Flare/Combustor Flame Arrester','PM Flare','PM BMS',
   'Billable Theif Hatch','Billable PRV','Billable PSV',
 ]
-const TECHS_LIST = ['Matthew Reid','Vladimir Rivero','Pedro Perez']
+// Techs loaded dynamically from app_settings (fallback to DEFAULT_TECHS)
 const CONDITION_OPTS = ['Good','Fair','Poor','Replaced']
 const nowStr = () => new Date().toTimeString().slice(0, 5)
 
@@ -74,6 +74,12 @@ function PhotoPicker({ label, value, onChange }) {
     </div>
   )
 }
+const SC_EQUIP_TYPES = [
+  'BMS / Controller','Flame Arrestor','Flare / Combustor','Heater Treater',
+  'Pilot Assembly','Pressure Vessel','Pump','Regulator','Separator',
+  'Solar / Battery','Thermocouple / Thermowell','Valve','Wiring / Electrical','Other'
+]
+
 export default function FormPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -82,6 +88,10 @@ export default function FormPage() {
   const jobTypeParam = (typeParam === 'sc' || typeParam === 'service') ? 'Service Call' : 'PM'
 
   const [pmNumber, setPmNumber] = useState(null)
+  // Dynamic lists from app_settings table (fallback to hardcoded defaults)
+  const [CUSTOMERS, setCUSTOMERS] = useState(DEFAULT_CUSTOMERS)
+  const [TRUCKS,    setTRUCKS]    = useState(DEFAULT_TRUCKS)
+  const [TECHS_LIST, setTECHS_LIST] = useState(DEFAULT_TECHS)
   const [jobType] = useState(jobTypeParam)
   const [warrantyWork, setWarrantyWork] = useState(false)
   const [customerName, setCustomerName] = useState(CUSTOMERS[0])
@@ -149,6 +159,15 @@ export default function FormPage() {
   })
 
   useEffect(() => { getNextPmNumber().then(setPmNumber).catch(() => setPmNumber(9136)) }, [])
+  // Load dynamic lists from app_settings
+  useEffect(() => {
+    fetchSettings().then(s => {
+      if (!s) return
+      if (s.customers && s.customers.length > 0) setCUSTOMERS(s.customers)
+      if (s.trucks    && s.trucks.length > 0)    setTRUCKS(s.trucks)
+      if (s.techs     && s.techs.length > 0)     setTECHS_LIST(s.techs)
+    }).catch(() => {})
+  }, [])
   // Check for draft on mount
   useEffect(() => {
     try {
@@ -350,7 +369,7 @@ export default function FormPage() {
       {saveError && <div style={{ margin:'0 16px 10px', background:'#fee', border:'1px solid #faa', borderRadius:6, padding:'8px 12px', color:'#c00', fontSize:13 }}>{saveError}</div>}
       {hasDraft && (
         <div style={{ margin:'0 16px 10px', background:'#fffbe6', border:'1px solid #f0c040', borderRadius:6, padding:'10px 12px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-          <span style={{ fontSize:13, color:'#7a5c00', fontWeight:600 }}>📝 You have an unsaved draft. Resume where you left off?</span>
+          <span style={{ fontSize:13, color:'#7a5c00', fontWeight:600 }}>📝 Draft restored (text only — photos are not saved in drafts)</span>
           <div style={{ display:'flex', gap:6, flexShrink:0 }}>
             <button type="button" onClick={() => { try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY)); loadDraft(d); } catch(e){} setHasDraft(false) }} style={{ padding:'5px 12px', background:'#e65c00', color:'#fff', border:'none', borderRadius:5, fontWeight:700, fontSize:12, cursor:'pointer' }}>Resume</button>
             <button type="button" onClick={() => { localStorage.removeItem(DRAFT_KEY); setHasDraft(false) }} style={{ padding:'5px 10px', background:'#f5f5f5', color:'#555', border:'1px solid #ddd', borderRadius:5, fontSize:12, cursor:'pointer' }}>Discard</button>
@@ -358,7 +377,7 @@ export default function FormPage() {
         </div>
       )}
       {draftSaved && (
-        <div style={{ margin:'0 16px 6px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:5, padding:'5px 10px', fontSize:12, color:'#15803d', fontWeight:600 }}>✓ Draft saved</div>
+        <div style={{ margin:'0 16px 6px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:5, padding:'5px 10px', fontSize:12, color:'#15803d', fontWeight:600 }}>✓ Draft saved (photos not included)</div>
       )}
 
       {/* JOB INFORMATION */}
@@ -459,7 +478,45 @@ export default function FormPage() {
           </div>
         </div>
       </div>
-      {/* PM-ONLY SECTIONS */}
+      {/* SC-ONLY: EQUIPMENT WORKED ON */}
+      {jobType === 'Service Call' && (
+        <div style={{ margin:'0 0 10px' }}>
+          <div style={sHdr}>Equipment Worked On</div>
+          <div style={sBody}>
+            <div style={{ fontSize:12, color:'#666', marginBottom:8 }}>Select all equipment types worked on this call:</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:12 }}>
+              {SC_EQUIP_TYPES.map(type => {
+                const active = scEquipment.some(e => e.type === type)
+                return (
+                  <button key={type} type="button"
+                    onClick={() => {
+                      if (active) setScEquipment(prev => prev.filter(e => e.type !== type))
+                      else setScEquipment(prev => [...prev, { type, notes: '' }])
+                    }}
+                    style={{ padding:'6px 12px', borderRadius:16, fontSize:12, fontWeight:600, cursor:'pointer',
+                      border:'2px solid '+(active?'#1a2332':'#ddd'),
+                      background:active?'#1a2332':'#fff', color:active?'#fff':'#333' }}>
+                    {type}
+                  </button>
+                )
+              })}
+            </div>
+            {scEquipment.map((item, i) => (
+              <div key={item.type} style={{ marginBottom:8 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#1a2332', marginBottom:3 }}>{item.type} — Notes</div>
+                <input style={inp} placeholder={"Notes for " + item.type + " (optional)..."}
+                  value={item.notes}
+                  onChange={e => setScEquipment(prev => prev.map((x,xi) => xi===i ? {...x,notes:e.target.value} : x))} />
+              </div>
+            ))}
+            {scEquipment.length === 0 && (
+              <div style={{ fontSize:12, color:'#aaa', textAlign:'center', padding:'8px 0' }}>No equipment selected</div>
+            )}
+          </div>
+        </div>
+      )}
+
+            {/* PM-ONLY SECTIONS */}
       {jobType === 'PM' && (
         <>
           {/* FLAME ARRESTORS */}
