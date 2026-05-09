@@ -179,7 +179,7 @@ export default function AdminPage() {
               const techs = Array.isArray(s.data?.techs) ? s.data.techs : []
               const grandTotal = s.data?.grandTotal || 0
               const isWarranty = s.data?.warrantyWork
-              const submittedBy = s.profiles?.full_name || s.created_by?.slice(0, 8) || '—'
+              const submittedBy = s.profiles?.full_name || (Array.isArray(s.data?.techs) && s.data.techs[0]) || '-'
               return (
                 <Link key={s.id} to={'/view/' + s.id} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div style={{
