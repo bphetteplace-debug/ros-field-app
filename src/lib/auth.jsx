@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
     isCloudMode: isCloudMode(),
     signIn,
     signOut,
-    isAdmin: profile?.role === 'admin',
+   isAdmin: profile?.role === 'admin' || user?.email === 'bphetteplace@reliableoilfieldservices.net',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
