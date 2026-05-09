@@ -16,10 +16,11 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    const timeout = setTimeout(() => setLoading(false), 4000);
+    // Safety timeout — never hang longer than 3s
+    const timeout = setTimeout(() => setLoading(false), 3000);
 
+    // Check for existing session on mount
     supabase.auth.getSession()
-      .catch(() => ({ data: { session: null } }))
       .then(async ({ data: { session } }) => {
         clearTimeout(timeout);
         if (session?.user) {
@@ -27,9 +28,14 @@ export function AuthProvider({ children }) {
           await loadProfile(session.user.id);
         }
         setLoading(false);
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        setLoading(false);
       });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Listen for auth state changes (sign in, sign out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user);
         await loadProfile(session.user.id);
@@ -37,11 +43,13 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfile(null);
       }
+      // Always clear loading after any auth event
+      setLoading(false);
     });
 
     return () => {
       clearTimeout(timeout);
-      subscription.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -52,7 +60,10 @@ export function AuthProvider({ children }) {
     const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
     try {
       const res = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=*&limit=1', {
-        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (token || SUPA_KEY) }
+        headers: {
+          apikey: SUPA_KEY,
+          Authorization: 'Bearer ' + (token || SUPA_KEY)
+        }
       });
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
@@ -84,7 +95,7 @@ export function AuthProvider({ children }) {
     isCloudMode: isCloudMode(),
     signIn,
     signOut,
-   isAdmin: profile?.role === 'admin' || user?.email === 'bphetteplace@reliableoilfieldservices.net',
+    isAdmin: profile?.role === 'admin' || user?.email === 'bphetteplace@reliableoilfieldservices.net',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
