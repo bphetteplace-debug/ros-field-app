@@ -81,7 +81,7 @@ const SC_EQUIP_TYPES = [
 ]
 
 export default function FormPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const typeParam = searchParams.get('type') || 'pm'
@@ -197,6 +197,20 @@ export default function FormPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Auto-select logged-in tech name and truck from profile (#7)
+  useEffect(() => {
+    if (!profile?.full_name) return
+    // Auto-select this tech if not already selected and not coming from a copy prefill
+    if (!sessionStorage.getItem('ros_copy_prefill')) {
+      setTechs(ts => ts.includes(profile.full_name) ? ts : [...ts, profile.full_name])
+    }
+    // Auto-set truck number from profile if field is still default
+    if (profile.truck_number) {
+      setTruckNumber(tn => tn === TRUCKS[2] ? profile.truck_number : tn)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.full_name, profile?.truck_number])
 
 
   const toggleTech = (t) => setTechs(ts => ts.includes(t) ? ts.filter(x=>x!==t) : [...ts,t])
