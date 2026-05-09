@@ -131,6 +131,26 @@ export default function FormPage() {
   const draftTimerRef = useRef(null)
 
   const [saveError, setSaveError] = useState(null)
+  // GPS location state
+  const [gpsLat, setGpsLat] = useState(null)
+  const [gpsLng, setGpsLng] = useState(null)
+  const [gpsAccuracy, setGpsAccuracy] = useState(null)
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [gpsError, setGpsError] = useState(null)
+  const captureGPS = () => {
+    if (!navigator.geolocation) { setGpsError('GPS not supported on this device'); return }
+    setGpsLoading(true); setGpsError(null)
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setGpsLat(pos.coords.latitude)
+        setGpsLng(pos.coords.longitude)
+        setGpsAccuracy(Math.round(pos.coords.accuracy))
+        setGpsLoading(false)
+      },
+      err => { setGpsError('GPS error: ' + err.message); setGpsLoading(false) },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
+  }
 
   // PM equipment state
   const mkArr = () => ({ arrestorId: '', condition: 'Good', filterChanged: false, notes: '', before1: null, before2: null, after1: null, after2: null })
@@ -316,6 +336,7 @@ export default function FormPage() {
         glCode, assetTag, workArea, date, startTime, departureTime,
         lastServiceDate, description, techs, equipment, parts,
         miles, costPerMile, laborHours, hourlyRate, billableTechs,
+        gpsLat, gpsLng, gpsAccuracy,
         arrestors: jobType==='PM' ? arrestors.map(a=>({arrestorId:a.arrestorId,condition:a.condition,filterChanged:a.filterChanged,notes:a.notes})) : [],
         flares: jobType==='PM' ? flares.map(f=>({flareId:f.flareId,condition:f.condition,pilotLit:f.pilotLit,lastIgnition:f.lastIgnition,notes:f.notes})) : [],
         heaters: jobType==='PM' ? heaters.map(h=>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length})) : [],
@@ -453,6 +474,21 @@ export default function FormPage() {
           </div>
           <div style={{ marginBottom:10 }}><label style={lbl}>Location / Well Name *</label>
             <input style={inp} value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="e.g. Pad A - Well 12" />
+          {/* GPS CAPTURE */}
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={captureGPS} disabled={gpsLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: gpsLat ? '#16a34a' : '#1a2332', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: gpsLoading ? 'not-allowed' : 'pointer' }}>
+              {gpsLoading ? '⏳ Getting GPS...' : gpsLat ? '📍 GPS Captured' : '📍 Capture GPS Location'}
+            </button>
+            {gpsLat && (
+              <a href={'https://maps.google.com/?q=' + gpsLat + ',' + gpsLng} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 12, color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}>
+                View on Map ↗
+              </a>
+            )}
+            {gpsLat && <span style={{ fontSize: 11, color: '#888' }}>±{gpsAccuracy}m accuracy</span>}
+            {gpsError && <span style={{ fontSize: 11, color: '#c00' }}>{gpsError}</span>}
+          </div>
           </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Contact</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} /></div>
