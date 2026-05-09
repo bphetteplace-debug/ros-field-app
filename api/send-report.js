@@ -5,11 +5,8 @@ const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'h
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 const RESEND_KEY = process.env.RESEND_API_KEY
 const TO = process.env.EMAIL_TO ? process.env.EMAIL_TO.split(',').map(e => e.trim()) : ['bphetteplace@reliableoilfieldservices.net']
-// FROM: use onboarding@resend.dev (always works) until reliable-oilfield-services.com domain verifies in Resend
-// Once domain SPF+MX go green at resend.com/domains, update RESEND_FROM env var and remove this line
-const FROM = process.env.RESEND_FROM && !process.env.RESEND_FROM.includes('reliable-oilfield-services.com')
-  ? process.env.RESEND_FROM
-  : 'ReliableTrack <onboarding@resend.dev>'
+// FROM: domain is verified — use RESEND_FROM env var directly
+const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>'
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -131,14 +128,22 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── HEADER ────────────────────────────────────────────────────────────────────
-    page.drawRectangle({ x: 0, y: H - 65, width: W, height: 65, color: navy })
-    txt('RELIABLE OILFIELD SERVICES', ML, H - 22, { font: fontBold, size: 15, color: orange })
-    txt('ReliableTrack - Built for Reliable Oilfield Services', ML, H - 38, { size: 9, color: rgb(0.8, 0.8, 0.8) })
-    txt(docTitle, ML, H - 52, { size: 9, color: rgb(0.7, 0.7, 0.7) })
-    txt(jobLabel, MR - 70, H - 20, { font: fontBold, size: 14, color: white })
-    txt(dateStr, MR - 70, H - 36, { size: 9, color: rgb(0.8, 0.8, 0.8) })
-    y = H - 80
+    // ── HEADER ──────────────────────────────────────────────────────────────────
+    // Full-width navy header bar (80pt tall)
+    page.drawRectangle({ x: 0, y: H - 80, width: W, height: 80, color: navy })
+    // Orange accent line at bottom of header
+    page.drawRectangle({ x: 0, y: H - 82, width: W, height: 2, color: orange })
+    // Orange circle logo mark
+    page.drawCircle({ x: ML + 18, y: H - 38, size: 18, color: orange })
+    txt('R', ML + 13, H - 44, { font: fontBold, size: 14, color: navy })
+    // Company name & subtitle
+    txt('RELIABLE OILFIELD SERVICES', ML + 42, H - 24, { font: fontBold, size: 15, color: orange })
+    txt('ReliableTrack  |  Built for Reliable Oilfield Services', ML + 42, H - 40, { size: 9, color: rgb(0.8, 0.8, 0.8) })
+    txt(docTitle, ML + 42, H - 54, { size: 9, color: rgb(0.7, 0.7, 0.7) })
+    // Job label + date top-right
+    txt(jobLabel, MR - 80, H - 24, { font: fontBold, size: 14, color: white })
+    txt(dateStr, MR - 80, H - 40, { size: 9, color: rgb(0.8, 0.8, 0.8) })
+    y = H - 95
 
     // ── JOB INFO ──────────────────────────────────────────────────────────────────
     section('JOB INFORMATION')
