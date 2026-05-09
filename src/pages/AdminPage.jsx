@@ -15,7 +15,6 @@ function getTypeLabel(s) {
   if (jt === 'Daily Inspection') return 'INSP'
   return s.template || '?'
 }
-
 function getTypeColor(s) {
   const lbl = getTypeLabel(s)
   if (lbl === 'PM') return '#e65c00'
@@ -25,6 +24,120 @@ function getTypeColor(s) {
   return '#888'
 }
 
+// ── EXPENSE ANALYTICS ──────────────────────────────────────────────────────────
+function getWeekRange() {
+  const now = new Date()
+  const day = now.getDay()
+  const start = new Date(now); start.setDate(now.getDate() - day); start.setHours(0,0,0,0)
+  const end = new Date(start); end.setDate(start.getDate() + 6); end.setHours(23,59,59,999)
+  return { start, end }
+}
+function getMonthRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  return { start, end }
+}
+function getYearRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 1)
+  const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59)
+  return { start, end }
+}
+
+function ExpenseAnalytics({ submissions }) {
+  const [period, setPeriod] = useState('month')
+
+  const expenseSubmissions = submissions.filter(s => getTypeLabel(s) === 'EXP')
+
+  const getRangeForPeriod = (p) => {
+    if (p === 'week') return getWeekRange()
+    if (p === 'month') return getMonthRange()
+    return getYearRange()
+  }
+
+  const filtered = expenseSubmissions.filter(s => {
+    if (!s.date) return false
+    const d = new Date(s.date)
+    const { start, end } = getRangeForPeriod(period)
+    return d >= start && d <= end
+  })
+
+  // Group by tech
+  const byTech = {}
+  for (const s of filtered) {
+    const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
+    if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, items: [] }
+    byTech[tech].total += parseFloat(s.data?.expenseTotal || 0)
+    byTech[tech].count += 1
+    byTech[tech].items.push(s)
+  }
+
+  const allTechTotals = Object.entries(byTech).sort((a, b) => b[1].total - a[1].total)
+  const grandTotal = allTechTotals.reduce((sum, [, v]) => sum + v.total, 0)
+
+  const fmt = n => '$' + (n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
+  const periodLabels = { week: 'This Week', month: 'This Month', year: 'This Year' }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ background: '#7c3aed', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>💜 Expense Tracking by Tech</span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['week', 'month', 'year'].map(p => (
+            <button key={p} onClick={() => setPeriod(p)} style={{
+              padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: period === p ? '#fff' : 'rgba(255,255,255,0.2)',
+              color: period === p ? '#7c3aed' : '#fff'
+            }}>{periodLabels[p]}</button>
+          ))}
+        </div>
+      </div>
+      {allTechTotals.length === 0 ? (
+        <div style={{ padding: '24px 16px', textAlign: 'center', color: '#aaa', fontSize: 13 }}>
+          No expense reports for {periodLabels[period].toLowerCase()}
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8f4ff' }}>
+                <th style={{ textAlign: 'left', padding: '8px 16px', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase' }}>Technician</th>
+                <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase' }}>Reports</th>
+                <th style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase' }}>Total</th>
+                <th style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase' }}>% of Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allTechTotals.map(([tech, data], i) => (
+                <tr key={tech} style={{ borderTop: '1px solid #f0f0f0', background: i % 2 === 0 ? '#fff' : '#fdf8ff' }}>
+                  <td style={{ padding: '8px 16px', fontWeight: 600, color: '#1a2332' }}>{tech}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center', color: '#666' }}>{data.count}</td>
+                  <td style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 700, color: '#7c3aed' }}>{fmt(data.total)}</td>
+                  <td style={{ padding: '8px 16px', textAlign: 'right', color: '#888' }}>
+                    {grandTotal > 0 ? Math.round((data.total / grandTotal) * 100) + '%' : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #7c3aed', background: '#f8f4ff' }}>
+                <td style={{ padding: '8px 16px', fontWeight: 800, color: '#1a2332' }}>TOTAL ({periodLabels[period]})</td>
+                <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700, color: '#1a2332' }}>{allTechTotals.reduce((s, [,v]) => s + v.count, 0)}</td>
+                <td style={{ padding: '8px 16px', textAlign: 'right', fontWeight: 800, color: '#7c3aed', fontSize: 15 }}>{fmt(grandTotal)}</td>
+                <td style={{ padding: '8px 16px', textAlign: 'right', color: '#888' }}>100%</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style={{ padding: '6px 16px 10px', fontSize: 11, color: '#aaa' }}>
+            All {expenseSubmissions.length} expense reports total: {fmt(expenseSubmissions.reduce((s, e) => s + parseFloat(e.data?.expenseTotal || 0), 0))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 export default function AdminPage() {
   const { isAdmin, loading: authLoading } = useAuth()
   const navigate = useNavigate()
@@ -38,6 +151,7 @@ export default function AdminPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [deleting, setDeleting] = useState(null)
+  const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses'
 
   const handleStatusChange = async (id, newStatus) => {
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
@@ -52,8 +166,11 @@ export default function AdminPage() {
     try {
       await deleteSubmission(s.id)
       setSubmissions(prev => prev.filter(x => x.id !== s.id))
-    } catch(e) { alert('Delete failed: ' + e.message) }
-    finally { setDeleting(null) }
+    } catch(e) {
+      alert('Delete failed: ' + e.message)
+    } finally {
+      setDeleting(null)
+    }
   }
 
   useEffect(() => {
@@ -84,11 +201,7 @@ export default function AdminPage() {
     const matchesDate = (!dateFrom || s.date >= dateFrom) && (!dateTo || s.date <= dateTo)
     if (!matchesType || !matchesStatus || !matchesTech || !matchesDate) return false
     if (!q) return true
-    const haystack = [
-      s.customer_name, s.location_name, s.date, s.truck_number,
-      s.pm_number ? String(s.pm_number) : '', s.summary, s.profiles?.full_name, s.work_type,
-      ...(Array.isArray(s.data?.techs) ? s.data.techs : [])
-    ].filter(Boolean).join(' ').toLowerCase()
+    const haystack = [s.customer_name, s.location_name, s.date, s.truck_number, s.pm_number ? String(s.pm_number) : '', s.summary, s.profiles?.full_name, s.work_type, ...(Array.isArray(s.data?.techs) ? s.data.techs : [])].filter(Boolean).join(' ').toLowerCase()
     return haystack.includes(q)
   })
 
@@ -110,10 +223,8 @@ export default function AdminPage() {
       <div style={{ fontSize: 20, fontWeight: 800, color: color || '#1a2332', marginTop: 4 }}>{value}</div>
     </div>
   )
-
   const hasFilters = search || filterType !== 'ALL' || filterStatus !== 'ALL' || filterTech !== 'ALL' || dateFrom || dateTo
   const clearFilters = () => { setSearch(''); setFilterType('ALL'); setFilterStatus('ALL'); setFilterTech('ALL'); setDateFrom(''); setDateTo('') }
-
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
       <div style={navBar}>
@@ -125,161 +236,143 @@ export default function AdminPage() {
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '12px 12px 80px' }}>
-        {/* STAT CARDS */}
-        {!loading && !error && (
-          <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-            {statCard('Total Jobs', filtered.length)}
-            {statCard('Revenue', fmt(totalRevenue), '#16a34a')}
-            {statCard('PMs', pmCount, '#e65c00')}
-            {statCard('Service Calls', scCount, '#2563eb')}
-            {statCard('Expenses', expCount, '#7c3aed')}
-            {statCard('Inspections', inspCount, '#0891b2')}
-            {statCard('Warranty', warrantyCount, '#888')}
-          </div>
-        )}
 
-        {/* FILTERS */}
-        <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-            <input type="search" placeholder="Search customer, location, PM#, tech, date..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 180, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }} />
-            <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
-              <option value="ALL">All Types</option>
-              <option value="PM">PM Only</option>
-              <option value="SC">SC Only</option>
-              <option value="EXP">Expenses</option>
-              <option value="INSP">Inspections</option>
-            </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
-              <option value="ALL">All Status</option>
-              <option value="submitted">Submitted</option>
-              <option value="reviewed">Reviewed</option>
-              <option value="invoiced">Invoiced</option>
-              <option value="draft">Draft</option>
-            </select>
-            {allTechs.length > 0 && (
-              <select value={filterTech} onChange={e => setFilterTech(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
-                <option value="ALL">All Techs</option>
-                {allTechs.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 12, color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>Date from</label>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', fontSize: 13 }} />
-            <label style={{ fontSize: 12, color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>to</label>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', fontSize: 13 }} />
-            {hasFilters && (
-              <button onClick={clearFilters} style={{ color: '#e65c00', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}>Clear all</button>
-            )}
-          </div>
+        {/* TAB BAR */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <button onClick={() => setActiveTab('submissions')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'submissions' ? '#1a2332' : '#fff', color: activeTab === 'submissions' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            📋 Submissions
+          </button>
+          <button onClick={() => setActiveTab('expenses')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'expenses' ? '#7c3aed' : '#fff', color: activeTab === 'expenses' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            💜 Expense Analytics
+          </button>
         </div>
 
-        {!loading && !error && (
-          <div style={{ fontSize: 12, color: '#888', marginBottom: 8, paddingLeft: 4 }}>
-            {filtered.length === submissions.length ? submissions.length + ' submissions' : filtered.length + ' of ' + submissions.length + ' submissions'}
-          </div>
+        {/* EXPENSE ANALYTICS TAB */}
+        {activeTab === 'expenses' && !loading && !error && (
+          <ExpenseAnalytics submissions={submissions} />
         )}
 
-        {loading && <p style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Loading all submissions...</p>}
-        {error && <p style={{ textAlign: 'center', color: '#e65c00', marginTop: 40 }}>Error: {error}</p>}
-        {!loading && !error && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', marginTop: 60, color: '#aaa' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-            <p style={{ fontSize: 15 }}>No results found.</p>
-          </div>
-        )}
+        {/* SUBMISSIONS TAB */}
+        {activeTab === 'submissions' && (
+          <>
+            {/* STAT CARDS */}
+            {!loading && !error && (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+                {statCard('Total Jobs', filtered.length)}
+                {statCard('Revenue', fmt(totalRevenue), '#16a34a')}
+                {statCard('PMs', pmCount, '#e65c00')}
+                {statCard('Service Calls', scCount, '#2563eb')}
+                {statCard('Expenses', expCount, '#7c3aed')}
+                {statCard('Inspections', inspCount, '#0891b2')}
+                {statCard('Warranty', warrantyCount, '#888')}
+              </div>
+            )}
 
-        {/* TABLE */}
-        {!loading && !error && filtered.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px' }}>
-              <div>Type</div>
-              <div>Name / Location</div>
-              <div>Techs</div>
-              <div>Date</div>
-              <div>Status</div>
-              <div>By</div>
-              <div style={{ textAlign: 'right' }}>Total</div>
-              <div style={{ textAlign: 'center' }}>Actions</div>
+            {/* FILTERS */}
+            <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                <input type="search" placeholder="Search customer, location, PM#, tech, date..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 180, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }} />
+                <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
+                  <option value="ALL">All Types</option>
+                  <option value="PM">PM Only</option>
+                  <option value="SC">SC Only</option>
+                  <option value="EXP">Expenses</option>
+                  <option value="INSP">Inspections</option>
+                </select>
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
+                  <option value="ALL">All Status</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="invoiced">Invoiced</option>
+                  <option value="draft">Draft</option>
+                </select>
+                {allTechs.length > 0 && (
+                  <select value={filterTech} onChange={e => setFilterTech(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
+                    <option value="ALL">All Techs</option>
+                    {allTechs.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: 12, color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>Date from</label>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', fontSize: 13 }} />
+                <label style={{ fontSize: 12, color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>to</label>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', fontSize: 13 }} />
+                {hasFilters && <button onClick={clearFilters} style={{ color: '#e65c00', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}>Clear all</button>}
+              </div>
             </div>
-            {filtered.map((s, i) => {
-              const lbl = getTypeLabel(s)
-              const color = getTypeColor(s)
-              const techs = Array.isArray(s.data?.techs) ? s.data.techs : []
-              const isWarranty = s.data?.warrantyWork
-              const submittedBy = s.profiles?.full_name || (Array.isArray(s.data?.techs) && s.data.techs[0]) || '-'
-              const isBeingDeleted = deleting === s.id
 
-              // Compute display value based on type
-              let displayTotal
-              if (lbl === 'EXP') {
-                displayTotal = fmt(s.data?.expenseTotal || 0)
-              } else if (lbl === 'INSP') {
-                const fails = s.data?.failCount || 0
-                displayTotal = fails === 0 ? '✓ Pass' : '⚠️ ' + fails + ' Fail'
-              } else {
-                displayTotal = isWarranty ? 'WARRANTY' : fmt(s.data?.grandTotal || 0)
-              }
-              const totalColor = lbl === 'INSP'
-                ? (s.data?.failCount > 0 ? '#dc2626' : '#16a34a')
-                : (isWarranty ? '#888' : '#1a2332')
+            {!loading && !error && (
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 8, paddingLeft: 4 }}>
+                {filtered.length === submissions.length ? submissions.length + ' submissions' : filtered.length + ' of ' + submissions.length + ' submissions'}
+              </div>
+            )}
 
-              // Name shown in list
-              const displayName = lbl === 'EXP' || lbl === 'INSP'
-                ? (techs[0] || s.location_name || '-')
-                : (s.customer_name || '-')
-              const displaySub = lbl === 'EXP'
-                ? 'Expense Report'
-                : lbl === 'INSP'
-                  ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || '?')
-                  : (s.location_name || '')
+            {loading && <p style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Loading all submissions...</p>}
+            {error && <p style={{ textAlign: 'center', color: '#e65c00', marginTop: 40 }}>Error: {error}</p>}
+            {!loading && !error && filtered.length === 0 && (
+              <div style={{ textAlign: 'center', marginTop: 60, color: '#aaa' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                <p style={{ fontSize: 15 }}>No results found.</p>
+              </div>
+            )}
 
-              return (
-                <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa'), alignItems: 'center', borderLeft: '3px solid ' + color }}>
-                  {/* Type */}
-                  <div style={{ cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>
-                    <span style={{ background: color, color: '#fff', fontWeight: 700, fontSize: 10, padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
-                      {lbl}{s.pm_number && lbl !== 'EXP' && lbl !== 'INSP' ? ' #' + s.pm_number : ''}
-                    </span>
-                  </div>
-                  {/* Name */}
-                  <div style={{ cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#1a2332' }}>{displayName}</div>
-                    <div style={{ fontSize: 12, color: '#777' }}>{displaySub}</div>
-                  </div>
-                  {/* Techs */}
-                  <div style={{ fontSize: 12, color: '#555', cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{techs.join(', ') || '—'}</div>
-                  {/* Date */}
-                  <div style={{ fontSize: 12, color: '#555', cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{s.date || '—'}</div>
-                  {/* Status */}
-                  <div onClick={e => e.stopPropagation()}>
-                    <select value={s.status || 'submitted'} onChange={e => handleStatusChange(s.id, e.target.value)} style={{ fontSize: 11, padding: '2px 4px', borderRadius: 5, fontWeight: 700, cursor: 'pointer', outline: 'none', border: '1.5px solid ' + ((s.status === 'submitted' || !s.status) ? '#16a34a' : s.status === 'reviewed' ? '#d97706' : '#7c3aed'), background: (s.status === 'submitted' || !s.status) ? '#dcfce7' : s.status === 'reviewed' ? '#fef3c7' : '#f5f3ff', color: (s.status === 'submitted' || !s.status) ? '#16a34a' : s.status === 'reviewed' ? '#92400e' : '#5b21b6' }}>
-                      <option value="submitted">Submitted</option>
-                      <option value="reviewed">Reviewed</option>
-                      <option value="invoiced">Invoiced</option>
-                    </select>
-                  </div>
-                  {/* By */}
-                  <div style={{ fontSize: 12, color: '#555' }}>{submittedBy}</div>
-                  {/* Total */}
-                  <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: totalColor, cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>
-                    {displayTotal}
-                  </div>
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
-                    {(lbl === 'PM' || lbl === 'SC') && (
-                      <button onClick={() => navigate('/edit/' + s.id)} title="Edit submission" style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-                        ✏️ Edit
-                      </button>
-                    )}
-                    <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
-                      {isBeingDeleted ? '...' : '🗑 Del'}
-                    </button>
-                  </div>
+            {/* TABLE */}
+            {!loading && !error && filtered.length > 0 && (
+              <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px' }}>
+                  <div>Type</div><div>Name / Location</div><div>Techs</div><div>Date</div><div>Status</div><div>By</div><div style={{ textAlign: 'right' }}>Total</div><div style={{ textAlign: 'center' }}>Actions</div>
                 </div>
-              )
-            })}
-          </div>
+                {filtered.map((s, i) => {
+                  const lbl = getTypeLabel(s)
+                  const color = getTypeColor(s)
+                  const techs = Array.isArray(s.data?.techs) ? s.data.techs : []
+                  const isWarranty = s.data?.warrantyWork
+                  const submittedBy = s.profiles?.full_name || (Array.isArray(s.data?.techs) && s.data.techs[0]) || '-'
+                  const isBeingDeleted = deleting === s.id
+                  let displayTotal
+                  if (lbl === 'EXP') { displayTotal = fmt(s.data?.expenseTotal || 0) }
+                  else if (lbl === 'INSP') { const fails = s.data?.failCount || 0; displayTotal = fails === 0 ? '✓ Pass' : '⚠️ ' + fails + ' Fail' }
+                  else { displayTotal = isWarranty ? 'WARRANTY' : fmt(s.data?.grandTotal || 0) }
+                  const totalColor = lbl === 'INSP' ? (s.data?.failCount > 0 ? '#dc2626' : '#16a34a') : (isWarranty ? '#888' : '#1a2332')
+                  const displayName = lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || '-') : (s.customer_name || '-')
+                  const displaySub = lbl === 'EXP' ? 'Expense Report' : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || '?') : (s.location_name || '')
+                  return (
+                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa'), alignItems: 'center', borderLeft: '3px solid ' + color }}>
+                      <div style={{ cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>
+                        <span style={{ background: color, color: '#fff', fontWeight: 700, fontSize: 10, padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
+                          {lbl}{s.pm_number && lbl !== 'EXP' && lbl !== 'INSP' ? ' #' + s.pm_number : ''}
+                        </span>
+                      </div>
+                      <div style={{ cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#1a2332' }}>{displayName}</div>
+                        <div style={{ fontSize: 12, color: '#777' }}>{displaySub}</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#555', cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{techs.join(', ') || '—'}</div>
+                      <div style={{ fontSize: 12, color: '#555', cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{s.date || '—'}</div>
+                      <div onClick={e => e.stopPropagation()}>
+                        <select value={s.status || 'submitted'} onChange={e => handleStatusChange(s.id, e.target.value)} style={{ fontSize: 11, padding: '2px 4px', borderRadius: 5, fontWeight: 700, cursor: 'pointer', outline: 'none', border: '1.5px solid ' + ((s.status === 'submitted' || !s.status) ? '#16a34a' : s.status === 'reviewed' ? '#d97706' : '#7c3aed'), background: (s.status === 'submitted' || !s.status) ? '#dcfce7' : s.status === 'reviewed' ? '#fef3c7' : '#f5f3ff', color: (s.status === 'submitted' || !s.status) ? '#16a34a' : s.status === 'reviewed' ? '#92400e' : '#5b21b6' }}>
+                          <option value="submitted">Submitted</option>
+                          <option value="reviewed">Reviewed</option>
+                          <option value="invoiced">Invoiced</option>
+                        </select>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#555' }}>{submittedBy}</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: totalColor, cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{displayTotal}</div>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                        {(lbl === 'PM' || lbl === 'SC') && (
+                          <button onClick={() => navigate('/edit/' + s.id)} title="Edit submission" style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✏️ Edit</button>
+                        )}
+                        <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
+                          {isBeingDeleted ? '...' : '🗑 Del'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
