@@ -465,28 +465,59 @@ export default function ViewSubmissionPage() {
           )}
         </div>
       )}
-      {sub.photos && sub.photos.length > 0 && (
-        <div style={{ margin: '0 12px 12px' }}>
-          <div style={sHdr}>Photos</div>
-          <div style={{ background: '#fff', border: '1px solid #ddd', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-              {sub.photos.sort((a, b) => a.display_order - b.display_order).map(photo => (
-                <div key={photo.id} style={{ borderRadius: 8, overflow: 'hidden', background: '#f0f0f0' }}>
-                  <img
-                    src={getPhotoUrl(photo.storage_path)}
-                    alt={photo.caption || 'photo'}
-                    style={{ width: '100%', height: 120, objectFit: 'cover' }}
-                  />
-                  {photo.caption && <div style={{ padding: '4px 8px', fontSize: 11, color: '#666' }}>{photo.caption}</div>}
-                  {photo.section && photo.section !== 'work' && (
-                    <div style={{ padding: '2px 8px', fontSize: 10, color: '#aaa', fontStyle: 'italic' }}>{photo.section}</div>
-                  )}
+      {sub.photos && sub.photos.length > 0 && (() => {
+        const videoSections = ['arrival-video', 'departure-video']
+        const videos = sub.photos.filter(p => videoSections.includes(p.section))
+        const regularPhotos = sub.photos.filter(p => !videoSections.includes(p.section))
+        return (
+          <>
+            {/* SC Arrival / Departure Videos */}
+            {videos.length > 0 && (
+              <div style={{ margin: '0 12px 12px' }}>
+                <div style={sHdr}>📹 Arrival &amp; Departure Videos</div>
+                <div style={{ background: '#fff', border: '1px solid #ddd', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 12 }}>
+                  {videos.map(v => (
+                    <div key={v.id} style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1a2332', marginBottom: 4 }}>
+                        {v.section === 'arrival-video' ? '📹 Arrival — Before Work' : '🎬 Departure — After Work'}
+                      </div>
+                      <video
+                        src={getPhotoUrl(v.storage_path)}
+                        controls
+                        style={{ width: '100%', borderRadius: 6, maxHeight: 300, background: '#000' }}
+                      />
+                      {v.caption && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{v.caption}</div>}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
+            )}
+            {/* Regular Photos */}
+            {regularPhotos.length > 0 && (
+              <div style={{ margin: '0 12px 12px' }}>
+                <div style={sHdr}>Photos</div>
+                <div style={{ background: '#fff', border: '1px solid #ddd', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                    {regularPhotos.sort((a, b) => a.display_order - b.display_order).map(photo => (
+                      <div key={photo.id} style={{ borderRadius: 8, overflow: 'hidden', background: '#f0f0f0' }}>
+                        <img
+                          src={getPhotoUrl(photo.storage_path)}
+                          alt={photo.caption || 'photo'}
+                          style={{ width: '100%', height: 120, objectFit: 'cover' }}
+                        />
+                        {photo.caption && <div style={{ padding: '4px 8px', fontSize: 11, color: '#666' }}>{photo.caption}</div>}
+                        {photo.section && photo.section !== 'work' && (
+                          <div style={{ padding: '2px 8px', fontSize: 10, color: '#aaa', fontStyle: 'italic' }}>{photo.section}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )
+      })()}
 
     </div>
   )
