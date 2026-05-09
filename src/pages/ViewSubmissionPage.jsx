@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { fetchSubmission, getPhotoUrl } from '../lib/submissions'
+import { fetchSubmission, getPhotoUrl, deleteSubmission } from '../lib/submissions'
 import { useAuth } from '../lib/auth'
 
 const COND_COLOR = { Good: '#16a34a', Fair: '#d97706', Poor: '#dc2626', Replaced: '#7c3aed' }
@@ -13,6 +13,9 @@ export default function ViewSubmissionPage() {
   const [error, setError]         = useState('')
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState('')
+  
+  const [deleting, setDeleting] = useState(false)
+  const [deleteMsg, setDeleteMsg] = useState('')
   const { isAdmin } = useAuth()
 
   const handleResend = async () => {
@@ -70,6 +73,19 @@ export default function ViewSubmissionPage() {
       console.warn('sessionStorage write failed', e)
     }
     navigate('/form?type=' + formType)
+  }
+
+  const handleDelete = async () => {
+    if (!sub) return
+    if (!window.confirm('Permanently delete this submission? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await deleteSubmission(sub.id)
+      navigate('/admin')
+    } catch(e) {
+      setDeleteMsg('Delete failed: ' + e.message)
+      setDeleting(false)
+    }
   }
 
   useEffect(() => {
@@ -160,7 +176,18 @@ export default function ViewSubmissionPage() {
                   {resendMsg}
                 </span>
               )}
-            </>
+            
+              {/* Edit button */}
+              <button onClick={() => navigate('/edit/' + sub.id)}
+                style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                ✏️ Edit Submission
+              </button>
+              {/* Delete button */}
+              <button onClick={handleDelete} disabled={deleting}
+                style={{ background: deleting ? '#fef2f2' : '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: deleting ? 'not-allowed' : 'pointer' }}>
+                {deleting ? 'Deleting...' : '🗑️ Delete'}
+              </button>
+              {deleteMsg && <span style={{ fontSize: 13, color: '#fca5a5', fontWeight: 700 }}>{deleteMsg}</span>}</>
           )}
         </div>
       </div>
