@@ -97,6 +97,8 @@ export async function saveSubmission(formData, userId, templateOverride) {
     inspectionType, odometer, checkItems, failCount, allPass, defects,
     // GPS location
     gpsLat, gpsLng, gpsAccuracy,
+  jhaSteps, jhaPPE, jhaEmergencyContact, jhaNearestHospital,
+  jhaMeetingPoint, jhaAdditionalHazards, jhaCrewMembers, jhaSupervisor, jhaHighRiskCount,
   } = formData;
 
   // Always ensure pm_number is set — expense/inspection forms pass null, so auto-generate
@@ -170,6 +172,16 @@ export async function saveSubmission(formData, userId, templateOverride) {
       gpsLat: gpsLat || null,
       gpsLng: gpsLng || null,
       gpsAccuracy: gpsAccuracy || null,
+      // JHA-specific fields (stored in data JSONB)
+      jhaSteps: jhaSteps || [],
+      jhaPPE: jhaPPE || [],
+      jhaEmergencyContact: jhaEmergencyContact || '',
+      jhaNearestHospital: jhaNearestHospital || '',
+      jhaMeetingPoint: jhaMeetingPoint || '',
+      jhaAdditionalHazards: jhaAdditionalHazards || '',
+      jhaCrewMembers: jhaCrewMembers || '',
+      jhaSupervisor: jhaSupervisor || '',
+      jhaHighRiskCount: jhaHighRiskCount || 0,
     },
   };
 
