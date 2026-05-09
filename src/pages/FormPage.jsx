@@ -140,6 +140,7 @@ export default function FormPage() {
   const [arrestors, setArrestors] = useState([mkArr()])
   const [flares, setFlares] = useState([mkFlare()])
   const [heaters, setHeaters] = useState([mkHT()])
+  const [scEquipment, setScEquipment] = useState([])
 
   const updArr = (i, k, v) => setArrestors(a => a.map((x,idx) => idx===i ? {...x,[k]:v} : x))
   const updFlare = (i, k, v) => setFlares(f => f.map((x,idx) => idx===i ? {...x,[k]:v} : x))
