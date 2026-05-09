@@ -336,7 +336,7 @@ module.exports = async function handler(req, res) {
       const failHtml = failItems.length > 0
         ? '<div style="background:#fff0f0;border:2px solid #dc2626;border-radius:4px;padding:10px;margin:10px 0">'
           + '<strong style="color:#dc2626">FAILED ITEMS:</strong><ul style="margin:6px 0;padding-left:18px;font-size:12px">'
-          + failItems.map(i => '<li><strong>'+i.section+'</strong>: '+i.label+'</li>').join('')
+          + (failItems||[]).map(i => '<li><strong>'+i.section+'</strong>: '+i.label+'</li>').join('')
           + '</ul></div>' : ''
 
       const itemsSummary = (() => {
@@ -693,14 +693,14 @@ module.exports = async function handler(req, res) {
     const partsHtml = parts.length > 0
       ? '<table border="1" cellpadding="4" style="border-collapse:collapse;font-size:12px;margin:8px 0;width:100%">'
         + '<tr style="background:#1a2332;color:#fff"><th>SKU</th><th>Part</th><th>Qty</th><th>Unit $</th><th>Total</th></tr>'
-        + parts.map(p => '<tr><td>'+(p.sku||p.code||'')+'</td><td>'+(p.name||'')+'</td><td>'+(p.qty||1)+'</td><td>$'+Number(p.price||0).toFixed(2)+'</td><td>$'+(Number(p.qty||1)*Number(p.price||0)).toFixed(2)+'</td></tr>').join('')
+        + (parts||[]).map(p => '<tr><td>'+(p.sku||p.code||'')+'</td><td>'+(p.name||'')+'</td><td>'+(p.qty||1)+'</td><td>$'+Number(p.price||0).toFixed(2)+'</td><td>$'+(Number(p.qty||1)*Number(p.price||0)).toFixed(2)+'</td></tr>').join('')
         + '</table>'
       : '<p style="color:#888;font-size:12px">No parts used</p>'
     let scEquipHtml = ''
     if (jobType === 'SC' && scEquipment.length > 0) {
       scEquipHtml = '<div style="margin-top:12px"><strong style="color:#1a2332">Equipment Worked On</strong>'
         + '<ul style="margin:6px 0;padding-left:18px;font-size:12px">'
-        + scEquipment.map(item => '<li><strong>'+(item.type||'')+'</strong>'+(item.notes?': <span style='color:#555'>'+item.notes+'</span>':'')+'</li>').join('')
+        + (scEquipment||[]).map(item => '<li><strong>'+(item.type||'')+'</strong>'+(item.notes?': <span style='color:#555'>'+item.notes+'</span>':'')+'</li>').join('')
         + '</ul></div>'
     }
     let pmEquipHtml = ''
@@ -709,23 +709,23 @@ module.exports = async function handler(req, res) {
         pmEquipHtml += '<div style="margin-top:12px"><strong style="color:#1a2332">Flame Arrestors</strong>'
           + '<table border="1" cellpadding="4" style="border-collapse:collapse;font-size:12px;margin:6px 0;width:100%">'
           + '<tr style="background:#1a2332;color:#fff"><th>#</th><th>ID/Tag</th><th>Condition</th><th>Filter Changed</th><th>Notes</th></tr>'
-          + arrestors.map((a,i) => '<tr><td>'+(i+1)+'</td><td>'+(a.arrestorId||'')+'</td><td>'+(a.condition||'Good')+'</td><td>'+(a.filterChanged?'Yes':'No')+'</td><td>'+(a.notes||'')+'</td></tr>').join('')
+          + (arrestors||[]).map((a,i) => '<tr><td>'+(i+1)+'</td><td>'+(a.arrestorId||'')+'</td><td>'+(a.condition||'Good')+'</td><td>'+(a.filterChanged?'Yes':'No')+'</td><td>'+(a.notes||'')+'</td></tr>').join('')
           + '</table></div>'
       }
       if (flares.length > 0) {
         pmEquipHtml += '<div style="margin-top:12px"><strong style="color:#1a2332">Flares</strong>'
           + '<table border="1" cellpadding="4" style="border-collapse:collapse;font-size:12px;margin:6px 0;width:100%">'
           + '<tr style="background:#1a2332;color:#fff"><th>#</th><th>ID/Tag</th><th>Condition</th><th>Pilot Lit</th><th>Last Ignition</th><th>Notes</th></tr>'
-          + flares.map((f,i) => '<tr><td>'+(i+1)+'</td><td>'+(f.flareId||'')+'</td><td>'+(f.condition||'Good')+'</td><td>'+(f.pilotLit?'Yes':'No')+'</td><td>'+(f.lastIgnition||'')+'</td><td>'+(f.notes||'')+'</td></tr>').join('')
+          + (flares||[]).map((f,i) => '<tr><td>'+(i+1)+'</td><td>'+(f.flareId||'')+'</td><td>'+(f.condition||'Good')+'</td><td>'+(f.pilotLit?'Yes':'No')+'</td><td>'+(f.lastIgnition||'')+'</td><td>'+(f.notes||'')+'</td></tr>').join('')
           + '</table></div>'
       }
       if (heaters.length > 0) {
         pmEquipHtml += '<div style="margin-top:12px"><strong style="color:#1a2332">Heater Treaters</strong>'
           + '<table border="1" cellpadding="4" style="border-collapse:collapse;font-size:12px;margin:6px 0;width:100%">'
           + '<tr style="background:#1a2332;color:#fff"><th>#</th><th>ID/Tag</th><th>Condition</th><th>Last Tube Clean</th><th>Notes</th></tr>'
-          + heaters.map((h,i) => {
+          + (heaters||[]).map((h,i) => {
             const fts = Array.isArray(h.firetubes) ? h.firetubes : []
-            const ftSummary = fts.length > 0 ? fts.map((ft,fi) => 'FT'+(fi+1)+': '+((ft&&ft.condition)||'Good')).join(', ') : (h.firetubeCnt||1)+' firetube(s)'
+            const ftSummary = fts.length > 0 ? (fts||[]).map((ft,fi) => 'FT'+(fi+1)+': '+((ft&&ft.condition)||'Good')).join(', ') : (h.firetubeCnt||1)+' firetube(s)'
             return '<tr><td>'+(i+1)+'</td><td>'+(h.heaterId||'')+'</td><td>'+(h.condition||'Good')+'</td><td>'+(h.lastCleanDate||'')+'</td><td>'+(h.notes||'')+'</td></tr>'+(fts.length>0?'<tr><td colspan="5" style="font-size:11px;color:#555;padding:3px 4px"><em>Firetubes: '+ftSummary+'</em></td></tr>':'')
           }).join('')
           + '</table></div>'
@@ -758,7 +758,7 @@ module.exports = async function handler(req, res) {
       + '</div>'
       + '<p style="font-size:10px;color:#aaa;padding:8px 24px">Sent by ReliableTrack - Built for Reliable Oilfield Services. PDF attached.</p>'
       + '</body></html>'
-    const techShort = techs.length > 0 ? techs.map(t => t.split(' ').pop()).join(', ') : 'No Tech'
+    const techShort = techs.length > 0 ? (techs||[]).map(t => t.split(' ').pop()).join(', ') : 'No Tech'
     const subject = [customer, location, techShort, workType, docTitle].filter(Boolean).join(' - ')
     const emailRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
