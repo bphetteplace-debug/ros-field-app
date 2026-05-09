@@ -52,7 +52,7 @@ module.exports = async function handler(req, res) {
   }
 };
 
-// ── HELPERS ──────────────────────────────────────────────────────────────
+// ââ HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function fmt(n) { return '$' + parseFloat(n || 0).toFixed(2); }
 function fmtDate(s) { if (!s) return ''; try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return s; } }
 
@@ -85,7 +85,7 @@ async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, start
   return y;
 }
 
-// ── PM / SC REPORT ───────────────────────────────────────────────────────
+// ââ PM / SC REPORT âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
@@ -101,7 +101,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const laborTotal = parseFloat(d.laborTotal || 0);
   const grandTotal = parseFloat(d.grandTotal || 0);
 
-  // ── Build PDF ────────────────────────────────────────────────────────
+  // ââ Build PDF ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const pdfDoc = await PDFDocument.create();
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -347,22 +347,22 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     + '<tr style="background:#102558;color:#fff;font-weight:bold"><td style="padding:8px">TOTAL</td><td style="padding:8px;text-align:right;color:#ef6600">' + fmt(grandTotal) + '</td></tr>'
     + '</table>'
     + '</div>'
-    + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack • Reliable Oilfield Services</div>'
+    + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack â¢ Reliable Oilfield Services</div>'
     + '</div>';
 
-  // Video links in email
-  const scVids = photos.filter(function(p) { return p.section === 'arrival-video' || p.section === 'departure-video'; });
-  var videoEmailHtml = '';
-  if (!isPM && scVids.length > 0) {
-    var vRows = scVids.map(function(v) {
-      var vLbl = v.section === 'arrival-video' ? 'Arrival - Before Work' : 'Departure - After Work';
-      var vLink = SUPA_URL + '/storage/v1/object/public/submission-photos/' + (v.storage_path || '');
-      return '<tr><td style="padding:8px;background:#f0f4ff;font-weight:bold;font-size:13px;width:200px">' + vLbl + '</td>'
-        + '<td style="padding:8px;font-size:13px"><a href="' + vLink + '" style="color:#1a56db">Download Video</a></td></tr>';
+  // Video links in email (SC only)
+  var scVids2 = photos.filter(function(p) { return p.section === 'arrival-video' || p.section === 'departure-video'; });
+  var videoEmailHtml2 = '';
+  if (!isPM && scVids2.length > 0) {
+    var vRows2 = scVids2.map(function(v) {
+      var vLbl2 = v.section === 'arrival-video' ? 'Arrival - Before Work' : 'Departure - After Work';
+      var vLink2 = SUPA_URL + '/storage/v1/object/public/submission-photos/' + (v.storage_path || '');
+      return '<tr><td style="padding:8px;font-weight:bold;font-size:13px;width:200px">' + vLbl2 + '</td>'
+        + '<td style="padding:8px;font-size:13px"><a href="' + vLink2 + '" style="color:#1a56db">Download</a></td></tr>';
     }).join('');
-    videoEmailHtml = '<h3 style="color:#102558;border-bottom:2px solid #ef6600;padding-bottom:6px">Arrival and Departure Videos</h3>'
-      + '<p style="font-size:12px;color:#666;margin-bottom:8px">Videos are saved and can be downloaded via the links below.</p>'
-      + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">' + vRows + '</table>';
+    videoEmailHtml2 = '<h3 style="color:#102558;border-bottom:2px solid #ef6600;padding-bottom:6px">Arrival and Departure Videos</h3>'
+      + '<p style="font-size:12px;color:#666;margin-bottom:8px">Click links to download the videos.</p>'
+      + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px">' + vRows2 + '</table>';
   }
 
   const emailResp = await fetch('https://api.resend.com/emails', {
@@ -372,7 +372,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
       from: FROM,
       to: TO,
       subject: label + ' - ' + (sub.customer_name||'') + ' - ' + fmtDate(sub.date),
-      html + videoEmailHtml,
+      html + videoEmailHtml2,
       attachments: [{ filename: label.replace('#','').replace(' ','-') + '-report.pdf', content: pdfB64 }],
     }),
   });
@@ -382,7 +382,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-// ── EXPENSE REPORT ───────────────────────────────────────────────────────
+// ââ EXPENSE REPORT âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const items = Array.isArray(d.expenseItems) ? d.expenseItems : [];
   const total = parseFloat(d.expenseTotal || 0);
@@ -486,7 +486,7 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-// ── DAILY INSPECTION REPORT ──────────────────────────────────────────────
+// ââ DAILY INSPECTION REPORT ââââââââââââââââââââââââââââââââââââââââââââââ
 async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const checks = Array.isArray(d.checkItems) ? d.checkItems : [];
   const failCount = parseInt(d.failCount || 0);
@@ -895,7 +895,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
     + '</div>'
     + '<div style="background:#059669;height:4px"></div>'
     + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
-    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED — Supervisor approval required before starting work</div>' : '')
+    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED â Supervisor approval required before starting work</div>' : '')
     + '<table style="width:100%;font-size:13px;margin-bottom:20px;border-collapse:collapse">'
     + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Lead Tech</td><td style="padding:5px">' + techName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Date</td><td style="padding:5px">' + fmtDate(sub.date) + '</td></tr>'
     + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Site / Location</td><td style="padding:5px">' + siteName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold">Truck</td><td style="padding:5px">' + (sub.truck_number||'') + '</td></tr>'
