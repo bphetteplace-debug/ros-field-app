@@ -64,6 +64,20 @@ export default function DailyInspectionPage() {
   const [defects, setDefects] = useState('')
   const [photos, setPhotos] = useState([])
   const [saving, setSaving] = useState(false)
+  const [gpsLat, setGpsLat] = useState(null)
+  const [gpsLng, setGpsLng] = useState(null)
+  const [gpsAccuracy, setGpsAccuracy] = useState(null)
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [gpsError, setGpsError] = useState(null)
+  const captureGPS = () => {
+    if (!navigator.geolocation) { setGpsError('GPS not supported on this device'); return }
+    setGpsLoading(true); setGpsError(null)
+    navigator.geolocation.getCurrentPosition(
+      pos => { setGpsLat(pos.coords.latitude); setGpsLng(pos.coords.longitude); setGpsAccuracy(Math.round(pos.coords.accuracy)); setGpsLoading(false) },
+      err => { setGpsError('GPS error: ' + err.message); setGpsLoading(false) },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
+  }
   const [saveError, setSaveError] = useState(null)
 
   useEffect(() => {
@@ -135,6 +149,7 @@ export default function DailyInspectionPage() {
         failCount,
         allPass,
         defects,
+        gpsLat, gpsLng, gpsAccuracy,
       }
       const submission = await saveSubmission(formData, user.id, 'daily_inspection')
       if (photos.length > 0) {
@@ -207,6 +222,16 @@ export default function DailyInspectionPage() {
           <div style={fld}>
             <label style={lbl}>Odometer Reading</label>
             <input type="number" min="0" style={inp} value={odometer} onChange={e => setOdometer(e.target.value)} placeholder="Miles" />
+          {/* GPS CAPTURE */}
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={captureGPS} disabled={gpsLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', background: gpsLat ? '#16a34a' : '#1a2332', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: gpsLoading ? 'not-allowed' : 'pointer' }}>
+              {gpsLoading ? '⏳ Getting GPS...' : gpsLat ? '📍 GPS Captured' : '📍 Capture GPS Location'}
+            </button>
+            {gpsLat && <a href={'https://maps.google.com/?q=' + gpsLat + ',' + gpsLng} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}>View on Map ↗</a>}
+            {gpsLat && <span style={{ fontSize: 11, color: '#888' }}>±{gpsAccuracy}m</span>}
+            {gpsError && <span style={{ fontSize: 11, color: '#c00' }}>{gpsError}</span>}
+          </div>
           </div>
         </div>
       </div>
