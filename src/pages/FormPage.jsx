@@ -122,6 +122,8 @@ export default function FormPage() {
   const [partSearch, setPartSearch] = useState('')
   const [showCatalog, setShowCatalog] = useState(false)
   const [photos, setPhotos] = useState([])
+  const [arrivalVideo, setArrivalVideo] = useState(null)
+  const [departureVideo, setDepartureVideo] = useState(null)
   const [photoCaptions, setPhotoCaptions] = useState({})
   const [saving, setSaving] = useState(false)
   // Draft saving
@@ -347,6 +349,20 @@ export default function FormPage() {
       if (photos.length > 0) {
         const photoObjs = photos.map((f,i) => ({ dataUrl: null, file: f, caption: photoCaptions[i]||'' }))
         await uploadPhotos(submission.id, photoObjs, 'work')
+      }
+
+            // Upload SC arrival/departure videos
+      if (jobType === 'Service Call') {
+        if (arrivalVideo) {
+          try {
+            await uploadPhotos(submission.id, [{ file: arrivalVideo, caption: 'Arrival Video', dataUrl: null }], 'arrival-video')
+          } catch(e) { console.warn('Arrival video upload err:', e) }
+        }
+        if (departureVideo) {
+          try {
+            await uploadPhotos(submission.id, [{ file: departureVideo, caption: 'Departure Video', dataUrl: null }], 'departure-video')
+          } catch(e) { console.warn('Departure video upload err:', e) }
+        }
       }
 
       // Upload part photos
@@ -807,6 +823,58 @@ export default function FormPage() {
           )}
         </div>
       </div>
+
+      {/* SC-ONLY: ARRIVAL / DEPARTURE VIDEOS */}
+      {jobType === 'Service Call' && (
+        <div style={{ margin:'0 0 10px' }}>
+          <div style={sHdr}>Arrival &amp; Departure Videos (SC)</div>
+          <div style={sBody}>
+            <div style={{ fontSize:12, color:'#555', marginBottom:10 }}>Record a short video before and after the work is completed.</div>
+            {/* Arrival Video */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ fontSize:13, fontWeight:700, color:'#1a2332', display:'block', marginBottom:4 }}>📹 Arrival Video — Before Work</label>
+              {arrivalVideo ? (
+                <div style={{ position:'relative', marginBottom:6 }}>
+                  <video src={URL.createObjectURL(arrivalVideo)} controls style={{ width:'100%', borderRadius:6, maxHeight:200 }} />
+                  <button type="button" onClick={()=>setArrivalVideo(null)} style={{ marginTop:4, fontSize:12, color:'#c00', background:'none', border:'none', cursor:'pointer', padding:0 }}>✕ Remove arrival video</button>
+                </div>
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <label style={{ display:'flex',alignItems:'center',justifyContent:'center',padding:12,background:'#1a2332',color:'#fff',borderRadius:6,cursor:'pointer',fontWeight:700,gap:6,fontSize:13 }}>
+                    📹 Record
+                    <input type="file" accept="video/*" capture="environment" style={{ display:'none' }} onChange={e=>e.target.files[0]&&setArrivalVideo(e.target.files[0])} />
+                  </label>
+                  <label style={{ display:'flex',alignItems:'center',justifyContent:'center',padding:12,background:'#f5f5f5',color:'#333',borderRadius:6,cursor:'pointer',fontWeight:700,border:'1px solid #ddd',gap:6,fontSize:13 }}>
+                    📂 Choose
+                    <input type="file" accept="video/*" style={{ display:'none' }} onChange={e=>e.target.files[0]&&setDepartureVideo(e.target.files[0])} />
+                  </label>
+                </div>
+              )}
+            </div>
+            {/* Departure Video */}
+            <div>
+              <label style={{ fontSize:13, fontWeight:700, color:'#1a2332', display:'block', marginBottom:4 }}>🎬 Departure Video — After Work</label>
+              {departureVideo ? (
+                <div style={{ position:'relative', marginBottom:6 }}>
+                  <video src={URL.createObjectURL(departureVideo)} controls style={{ width:'100%', borderRadius:6, maxHeight:200 }} />
+                  <button type="button" onClick={()=>setDepartureVideo(null)} style={{ marginTop:4, fontSize:12, color:'#c00', background:'none', border:'none', cursor:'pointer', padding:0 }}>✕ Remove departure video</button>
+                </div>
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <label style={{ display:'flex',alignItems:'center',justifyContent:'center',padding:12,background:'#e65c00',color:'#fff',borderRadius:6,cursor:'pointer',fontWeight:700,gap:6,fontSize:13 }}>
+                    🎬 Record
+                    <input type="file" accept="video/*" capture="environment" style={{ display:'none' }} onChange={e=>e.target.files[0]&&setDepartureVideo(e.target.files[0])} />
+                  </label>
+                  <label style={{ display:'flex',alignItems:'center',justifyContent:'center',padding:12,background:'#f5f5f5',color:'#333',borderRadius:6,cursor:'pointer',fontWeight:700,border:'1px solid #ddd',gap:6,fontSize:13 }}>
+                    📂 Choose
+                    <input type="file" accept="video/*" style={{ display:'none' }} onChange={e=>e.target.files[0]&&setDepartureVideo(e.target.files[0])} />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GENERAL JOB PHOTOS */}
       <div style={{ margin:'0 0 10px' }}>
