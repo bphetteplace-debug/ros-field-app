@@ -3,6 +3,12 @@ import { supabase, isCloudMode } from './supabase.js';
 
 const AuthContext = createContext(null);
 
+// Admin email list — add/remove as needed
+const ADMIN_EMAILS = [
+  'bphetteplace@reliableoilfieldservices.net',
+  'cphetteplace@reliableoilfieldservices.net',  // Caryl — update if email differs
+]
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -29,10 +35,7 @@ export function AuthProvider({ children }) {
         }
         setLoading(false);
       })
-      .catch(() => {
-        clearTimeout(timeout);
-        setLoading(false);
-      });
+      .catch(() => { clearTimeout(timeout); setLoading(false); });
 
     // Listen for auth state changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -43,14 +46,10 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfile(null);
       }
-      // Always clear loading after any auth event
       setLoading(false);
     });
 
-    return () => {
-      clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
+    return () => { clearTimeout(timeout); subscription.unsubscribe(); };
   }, []);
 
   async function loadProfile(userId) {
@@ -60,22 +59,15 @@ export function AuthProvider({ children }) {
     const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
     try {
       const res = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=*&limit=1', {
-        headers: {
-          apikey: SUPA_KEY,
-          Authorization: 'Bearer ' + (token || SUPA_KEY)
-        }
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (token || SUPA_KEY) }
       });
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
-    } catch (e) {
-      console.warn('loadProfile error:', e);
-    }
+    } catch (e) { console.warn('loadProfile error:', e); }
   }
 
   async function signIn(email, password) {
-    if (!isCloudMode()) {
-      throw new Error('Sign-in requires Supabase env vars. See WEEK1_BACKEND.md.');
-    }
+    if (!isCloudMode()) throw new Error('Sign-in requires Supabase env vars. See WEEK1_BACKEND.md.');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
@@ -88,6 +80,8 @@ export function AuthProvider({ children }) {
     setProfile(null);
   }
 
+  const isAdmin = profile?.role === 'admin' || ADMIN_EMAILS.includes(user?.email || '');
+
   const value = {
     user,
     profile,
@@ -95,7 +89,10 @@ export function AuthProvider({ children }) {
     isCloudMode: isCloudMode(),
     signIn,
     signOut,
-    isAdmin: profile?.role === 'admin' || user?.email === 'bphetteplace@reliableoilfieldservices.net',
+    isAdmin,
+    // Convenience: tech name from profile for auto-fill
+    techName: profile?.full_name || null,
+    truckNumber: profile?.truck_number || null,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
