@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { fetchSubmissions } from '../lib/submissions'
 import { getQueueCount, processOfflineQueue } from '../lib/offlineSync'
@@ -9,7 +9,6 @@ function getTypeLabel(s) {
   if (s.template === 'service_call') return 'SC'
   if (s.template === 'expense_report') return 'EXP'
   if (s.template === 'daily_inspection') return 'INSP'
-  // fallback: use job_type field from data
   const jt = s.data?.jobType || s.job_type || ''
   if (jt === 'PM') return 'PM'
   if (jt === 'Service Call') return 'SC'
@@ -17,7 +16,6 @@ function getTypeLabel(s) {
   if (jt === 'Daily Inspection') return 'INSP'
   return jt || '?'
 }
-
 function getTypeColor(s) {
   const lbl = getTypeLabel(s)
   if (lbl === 'PM') return '#e65c00'
@@ -29,6 +27,7 @@ function getTypeColor(s) {
 
 export default function SubmissionsListPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -71,15 +70,15 @@ export default function SubmissionsListPage() {
     finally { setSyncing(false); setTimeout(() => setSyncMsg(''), 4000) }
   }
 
-  const fmt = n => '$' + (n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-
   const filtered = submissions.filter(s => {
     const q = search.toLowerCase().trim()
     const lbl = getTypeLabel(s)
     const matchesType = filterType === 'ALL' || lbl === filterType
     if (!q) return matchesType
-    const haystack = [s.customer_name, s.location_name, s.date, s.truck_number, lbl,
-      s.pm_number ? String(s.pm_number) : '', s.summary, s.work_type,
+    const haystack = [
+      s.customer_name, s.location_name, s.date, s.truck_number, lbl,
+      s.pm_number ? String(s.pm_number) : '',
+      s.summary, s.work_type,
       ...(Array.isArray(s.data?.techs) ? s.data.techs : [])
     ].filter(Boolean).join(' ').toLowerCase()
     return matchesType && haystack.includes(q)
@@ -106,7 +105,6 @@ export default function SubmissionsListPage() {
       {syncMsg && (
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
-
       {/* NAV */}
       <div style={navBar}>
         <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16 }}>📋 ReliableTrack</span>
@@ -121,8 +119,17 @@ export default function SubmissionsListPage() {
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '12px 12px 80px' }}>
         {/* SEARCH + FILTER */}
         <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input type="search" placeholder="Search by customer, location, PM#, date, tech..." value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 160, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }} />
-          <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
+          <input
+            type="search"
+            placeholder="Search by customer, location, PM#, date, tech..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, minWidth: 160, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }}
+          />
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
             <option value="ALL">All Types</option>
             <option value="PM">PM Only</option>
             <option value="SC">Service Calls</option>
@@ -133,7 +140,9 @@ export default function SubmissionsListPage() {
 
         {!loading && !error && (
           <div style={{ fontSize: 12, color: '#888', marginBottom: 8, paddingLeft: 4 }}>
-            {filtered.length === submissions.length ? submissions.length + ' submissions' : filtered.length + ' of ' + submissions.length + ' submissions'}
+            {filtered.length === submissions.length
+              ? submissions.length + ' submissions'
+              : filtered.length + ' of ' + submissions.length + ' submissions'}
             {search && ' matching "' + search + '"'}
           </div>
         )}
@@ -149,14 +158,13 @@ export default function SubmissionsListPage() {
             )}
           </div>
         )}
-
         {filtered.map(s => {
           const lbl = getTypeLabel(s)
           const color = getTypeColor(s)
           const jobLabel = s.pm_number ? lbl + ' #' + s.pm_number : lbl
           const techs = Array.isArray(s.data?.techs) ? s.data.techs : []
           const isWarranty = s.data?.warrantyWork === true
-          // For expense reports, show expense total from data; for inspections show pass/fail; others show grand total
+
           let rightValue
           if (lbl === 'EXP') {
             const total = s.data?.expenseTotal || 0
@@ -168,23 +176,27 @@ export default function SubmissionsListPage() {
             const grandTotal = s.data?.grandTotal || (parseFloat(s.labor_total || 0) + parseFloat(s.parts_total || 0) + parseFloat(s.mileage_total || 0))
             rightValue = isWarranty ? 'WARRANTY' : '$' + parseFloat(grandTotal || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
           }
-          const rightColor = lbl === 'INSP' ? (s.data?.failCount > 0 ? '#dc2626' : '#16a34a') : (isWarranty ? '#e65c00' : '#222')
+          const rightColor = lbl === 'INSP'
+            ? (s.data?.failCount > 0 ? '#dc2626' : '#16a34a')
+            : (isWarranty ? '#e65c00' : '#222')
 
           return (
-            <Link key={s.id} to={'/view/' + s.id} style={{ textDecoration: 'none' }}>
-              <div style={{ background: '#fff', borderRadius: 10, marginBottom: 10, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid ' + color }}>
+            <div key={s.id} style={{ background: '#fff', borderRadius: 10, marginBottom: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid ' + color, overflow: 'hidden' }}>
+              {/* Main card — tapping navigates to view */}
+              <Link to={'/view/' + s.id} style={{ textDecoration: 'none', display: 'block', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#1a2332' }}>
                       {lbl === 'EXP' || lbl === 'INSP'
                         ? (techs[0] || s.location_name || 'Unknown')
-                        : (s.customer_name || 'Unknown Customer')
-                      }
+                        : (s.customer_name || 'Unknown Customer')}
                     </div>
                     <div style={{ color: '#555', fontSize: 13, marginTop: 2 }}>
-                      {lbl === 'EXP' ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
-                       : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
-                       : (s.location_name || '')}
+                      {lbl === 'EXP'
+                        ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
+                        : lbl === 'INSP'
+                          ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
+                          : (s.location_name || '')}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
@@ -196,8 +208,16 @@ export default function SubmissionsListPage() {
                   <div style={{ fontSize: 12, color: '#888' }}>{techs.join(', ') || (s.data?.techName || '')}</div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: rightColor }}>{rightValue}</div>
                 </div>
+              </Link>
+              {/* Edit button row */}
+              <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 14px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={e => { e.preventDefault(); navigate('/edit/' + s.id) }}
+                  style={{ background: '#f5f5f5', border: '1px solid #ddd', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#333', cursor: 'pointer' }}>
+                  ✏️ Edit
+                </button>
               </div>
-            </Link>
+            </div>
           )
         })}
       </div>
