@@ -40,7 +40,13 @@ module.exports = async function handler(req, res) {
     if (template === 'daily_inspection') {
       return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
     }
-    // Default: PM or SC
+    //   if (template === 'jha') {
+    return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+  }
+    if (template === 'jha' || (d && d.jobType === 'JHA/JSA')) {
+    return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+  }
+  Default: PM or SC
     return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
 
   } catch (err) {
@@ -589,6 +595,328 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
     }),
   });
   const emailData = await emailResp.json();
+  if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
+  return res.status(200).json({ ok: true, emailId: emailData.id });
+}
+
+
+// -- JHA / JSA REPORT --
+async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+  var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
+  var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
+  var techName = d.techs && d.techs.length ? d.techs[0] : '';
+  var crew = d.jhaCrewMembers || '';
+  var supervisor = d.jhaSupervisor || '';
+  var emergency = d.jhaEmergencyContact || '';
+  var hospital = d.jhaNearestHospital || '';
+  var muster = d.jhaMeetingPoint || '';
+  var extraNotes = d.jhaAdditionalHazards || '';
+  var highRisk = steps.filter(function(s){return s.risk === 'High' || s.risk === 'Critical';}).length;
+
+  var pdfDoc = await PDFDocument.create();
+  var boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  var regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  var NAVY = rgb(0.063, 0.149, 0.290);
+  var GREEN = rgb(0.024, 0.588, 0.416);
+  var RED = rgb(0.85, 0.1, 0.1);
+  var ORANGE = rgb(0.937, 0.400, 0.000);
+  var WHITE = rgb(1, 1, 1);
+  var LGRAY = rgb(0.95, 0.95, 0.95);
+
+  var page = pdfDoc.addPage([612, 792]);
+  page.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
+  page.drawCircle({ x: 35, y: 767, size: 18, color: GREEN });
+  page.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
+  page.drawText('Job Hazard Analysis / JSA', { x: 58, y: 756, size: 14, font: boldFont, color: WHITE });
+  page.drawText(fmtDate(sub.date) + ' | ' + (sub.location_name || sub.customer_name || ''), { x: 58, y: 744, size: 9, font: regFont, color: rgb(0.7,0.7,0.7) });
+  page.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: GREEN });
+
+  var y = 720;
+  if (highRisk > 0) {
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 16, color: RED });
+    page.drawText('WARNING: ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) - SUPERVISOR APPROVAL REQUIRED', { x: 54, y: y + 1, size: 9, font: boldFont, color: WHITE });
+    y -= 24;
+  }
+
+  page.drawText('Lead Tech: ' + techName, { x: 50, y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Date: ' + fmtDate(sub.date), { x: 250, y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Truck: ' + (sub.truck_number || ''), { x: 400, y, size: 9, font: regFont, color: NAVY });
+  y -= 13;
+  page.drawText('Site: ' + (sub.location_name || sub.customer_name || ''), { x: 50, y, size: 9, font: regFont, color: NAVY });
+  if (supervisor) page.drawText('Supervisor: ' + supervisor, { x: 300, y, size: 9, font: regFont, color: NAVY });
+  y -= 13;
+  if (crew) { page.drawText('Crew: ' + crew, { x: 50, y, size: 9, font: regFont, color: NAVY }); y -= 13; }
+  y -= 6;
+
+  // Hazard Steps
+  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+  y -= 6;
+  page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 2, color: GREEN });
+  y -= 12;
+
+  // Table headers
+  page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
+  page.drawText('#', { x: 54, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Task Step', { x: 68, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Hazard', { x: 210, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Controls', { x: 340, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Risk', { x: 540, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  y -= 18;
+
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    if (y < 60) break;
+    var riskColor = (s.risk === 'Critical' || s.risk === 'High') ? RED : (s.risk === 'Medium' ? ORANGE : GREEN);
+    if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: LGRAY });
+    page.drawText(String(i + 1), { x: 54, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.taskStep || '').substring(0, 20), { x: 68, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.hazard || '').substring(0, 20), { x: 210, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.controls || '').substring(0, 28), { x: 340, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.risk || 'Med'), { x: 540, y: y - 10, size: 7, font: boldFont, color: riskColor });
+    y -= 16;
+  }
+  y -= 8;
+
+  // PPE
+  if (ppeList.length > 0 && y > 80) {
+    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 50, y, size: 8, font: regFont, color: NAVY });
+    y -= 14;
+  }
+
+  // Emergency
+  if ((emergency || hospital) && y > 80) {
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: RED });
+    y -= 10;
+    page.drawText('EMERGENCY INFO', { x: 50, y, size: 9, font: boldFont, color: RED });
+    y -= 12;
+    if (emergency) { page.drawText('Contact: ' + emergency, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    if (hospital) { page.drawText('Hospital: ' + hospital, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    if (muster) { page.drawText('Muster Point: ' + muster, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+  }
+
+  if (extraNotes && y > 80) {
+    y -= 6;
+    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
+  }
+
+  var pdfBytes = await pdfDoc.save();
+  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
+
+  // Build step rows HTML
+  var stepRows = steps.map(function(s, i) {
+    var riskBg = s.risk === 'Critical' ? '#7c3aed' : s.risk === 'High' ? '#dc2626' : s.risk === 'Medium' ? '#d97706' : '#16a34a';
+    return '<tr>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:bold;width:24px">' + (i+1) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px">' + (s.taskStep||'') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;color:#dc2626">' + (s.hazard||'') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;color:#16a34a">' + (s.controls||'') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center"><span style="background:' + riskBg + ';color:#fff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:bold">' + (s.risk||'Med') + '</span></td>' +
+      '</tr>';
+  }).join('');
+
+  var ppeHtml = ppeList.length > 0 ? ppeList.map(function(p){return '<span style="display:inline-block;background:#eef2ff;border:1px solid #1a2332;color:#1a2332;padding:3px 10px;border-radius:12px;font-size:12px;margin:3px">' + p + '</span>';}).join('') : '<em style="color:#888">None specified</em>';
+
+  var subjectFlag = highRisk > 0 ? '[HIGH RISK] ' : '';
+
+  var html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">' +
+    '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">' +
+    '<span style="display:inline-block;background:#059669;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>' +
+    '<span style="color:#fff;font-size:20px;font-weight:bold">Job Hazard Analysis / JSA</span>' +
+    '</div>' +
+    '<div style="background:#059669;height:4px"></div>' +
+    '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">' +
+    (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:12px;margin-bottom:16px;font-weight:bold;color:#dc2626;text-align:center">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED &mdash; SUPERVISOR APPROVAL REQUIRED BEFORE STARTING WORK</div>' : '<div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:6px;padding:10px;margin-bottom:16px;font-weight:bold;color:#16a34a;text-align:center">&#10003; All Risk Levels Acceptable</div>') +
+    '<table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px">' +
+    '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Lead Tech</td><td style="padding:5px">' + techName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold">Date</td><td style="padding:5px">' + fmtDate(sub.date) + '</td></tr>' +
+    '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Site / Location</td><td style="padding:5px" colspan="3">' + (sub.location_name || sub.customer_name || '') + '</td></tr>' +
+    (supervisor ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Supervisor</td><td style="padding:5px" colspan="3">' + supervisor + '</td></tr>' : '') +
+    (crew ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Crew</td><td style="padding:5px" colspan="3">' + crew + '</td></tr>' : '') +
+    (sub.work_order ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Work Order</td><td style="padding:5px" colspan="3">' + sub.work_order + '</td></tr>' : '') +
+    (sub.summary ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Job Description</td><td style="padding:5px" colspan="3">' + sub.summary + '</td></tr>' : '') +
+    '</table>' +
+    '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Hazard Identification &amp; Controls</h3>' +
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">' +
+    '<thead><tr style="background:#102558;color:#fff">' +
+    '<th style="padding:8px;text-align:left;width:24px">#</th>' +
+    '<th style="padding:8px;text-align:left">Task Step</th>' +
+    '<th style="padding:8px;text-align:left;color:#fca5a5">Hazard(s)</th>' +
+    '<th style="padding:8px;text-align:left;color:#86efac">Control Measures</th>' +
+    '<th style="padding:8px;text-align:center;width:70px">Risk</th>' +
+    '</tr></thead><tbody>' + stepRows + '</tbody></table>' +
+    '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Required PPE</h3>' +
+    '<div style="margin-bottom:20px">' + ppeHtml + '</div>' +
+    '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:14px;border-radius:4px;margin-bottom:16px">' +
+    '<strong style="color:#dc2626">Emergency Information</strong><br><br>' +
+    (emergency ? '<b>Contact:</b> ' + emergency + '<br>' : '') +
+    (hospital ? '<b>Nearest Hospital:</b> ' + hospital + '<br>' : '') +
+    (muster ? '<b>Muster Point:</b> ' + muster : '') +
+    '</div>' +
+    (extraNotes ? '<div style="background:#f0f4ff;border-left:4px solid #102558;padding:12px;border-radius:4px;margin-bottom:16px"><strong style="color:#102558">Additional Hazards / Notes</strong><p style="margin:6px 0 0;color:#444;font-size:13px">' + extraNotes + '</p></div>' : '') +
+    '</div>' +
+    '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack \u2022 Reliable Oilfield Services</div>' +
+    '</div>';
+
+  var emailResp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: FROM,
+      to: TO,
+      subject: subjectFlag + 'JHA/JSA - ' + (sub.location_name || sub.customer_name || '') + ' - ' + techName + ' - ' + fmtDate(sub.date),
+      html: html,
+      attachments: [{ filename: 'JHA-' + (sub.date||'') + '-' + techName.replace(/ /g,'-') + '.pdf', content: pdfB64 }],
+    }),
+  });
+  var emailData = await emailResp.json();
+  if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
+  return res.status(200).json({ ok: true, emailId: emailData.id });
+}
+
+
+// -- JHA / JSA REPORT --
+async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+  var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
+  var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
+  var techName = d.techs && d.techs.length ? d.techs[0] : (sub.location_name || '');
+  var crew = d.jhaCrewMembers || '';
+  var supervisor = d.jhaSupervisor || '';
+  var emergency = d.jhaEmergencyContact || '';
+  var hospital = d.jhaNearestHospital || '';
+  var muster = d.jhaMeetingPoint || '';
+  var extraNotes = d.jhaAdditionalHazards || '';
+  var highRisk = steps.filter(function(s){return s.risk === 'High' || s.risk === 'Critical';}).length;
+  var siteName = sub.location_name || sub.customer_name || '';
+
+  var pdfDoc = await PDFDocument.create();
+  var boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  var regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  var NAVY = rgb(0.063, 0.149, 0.290);
+  var GREEN = rgb(0.024, 0.588, 0.416);
+  var RED = rgb(0.85, 0.1, 0.1);
+  var AMBER = rgb(0.937, 0.400, 0.000);
+  var WHITE = rgb(1, 1, 1);
+  var LGRAY = rgb(0.95, 0.95, 0.95);
+
+  var page = pdfDoc.addPage([612, 792]);
+  page.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
+  page.drawCircle({ x: 35, y: 767, size: 18, color: GREEN });
+  page.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
+  page.drawText('Job Hazard Analysis / JSA', { x: 58, y: 756, size: 14, font: boldFont, color: WHITE });
+  page.drawText(fmtDate(sub.date) + ' | ' + siteName, { x: 58, y: 744, size: 9, font: regFont, color: rgb(0.7,0.7,0.7) });
+  page.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: GREEN });
+
+  var y = 720;
+  if (highRisk > 0) {
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 16, color: RED });
+    page.drawText('WARNING: ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) - SUPERVISOR APPROVAL REQUIRED', { x: 54, y: y + 1, size: 8, font: boldFont, color: WHITE });
+    y -= 22;
+  }
+  page.drawText('Lead Tech: ' + techName, { x: 50, y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Date: ' + fmtDate(sub.date), { x: 250, y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Truck: ' + (sub.truck_number || ''), { x: 400, y, size: 9, font: regFont, color: NAVY });
+  y -= 13;
+  page.drawText('Site: ' + siteName, { x: 50, y, size: 9, font: regFont, color: NAVY });
+  if (supervisor) page.drawText('Supervisor: ' + supervisor, { x: 300, y, size: 9, font: regFont, color: NAVY });
+  y -= 13;
+  if (crew) { page.drawText('Crew: ' + crew, { x: 50, y, size: 9, font: regFont, color: NAVY }); y -= 13; }
+  y -= 6;
+  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+  y -= 6;
+  page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 2, color: GREEN });
+  y -= 14;
+  page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
+  page.drawText('#', { x: 54, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Task Step', { x: 68, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Hazard(s)', { x: 215, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Controls', { x: 345, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  page.drawText('Risk', { x: 543, y: y - 11, size: 7, font: boldFont, color: WHITE });
+  y -= 18;
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    if (y < 60) break;
+    var rc = (s.risk === 'Critical' || s.risk === 'High') ? RED : (s.risk === 'Medium' ? AMBER : GREEN);
+    if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: LGRAY });
+    page.drawText(String(i + 1), { x: 54, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.taskStep || '').substring(0, 22), { x: 68, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.hazard || '').substring(0, 22), { x: 215, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.controls || '').substring(0, 26), { x: 345, y: y - 10, size: 7, font: regFont, color: NAVY });
+    page.drawText(String(s.risk || 'Med'), { x: 540, y: y - 10, size: 7, font: boldFont, color: rc });
+    y -= 16;
+  }
+  y -= 8;
+  if (ppeList.length > 0 && y > 80) {
+    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 50, y, size: 8, font: regFont, color: NAVY });
+    y -= 14;
+  }
+  if ((emergency || hospital) && y > 80) {
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: RED });
+    y -= 10;
+    page.drawText('EMERGENCY INFO', { x: 50, y, size: 9, font: boldFont, color: RED });
+    y -= 12;
+    if (emergency) { page.drawText('Contact: ' + emergency, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    if (hospital) { page.drawText('Hospital: ' + hospital, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    if (muster) { page.drawText('Muster: ' + muster, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+  }
+  if (extraNotes && y > 80) {
+    y -= 6;
+    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
+  }
+  var pdfBytes = await pdfDoc.save();
+  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
+
+  // Build step rows for HTML
+  var stepRows = steps.map(function(s, i) {
+    var riskColor = s.risk === 'Critical' ? '#7c3aed' : s.risk === 'High' ? '#dc2626' : s.risk === 'Medium' ? '#d97706' : '#16a34a';
+    return '<tr><td style="padding:7px 8px;border-bottom:1px solid #eee;font-weight:700;color:#102558">' + (i+1) + '</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee">' + (s.taskStep||'')+'</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;color:#dc2626">' + (s.hazard||'')+'</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;color:#16a34a">' + (s.controls||'')+'</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;font-weight:700;color:' + riskColor + '">' + (s.risk||'Med')+'</td></tr>';
+  }).join('');
+
+  var subjectPrefix = highRisk > 0 ? ('\u26a0\ufe0f URGENT JHA - ' + highRisk + ' HIGH RISK - ') : '\u2713 JHA/JSA - ';
+
+  var html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">'
+    + '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">'
+    + '<span style="display:inline-block;background:#059669;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>'
+    + '<span style="color:#fff;font-size:20px;font-weight:bold">Job Hazard Analysis / JSA</span>'
+    + '</div>'
+    + '<div style="background:#059669;height:4px"></div>'
+    + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
+    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED — Supervisor approval required before starting work</div>' : '')
+    + '<table style="width:100%;font-size:13px;margin-bottom:20px;border-collapse:collapse">'
+    + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Lead Tech</td><td style="padding:5px">' + techName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Date</td><td style="padding:5px">' + fmtDate(sub.date) + '</td></tr>'
+    + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Site / Location</td><td style="padding:5px">' + siteName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold">Truck</td><td style="padding:5px">' + (sub.truck_number||'') + '</td></tr>'
+    + (supervisor ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Supervisor</td><td style="padding:5px" colspan="3">' + supervisor + '</td></tr>' : '')
+    + (crew ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Crew</td><td style="padding:5px" colspan="3">' + crew + '</td></tr>' : '')
+    + (sub.summary || d.jobDescription ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Task Description</td><td style="padding:5px" colspan="3">' + (sub.summary||d.jobDescription||'') + '</td></tr>' : '')
+    + '</table>'
+    + '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px;margin-bottom:8px">Hazard Identification &amp; Controls</h3>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">'
+    + '<thead><tr style="background:#102558;color:#fff"><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Task Step</th><th style="padding:8px;text-align:left">Hazard(s)</th><th style="padding:8px;text-align:left">Control Measures</th><th style="padding:8px;text-align:left">Risk</th></tr></thead>'
+    + '<tbody>' + stepRows + '</tbody></table>'
+    + (ppeList.length > 0 ? '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Required PPE</h3><p style="font-size:13px">' + ppeList.join(' &bull; ') + '</p>' : '')
+    + '<h3 style="color:#dc2626;border-bottom:2px solid #dc2626;padding-bottom:6px">Emergency Information</h3>'
+    + '<table style="width:100%;font-size:13px;border-collapse:collapse">'
+    + (emergency ? '<tr><td style="padding:5px;background:#fff5f5;font-weight:bold;width:180px">Emergency Contact</td><td style="padding:5px">' + emergency + '</td></tr>' : '')
+    + (hospital ? '<tr><td style="padding:5px;background:#fff5f5;font-weight:bold">Nearest Hospital</td><td style="padding:5px">' + hospital + '</td></tr>' : '')
+    + (muster ? '<tr><td style="padding:5px;background:#fff5f5;font-weight:bold">Muster Point</td><td style="padding:5px">' + muster + '</td></tr>' : '')
+    + '</table>'
+    + (extraNotes ? '<div style="background:#f0f9ff;border-left:4px solid #0891b2;padding:12px;margin-top:16px;border-radius:4px"><strong>Additional Hazards / Notes:</strong><p style="margin:6px 0 0;color:#444">' + extraNotes + '</p></div>' : '')
+    + '</div><div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack &bull; Reliable Oilfield Services</div></div>';
+
+  var emailResp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: FROM,
+      to: TO,
+      subject: subjectPrefix + siteName + ' - ' + techName + ' - ' + fmtDate(sub.date),
+      html: html,
+      attachments: [{ filename: 'jha-' + (sub.date||'') + '.pdf', content: pdfB64 }],
+    }),
+  });
+  var emailData = await emailResp.json();
   if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
