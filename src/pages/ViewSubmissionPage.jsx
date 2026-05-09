@@ -213,6 +213,21 @@ export default function ViewSubmissionPage() {
             {(sub.gl_code    || d.glCode)          && <Field label='GL Code'    value={sub.gl_code    || d.glCode} />}
             {d.lastServiceDate && <Field label='Last Service Date' value={d.lastServiceDate} />}
           </div>
+          {/* GPS LOCATION LINK */}
+          {d.gpsLat && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>GPS Location</span>
+              <a
+                href={'https://maps.google.com/?q=' + d.gpsLat + ',' + d.gpsLng}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', background: '#1a2332', color: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                📍 Open in Google Maps
+              </a>
+              {d.gpsAccuracy && <span style={{ fontSize: 11, color: '#888' }}>±{d.gpsAccuracy}m accuracy</span>}
+              <span style={{ fontSize: 11, color: '#aaa' }}>{Number(d.gpsLat).toFixed(6)}, {Number(d.gpsLng).toFixed(6)}</span>
+            </div>
+          )}
         </div>
       </div>
 
