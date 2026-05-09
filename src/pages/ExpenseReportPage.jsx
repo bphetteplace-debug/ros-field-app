@@ -82,7 +82,8 @@ export default function ExpenseReportPage() {
         jobType: 'Expense Report',
         expenseItems: expenses.map(function(e){return {category:e.category,description:e.description,amount:parseFloat(e.amount||0)}}),
         expenseTotal: expenses.reduce(function(s,e){return s+parseFloat(e.amount||0)},0),
-      }      const submission = await saveSubmission(formData, user.id, 'expense_report')
+      }
+      const submission = await saveSubmission(formData, user.id, 'expense_report')
 
       // Upload receipt and item photos for each expense
       for (let i = 0; i < expenses.length; i++) {
