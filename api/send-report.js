@@ -583,7 +583,7 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: FROM, to: TO,
-      subject: (allPass ? '\u2713 ' : '\u26a0\ufe0f ') + 'Vehicle Inspection - ' + (sub.truck_number||'') + ' - ' + techName + ' - ' + fmtDate(sub.date),
+      subject: (allPass ? '\u2713 All Pass - Vehicle Inspection' : '\u26a0\ufe0f URGENT: ' + failCount + ' DEFECT(S) FOUND - Vehicle Inspection') + ' - ' + (sub.truck_number||'') + ' - ' + techName + ' - ' + fmtDate(sub.date),
       html,
       attachments: [{ filename: 'inspection-' + (sub.truck_number||'truck') + '-' + (sub.date||'') + '.pdf', content: pdfB64 }],
     }),
