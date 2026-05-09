@@ -884,6 +884,9 @@ export default function FormPage() {
 
       {/* SUBMIT */}
       <div style={{ padding:'0 16px' }}>
+        <button type="button" onClick={saveDraft} style={{ width: '100%', padding: 12, marginBottom: 8, background: draftSaved ? '#16a34a' : '#f5f5f5', color: draftSaved ? '#fff' : '#555', border: '1px solid ' + (draftSaved ? '#16a34a' : '#ddd'), borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+          {draftSaved ? '✅ Draft Saved!' : '💾 Save Draft'}
+        </button>
         <button type="button" onClick={handleSubmit} disabled={saving} style={{ width:'100%',padding:14,background:saving?'#ccc':'#e65c00',color:'#fff',border:'none',borderRadius:8,fontWeight:800,fontSize:16,cursor:saving?'not-allowed':'pointer' }}>
           {saving ? 'Saving...' : 'Submit ' + (jobType==='PM'?'PM':'Service Call')}
         </button>
