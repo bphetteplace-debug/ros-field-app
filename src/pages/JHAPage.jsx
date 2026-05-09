@@ -261,15 +261,9 @@ export default function JHAPage() {
               </select>
             </div>
           </div>
-          <div style={row}>
-            <div style={fld}>
-              <label style={lbl}>Date</label>
-              <input type="date" style={inp} value={date} onChange={e => setDate(e.target.value)} />
-            </div>
-            <div style={fld}>
-              <label style={lbl}>Work Order / Job #</label>
-              <input style={inp} value={workOrder} onChange={e => setWorkOrder(e.target.value)} placeholder="WO-12345" />
-            </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={lbl}>Date</label>
+            <input type="date" style={inp} value={date} onChange={e => setDate(e.target.value)} />
           </div>
           <div style={{ marginBottom: 10 }}>
             <label style={lbl}>Job Location / Site *</label>
