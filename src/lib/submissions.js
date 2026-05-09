@@ -246,7 +246,7 @@ export function getPhotoUrl(storagePath) {
 
 export async function fetchAllSubmissions() {
   try {
-    const data = await supaRest('GET', 'submissions?select=*,profiles(full_name)&order=created_at.desc');
+    const data = await supaRest('GET', 'submissions?select=*,profiles!submissions_created_by_fkey(full_name)&order=created_at.desc');
     return data || [];
   } catch (e) { console.error('Fetch all submissions error:', e); return []; }
 }
