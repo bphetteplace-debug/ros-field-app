@@ -68,8 +68,22 @@ export async function fetchSettings() {
 }
 
 export async function saveSettings(key, value) {
-  // Upsert a single setting row
-  return supaRest('POST', 'app_settings?on_conflict=key', { key, value, updated_at: new Date().toISOString() });
+  // Upsert a single setting row — must use resolution=merge-duplicates or the existing row causes a 23505 PK violation
+  const token = getAuthToken();
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation,resolution=merge-duplicates',
+  };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(SUPA_URL + '/rest/v1/app_settings?on_conflict=key', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ key, value, updated_at: new Date().toISOString() }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || 'saveSettings failed: ' + res.status);
+  return text ? JSON.parse(text) : null;
 }
 
 // ── SUBMISSIONS ──────────────────────────────────────────────────────────────
