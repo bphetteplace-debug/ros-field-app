@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Flame, LogOut, ShieldCheck } from 'lucide-react';
+import { Flame, LogOut, ShieldCheck, Settings } from 'lucide-react';
 import { useAuth } from '../lib/auth.jsx';
 
 export default function Layout({ children }) {
@@ -22,28 +22,25 @@ export default function Layout({ children }) {
               </div>
             </div>
           </Link>
-
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <Link
-                to="/admin"
-                className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold transition ${
-                  location.pathname === '/admin'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
-                }`}
-                title="Admin View"
-              >
+              <Link to="/admin" className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold transition ${
+                location.pathname === '/admin' ? 'bg-orange-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+              }`} title="Admin View">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Admin
               </Link>
             )}
+            {isAdmin && (
+              <Link to="/settings" className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold transition ${
+                location.pathname === '/settings' ? 'bg-orange-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+              }`} title="Settings">
+                <Settings className="w-3.5 h-3.5" />
+                Settings
+              </Link>
+            )}
             {isCloudMode && (
-              <button
-                onClick={signOut}
-                className="p-2 text-slate-400 hover:text-white transition"
-                title="Sign out"
-              >
+              <button onClick={signOut} className="p-2 text-slate-400 hover:text-white transition" title="Sign out">
                 <LogOut className="w-4 h-4" />
               </button>
             )}
