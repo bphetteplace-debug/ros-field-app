@@ -50,6 +50,15 @@ export default function ExpenseReportPage() {
     )
   }
   const [saveError, setSaveError] = useState(null)
+  const [draftSaved, setDraftSaved] = useState(false)
+  const DRAFT_KEY = 'ros_expense_draft'
+  const saveDraft = () => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ techName, truckNumber, date, notes, expenses: expenses.map(e => ({...e, receipt: null, itemPhoto: null})) }))
+      setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2000)
+    } catch(e) {}
+  }
+  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY) } catch(e) {} }
 
   function mkExp() { return { category: EXPENSE_CATEGORIES[0], description: '', amount: '', receipt: null, itemPhoto: null } }
 
@@ -64,6 +73,17 @@ export default function ExpenseReportPage() {
   useEffect(() => {
     if (profile?.full_name) setTechName(profile.full_name)
     if (profile?.truck_number) setTruckNumber(profile.truck_number)
+    // Load saved draft
+    try {
+      const saved = JSON.parse(localStorage.getItem('ros_expense_draft') || 'null')
+      if (saved) {
+        if (saved.techName) setTechName(saved.techName)
+        if (saved.truckNumber) setTruckNumber(saved.truckNumber)
+        if (saved.date) setDate(saved.date)
+        if (saved.notes) setNotes(saved.notes)
+        if (saved.expenses && saved.expenses.length > 0) setExpenses(saved.expenses.map(e => ({...e, receipt: null, itemPhoto: null})))
+      }
+    } catch(e) {}
   }, [profile?.full_name, profile?.truck_number])
 
   const updExp = (i, k, v) => setExpenses(es => es.map((e, idx) => idx === i ? { ...e, [k]: v } : e))
@@ -118,6 +138,7 @@ export default function ExpenseReportPage() {
         const token = Object.keys(localStorage).map(k => k.startsWith('sb-') && k.endsWith('-auth-token') ? JSON.parse(localStorage.getItem(k))?.access_token : null).find(Boolean)
         fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: submission.id, userToken: token }) }).catch(() => {})
       } catch (_) {}
+      clearDraft()
       navigate('/submissions')
     } catch (e) {
       setSaveError(e.message || 'Save failed')
@@ -239,7 +260,12 @@ export default function ExpenseReportPage() {
 
       {/* SUBMIT */}
       <div style={{ padding: '0 0' }}>
-        <button type="button" onClick={handleSubmit} disabled={saving} style={{ width: '100%', padding: 14, background: saving ? '#ccc' : '#e65c00', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <div style={{ padding: '0 0 8px' }}>
+        <button type="button" onClick={saveDraft} style={{ width: '100%', padding: 10, background: draftSaved ? '#16a34a' : '#f5f5f5', color: draftSaved ? '#fff' : '#555', border: '1px solid ' + (draftSaved ? '#16a34a' : '#ddd'), borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+          {draftSaved ? '✅ Draft Saved!' : '💾 Save Draft'}
+        </button>
+      </div>
+      <button type="button" onClick={handleSubmit} disabled={saving} style={{ width: '100%', padding: 14, background: saving ? '#ccc' : '#e65c00', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 16, cursor: saving ? 'not-allowed' : 'pointer' }}>
           {saving ? 'Saving...' : 'Submit Expense Report'}
         </button>
       </div>
