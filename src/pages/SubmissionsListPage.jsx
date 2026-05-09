@@ -20,6 +20,7 @@ function getTypeLabel(s) {
   if (jt === 'JHA/JSA') return 'JHA'
   return jt || '?'
 }
+
 function getTypeColor(s) {
   const lbl = getTypeLabel(s)
   if (lbl === 'PM') return '#e65c00'
@@ -82,6 +83,14 @@ export default function SubmissionsListPage() {
   const handleLogout = async () => {
     setLoggingOut(true)
     try { await signOut() } catch(e) {}
+    // Belt-and-suspenders: clear any remaining sb- tokens in localStorage
+    try {
+      Object.keys(localStorage).forEach(function(k) {
+        if (k.startsWith('sb-') && (k.endsWith('-auth-token') || k.includes('-auth-'))) {
+          localStorage.removeItem(k)
+        }
+      })
+    } catch(e) {}
     navigate('/login')
   }
 
@@ -92,7 +101,8 @@ export default function SubmissionsListPage() {
     if (!q) return matchesType
     const haystack = [
       s.customer_name, s.location_name, s.date, s.truck_number, lbl,
-      s.pm_number ? String(s.pm_number) : '', s.summary, s.work_type,
+      s.pm_number ? String(s.pm_number) : '',
+      s.summary, s.work_type,
       ...(Array.isArray(s.data?.techs) ? s.data.techs : [])
     ].filter(Boolean).join(' ').toLowerCase()
     return matchesType && haystack.includes(q)
@@ -101,10 +111,30 @@ export default function SubmissionsListPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
+  // Nav button style — comfortable tap targets for mobile (min 36px tall)
+  const navBtnBase = {
+    padding: '7px 12px',
+    borderRadius: 6,
+    textDecoration: 'none',
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: '1',
+    minHeight: 34,
+    display: 'inline-flex',
+    alignItems: 'center',
+    whiteSpace: 'nowrap',
+  }
+
   const navBar = {
-    background: '#1a2332', padding: '0 16px', height: 52,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    position: 'sticky', top: 0, zIndex: 100
+    background: '#1a2332',
+    padding: '0 12px',
+    height: 52,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100
   }
 
   return (
@@ -129,14 +159,18 @@ export default function SubmissionsListPage() {
 
       {/* NAV */}
       <div style={navBar}>
-        <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16 }}>📋 ReliableTrack</span>
+        <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16, flexShrink: 0, marginRight: 8 }}>📋 ReliableTrack</span>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <Link to="/form?type=pm" style={{ background: '#e65c00', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ PM</Link>
-          <Link to="/form?type=sc" style={{ background: '#2563eb', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ SC</Link>
-          <Link to="/expense" style={{ background: '#7c3aed', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ Expense</Link>
-          <Link to="/inspection" style={{ background: '#0891b2', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ Inspect</Link>
-          <Link to="/jha" style={{ background: '#059669', color: '#fff', padding: '5px 10px', borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>+ JHA</Link>
-          <button onClick={handleLogout} disabled={loggingOut} style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: loggingOut ? 'not-allowed' : 'pointer' }}>
+          <Link to="/form?type=pm"  style={{ ...navBtnBase, background: '#e65c00', color: '#fff' }}>+ PM</Link>
+          <Link to="/form?type=sc"  style={{ ...navBtnBase, background: '#2563eb', color: '#fff' }}>+ SC</Link>
+          <Link to="/expense"       style={{ ...navBtnBase, background: '#7c3aed', color: '#fff' }}>+ Expense</Link>
+          <Link to="/inspection"    style={{ ...navBtnBase, background: '#0891b2', color: '#fff' }}>+ Inspect</Link>
+          <Link to="/jha"           style={{ ...navBtnBase, background: '#059669', color: '#fff' }}>+ JHA</Link>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            style={{ ...navBtnBase, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', cursor: loggingOut ? 'not-allowed' : 'pointer', opacity: loggingOut ? 0.7 : 1 }}
+          >
             {loggingOut ? '...' : '🚪 Logout'}
           </button>
         </div>
@@ -152,13 +186,14 @@ export default function SubmissionsListPage() {
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 160, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }}
           />
-          <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}
+            style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
             <option value="ALL">All Types</option>
             <option value="PM">PM Only</option>
             <option value="SC">Service Calls</option>
             <option value="EXP">Expenses</option>
             <option value="INSP">Inspections</option>
-                <option value="JHA">JHA / JSA</option>
+            <option value="JHA">JHA / JSA</option>
           </select>
         </div>
 
@@ -178,7 +213,8 @@ export default function SubmissionsListPage() {
             <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
             <p style={{ fontSize: 15 }}>{search || filterType !== 'ALL' ? 'No results found.' : 'No submissions yet.'}</p>
             {(search || filterType !== 'ALL') && (
-              <button onClick={() => { setSearch(''); setFilterType('ALL') }} style={{ marginTop: 8, color: '#e65c00', background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button>
+              <button onClick={() => { setSearch(''); setFilterType('ALL') }}
+                style={{ marginTop: 8, color: '#e65c00', background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button>
             )}
           </div>
         )}
@@ -203,23 +239,18 @@ export default function SubmissionsListPage() {
           const rightColor = lbl === 'INSP'
             ? (s.data?.failCount > 0 ? '#dc2626' : '#16a34a')
             : (isWarranty ? '#e65c00' : '#222')
-
           return (
             <div key={s.id} style={{ background: '#fff', borderRadius: 10, marginBottom: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid ' + color, overflow: 'hidden' }}>
               <Link to={'/view/' + s.id} style={{ textDecoration: 'none', display: 'block', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#1a2332' }}>
-                      {lbl === 'EXP' || lbl === 'INSP'
-                        ? (techs[0] || s.location_name || 'Unknown')
-                        : (s.customer_name || 'Unknown Customer')}
+                      {lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || 'Unknown') : (s.customer_name || 'Unknown Customer')}
                     </div>
                     <div style={{ color: '#555', fontSize: 13, marginTop: 2 }}>
-                      {lbl === 'EXP'
-                        ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
-                        : lbl === 'INSP'
-                          ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
-                          : (s.location_name || '')}
+                      {lbl === 'EXP' ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
+                       : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
+                       : (s.location_name || '')}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
@@ -236,9 +267,7 @@ export default function SubmissionsListPage() {
                 <button
                   onClick={e => { e.preventDefault(); navigate('/edit/' + s.id) }}
                   style={{ background: '#f5f5f5', border: '1px solid #ddd', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#333', cursor: 'pointer' }}
-                >
-                  ✏️ Edit
-                </button>
+                >✏️ Edit</button>
               </div>
             </div>
           )
@@ -247,8 +276,10 @@ export default function SubmissionsListPage() {
         {/* PAGINATION */}
         {totalPages > 1 && (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-            <button onClick={() => setPage(1)} disabled={page === 1} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>«</button>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>‹ Prev</button>
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#aaa' : '#333', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>‹ Prev</button>
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               let p
               if (totalPages <= 7) p = i + 1
@@ -256,11 +287,14 @@ export default function SubmissionsListPage() {
               else if (page >= totalPages - 3) p = totalPages - 6 + i
               else p = page - 3 + i
               return (
-                <button key={p} onClick={() => setPage(p)} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid ' + (p === page ? '#e65c00' : '#ddd'), background: p === page ? '#e65c00' : '#fff', color: p === page ? '#fff' : '#333', cursor: 'pointer', fontWeight: p === page ? 700 : 400, fontSize: 13 }}>{p}</button>
+                <button key={p} onClick={() => setPage(p)}
+                  style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid ' + (p === page ? '#e65c00' : '#ddd'), background: p === page ? '#e65c00' : '#fff', color: p === page ? '#fff' : '#333', cursor: 'pointer', fontWeight: p === page ? 700 : 400, fontSize: 13 }}>{p}</button>
               )
             })}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>Next ›</button>
-            <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>»</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>Next ›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#aaa' : '#333', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>»</button>
           </div>
         )}
       </div>
