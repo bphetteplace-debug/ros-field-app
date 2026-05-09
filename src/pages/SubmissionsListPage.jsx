@@ -16,6 +16,19 @@ export default function SubmissionsListPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
 
+  // Monitor online/offline status and queue count
+  useEffect(() => {
+    const updateQueue = async () => {
+      try { setQueueCount(await getQueueCount()) } catch(e) {}
+    }
+    updateQueue()
+    const onOnline = () => { setIsOnline(true); updateQueue() }
+    const onOffline = () => setIsOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline) }
+  }, [])
+
   useEffect(() => {
     if (!user) return
     fetchSubmissions(user.id)
@@ -24,58 +37,65 @@ export default function SubmissionsListPage() {
       .finally(() => setLoading(false))
   }, [user])
 
+  const handleSync = async () => {
+    if (syncing) return
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const count = await processOfflineQueue(user?.id)
+      setSyncMsg(count > 0 ? count + ' submission' + (count !== 1 ? 's' : '') + ' synced!' : 'All caught up!')
+      setQueueCount(0)
+      // Reload submissions list
+      if (user) {
+        const fresh = await fetchSubmissions(user.id)
+        setSubmissions(fresh)
+      }
+    } catch(e) {
+      setSyncMsg('Sync failed: ' + e.message)
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setSyncMsg(''), 4000)
+    }
+  }
+
   const fmt = n => '$' + (n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
   const filtered = submissions.filter(s => {
     const q = search.toLowerCase().trim()
     const matchesType = filterType === 'ALL' || s.job_type === filterType
     if (!q) return matchesType
-    const haystack = [
-      s.customer_name,
-      s.location_name,
-      s.date,
-      s.truck_number,
-      s.job_type,
-      s.pm_number ? String(s.pm_number) : '',
-      s.description,
-      s.work_type
+    const haystack = [s.customer_name, s.location_name, s.date, s.truck_number, s.job_type,
+      s.pm_number ? String(s.pm_number) : '', s.description, s.work_type
     ].filter(Boolean).join(' ').toLowerCase()
     return matchesType && haystack.includes(q)
   })
 
-  const navBar = {
-    background: '#1a2332',
-    padding: '0 16px',
-    height: 52,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100
-  }
+  const navBar = { background: '#1a2332', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }
 
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
       {/* OFFLINE BANNER */}
       {!isOnline && (
         <div style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
-          You are offline. Fill out forms normally - they will sync automatically when connection is restored.
+          ⚡ Offline — forms save locally and sync when you reconnect.
           {queueCount > 0 && <span style={{ marginLeft: 8 }}>({queueCount} pending)</span>}
         </div>
       )}
+      {/* PENDING SYNC BANNER */}
       {isOnline && queueCount > 0 && (
         <div style={{ background: '#2563eb', color: '#fff', padding: '8px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          {queueCount} submission{queueCount !== 1 ? 's' : ''} pending sync
+          📤 {queueCount} submission{queueCount !== 1 ? 's' : ''} pending sync
           <button onClick={handleSync} disabled={syncing}
             style={{ background: '#fff', color: '#2563eb', border: 'none', borderRadius: 4, padding: '2px 10px', fontSize: 12, fontWeight: 700, cursor: syncing ? 'not-allowed' : 'pointer' }}>
             {syncing ? 'Syncing...' : 'Sync Now'}
           </button>
         </div>
       )}
+      {/* SYNC SUCCESS BANNER */}
       {syncMsg && (
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
+
       {/* NAV */}
       <div style={navBar}>
         <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16 }}>📋 ReliableTrack</span>
@@ -88,18 +108,11 @@ export default function SubmissionsListPage() {
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '12px 12px 80px' }}>
         {/* SEARCH + FILTER BAR */}
         <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="search"
-            placeholder="Search by customer, location, PM#, date..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ flex: 1, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }}
-          />
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}
-          >
+          <input type="search" placeholder="Search by customer, location, PM#, date..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }} />
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}
+            style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
             <option value="ALL">All Types</option>
             <option value="PM">PM Only</option>
             <option value="Service Call">Service Call</option>
