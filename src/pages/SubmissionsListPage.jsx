@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import NavBar from '../components/NavBar'
 import { fetchSubmissions } from '../lib/submissions'
 import { getQueueCount, processOfflineQueue } from '../lib/offlineSync'
 
@@ -170,27 +171,7 @@ export default function SubmissionsListPage() {
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
       {/* NAV — two rows so buttons never overflow on small screens */}
-      <div style={{ background: '#1a2332', position: 'sticky', top: 0, zIndex: 100, padding: '8px 12px 10px' }}>
-        {/* Row 1: logo + logout */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ color: '#e65c00', fontWeight: 800, fontSize: 16 }}>📋 ReliableTrack</span>
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            style={{ ...btnStyle, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', cursor: loggingOut ? 'not-allowed' : 'pointer', opacity: loggingOut ? 0.6 : 1, padding: '6px 12px', fontSize: 12 }}
-          >
-            {loggingOut ? 'Logging out...' : '🚪 Logout'}
-          </button>
-        </div>
-        {/* Row 2: new form buttons — flex-wrap as last resort but should fit on any phone */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <Link to="/form?type=pm" style={{ ...btnStyle, background: '#e65c00', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ PM</Link>
-          <Link to="/form?type=sc" style={{ ...btnStyle, background: '#2563eb', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ SC</Link>
-          <Link to="/expense" style={{ ...btnStyle, background: '#7c3aed', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Expense</Link>
-          <Link to="/inspection" style={{ ...btnStyle, background: '#0891b2', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Inspect</Link>
-          <Link to="/jha" style={{ ...btnStyle, background: '#059669', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ JHA</Link>
-        </div>
-      </div>
+      <NavBar />
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '12px 12px 80px' }}>
         {/* SEARCH + FILTER */}
