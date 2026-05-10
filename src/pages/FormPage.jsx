@@ -311,17 +311,114 @@ export default function FormPage() {
     // OFFLINE PATH: save to IndexedDB queue if no network
     if (!navigator.onLine) {
       try {
+        // Helper: convert File/Blob to base64 data URL for safe IDB storage
+        const toDataUrl = (file) => new Promise((resolve) => {
+          if (!file) return resolve(null)
+          const reader = new FileReader()
+          reader.onload = e => resolve(e.target.result)
+          reader.onerror = () => resolve(null)
+          reader.readAsDataURL(file)
+        })
+
         const formData = {
           pmNumber, jobType, warrantyWork, customerName, truckNumber, locationName,
           customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
           date, startTime, departureTime, description, techs, equipment, parts,
           miles, costPerMile, laborHours, hourlyRate, billableTechs,
-          arrestors: jobType==='PM' ? arrestors.map(a=>({arrestorId:a.arrestorId,condition:a.condition,filterChanged:a.filterChanged,notes:a.notes})) : [],
-          flares: jobType==='PM' ? flares.map(f=>({flareId:f.flareId,condition:f.condition,pilotLit:f.pilotLit,lastIgnition:f.lastIgnition,notes:f.notes})) : [],
-          heaters: jobType==='PM' ? heaters.map(h=>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length,firetubes:h.firetubes.map(ft=>({condition:ft.condition}))})) : [],
-          scEquipment: jobType==='Service Call' ? scEquipment : [],
+          arrestors: jobType === 'PM' ? arrestors.map(a =>({arrestorId:a.arrestorId,condition:a.condition,filterChanged:a.filterChanged,notes:a.notes})) : [],
+          flares: jobType === 'PM' ? flares.map(f =>({flareId:f.flareId,condition:f.condition,pilotLit:f.pilotLit,lastIgnition:f.lastIgnition,notes:f.notes})) : [],
+          heaters: jobType === 'PM' ? heaters.map(h =>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length,firetubes:h.firetubes.map(ft =>({condition:ft.condition}))})) : [],
+          scEquipment: jobType === 'Service Call' ? scEquipment : [],
         }
-        await queueOfflineSubmission({ formData, userId: user.id })
+
+        // Convert all photos/videos/signatures to data URLs for safe IDB storage
+        const photoDataUrls = {}
+
+        // General work photos
+        if (photos.length > 0) {
+          photoDataUrls['work'] = await Promise.all(
+            photos.map(async (f, i) => ({ dataUrl: await toDataUrl(f), caption: photoCaptions[i] || '' }))
+          )
+        }
+
+        // SC arrival/departure videos
+        if (jobType === 'Service Call') {
+          if (arrivalVideo) {
+            const url = await toDataUrl(arrivalVideo)
+            if (url) photoDataUrls['arrival-video'] = [{ dataUrl: url, caption: 'Arrival Video' }]
+          }
+          if (departureVideo) {
+            const url = await toDataUrl(departureVideo)
+            if (url) photoDataUrls['departure-video'] = [{ dataUrl: url, caption: 'Departure Video' }]
+          }
+        }
+
+        // Part photos
+        for (const p of parts) {
+          const pf = partPhotos[p.sku] || []
+          if (pf.length > 0) {
+            photoDataUrls['part-' + p.sku] = await Promise.all(
+              pf.map(async (f, i) => ({ dataUrl: await toDataUrl(f), caption: 'Part ' + p.name + ' Photo ' + (i + 1) }))
+            )
+          }
+        }
+
+        // Tech signatures (canvas toDataURL — already data URLs)
+        for (const name of techs) {
+          if (signatures[name]) {
+            photoDataUrls['sig-' + name.split(' ')[0].toLowerCase()] = [{ dataUrl: signatures[name], caption: 'Signature: ' + name }]
+          }
+        }
+        if (customerSig) {
+          photoDataUrls['customer-sig'] = [{ dataUrl: customerSig, caption: 'Customer Signature' }]
+        }
+
+        // PM equipment photos
+        if (jobType === 'PM') {
+          for (let i = 0; i < arrestors.length; i++) {
+            const a = arrestors[i]
+            const pf = [
+              a.before1 && { file: a.before1, caption: 'Arrestor ' + (i+1) + ' Before 1' },
+              a.before2 && { file: a.before2, caption: 'Arrestor ' + (i+1) + ' Before 2' },
+              a.after1  && { file: a.after1,  caption: 'Arrestor ' + (i+1) + ' After 1' },
+              a.after2  && { file: a.after2,  caption: 'Arrestor ' + (i+1) + ' After 2' },
+            ].filter(Boolean)
+            if (pf.length) {
+              photoDataUrls['arrestor-' + i] = await Promise.all(
+                pf.map(async x => ({ dataUrl: await toDataUrl(x.file), caption: x.caption }))
+              )
+            }
+          }
+          for (let i = 0; i < flares.length; i++) {
+            const f = flares[i]
+            const pf = [
+              f.photo1 && { file: f.photo1, caption: 'Flare ' + (i+1) + ' Photo 1' },
+              f.photo2 && { file: f.photo2, caption: 'Flare ' + (i+1) + ' Photo 2' },
+            ].filter(Boolean)
+            if (pf.length) {
+              photoDataUrls['flare-' + i] = await Promise.all(
+                pf.map(async x => ({ dataUrl: await toDataUrl(x.file), caption: x.caption }))
+              )
+            }
+          }
+          for (let hi = 0; hi < heaters.length; hi++) {
+            const h = heaters[hi]
+            for (let fi = 0; fi < h.firetubes.length; fi++) {
+              const ft = h.firetubes[fi]
+              const pf = [
+                ft.photo1 && { file: ft.photo1, caption: 'HT ' + (hi+1) + ' FT ' + (fi+1) + ' Photo 1' },
+                ft.photo2 && { file: ft.photo2, caption: 'HT ' + (hi+1) + ' FT ' + (fi+1) + ' Photo 2' },
+              ].filter(Boolean)
+              if (pf.length) {
+                photoDataUrls['ht-' + hi + '-ft-' + fi] = await Promise.all(
+                  pf.map(async x => ({ dataUrl: await toDataUrl(x.file), caption: x.caption }))
+                )
+              }
+            }
+          }
+        }
+
+        await queueOfflineSubmission({ formData, userId: user.id, photoDataUrls })
         localStorage.removeItem(DRAFT_KEY)
         navigate('/submissions?offline=1')
       } catch(e) {
