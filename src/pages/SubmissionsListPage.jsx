@@ -33,7 +33,7 @@ function getTypeColor(s) {
 }
 
 export default function SubmissionsListPage() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
