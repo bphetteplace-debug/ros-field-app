@@ -14,11 +14,15 @@ export async function processOfflineQueue(userId) {
   for (const item of queue) {
     try {
       const submission = await saveSubmission(item.formData, userId);
-      // Re-upload photos stored as base64 data URLs
+      // Re-upload photos stored as { dataUrl, caption } objects keyed by section
       if (item.photoDataUrls && submission) {
         for (const [section, photos] of Object.entries(item.photoDataUrls)) {
-          if (photos.length > 0) {
-            await uploadPhotos(submission.id, photos.map((url, i) => ({ dataUrl: url, caption: '' })), section);
+          if (photos && photos.length > 0) {
+            await uploadPhotos(
+              submission.id,
+              photos.map(p => ({ dataUrl: p.dataUrl, caption: p.caption || '' })),
+              section
+            );
           }
         }
       }
@@ -29,7 +33,7 @@ export async function processOfflineQueue(userId) {
       failed++;
     }
   }
-  return { success, failed };
+  return { success: success, failed: failed };
 }
 
 export async function getQueueCount() {
