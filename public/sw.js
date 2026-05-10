@@ -1,7 +1,7 @@
 // public/sw.js — ReliableTrack Service Worker
-// Provides offline capability: caches app shell, queues form submissions when offline
-
-const CACHE_NAME = 'reliabletrack-v1';
+// __SW_VERSION__ is replaced at build time by vite.config.js define()
+// This ensures each deploy gets a unique cache name, auto-busting stale assets
+const CACHE_NAME = 'reliabletrack-' + (typeof __SW_VERSION__ !== 'undefined' ? __SW_VERSION__ : 'dev');
 
 // App shell files to cache on install
 const SHELL_URLS = [
@@ -10,23 +10,27 @@ const SHELL_URLS = [
   '/manifest.webmanifest',
 ];
 
-// ── INSTALL: cache app shell ─────────────────────────────────────────────────
+// ── INSTALL: cache app shell ───────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_URLS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(SHELL_URLS))
+      .then(() => self.skipWaiting()) // activate immediately, don't wait for old SW to die
   );
 });
 
-// ── ACTIVATE: clean up old caches ───────────────────────────────────────────
+// ── ACTIVATE: clean up old caches, claim all clients immediately ───────────
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim()) // take control of all open tabs immediately
   );
 });
 
-// ── FETCH: network-first for API/auth, cache-first for assets ────────────────
+// ── FETCH: network-first for API/auth, cache-first for assets ──────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -56,22 +60,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For JS/CSS/fonts: cache-first
+  // For JS/CSS/fonts: cache-first, update in background
   event.respondWith(
     caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(res => {
+      const networkFetch = fetch(event.request).then(res => {
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return res;
       });
+      return cached || networkFetch;
     })
   );
 });
 
-// ── SYNC: process offline submission queue when back online ──────────────────
+// ── SYNC: process offline submission queue when back online ────────────────
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-submissions') {
     event.waitUntil(syncOfflineQueue());
@@ -84,7 +88,7 @@ async function syncOfflineQueue() {
   clients.forEach(client => client.postMessage({ type: 'SYNC_QUEUE' }));
 }
 
-// ── MESSAGE: handle messages from the app ───────────────────────────────────
+// ── MESSAGE: handle messages from the app ─────────────────────────────────
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
