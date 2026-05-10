@@ -519,7 +519,6 @@ export default function ViewSubmissionPage() {
           </div>
         </div>
       )}
-      )}
       {sub.photos && sub.photos.length > 0 && (() => {
         const videoSections = ['arrival-video', 'departure-video']
         const videos = sub.photos.filter(p => videoSections.includes(p.section))
