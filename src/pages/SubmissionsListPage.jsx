@@ -58,7 +58,14 @@ export default function SubmissionsListPage() {
     return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline) }
   }, [])
 
+  // Wire up SW Background Sync signal → trigger handleSync when back online
   useEffect(() => {
+    const onSyncQueue = () => { if (navigator.onLine) handleSync() }
+    window.addEventListener('ros-sync-queue', onSyncQueue)
+    return () => window.removeEventListener('ros-sync-queue', onSyncQueue)
+  }, [syncing, user])
+
+    useEffect(() => {
     if (!user) return
     fetchSubmissions(user.id)
       .then(setSubmissions)
