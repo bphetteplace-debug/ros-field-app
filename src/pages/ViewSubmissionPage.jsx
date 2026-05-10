@@ -465,21 +465,20 @@ export default function ViewSubmissionPage() {
           <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
             <div style={{ background: '#1a2332', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', fontWeight: 700, fontSize: 14 }}>EXPENSE ITEMS</div>
             <div style={{ padding: 16 }}>
-              {(d.expenseItems || []).length === 0 && <div style={{ color: '#999', fontSize: 14 }}>No expense items recorded.</div>}
-              {(d.expenseItems || []).map(function(item, i) { return (
+              {(d.expenseItems || []).length === 0 && <div style={{ color: '#999', fontSize: 14 }}>No expense items.</div>}
+              {(d.expenseItems || []).map((item, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{item.category || item.description || 'Item '+(i+1)}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{item.category || item.description || ('Item ' + (i + 1))}</div>
                     {item.description && item.category && <div style={{ color: '#666', fontSize: 12 }}>{item.description}</div>}
                     {item.date && <div style={{ color: '#999', fontSize: 12 }}>{item.date}</div>}
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a2332' }}>${(parseFloat(item.amount)||0).toFixed(2)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>${(parseFloat(item.amount) || 0).toFixed(2)}</div>
                 </div>
-              )})}
-              {(d.expenseItems||[]).length > 0 && (
+              ))}
+              {(d.expenseItems || []).length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15, paddingTop: 10, borderTop: '2px solid #1a2332', marginTop: 4 }}>
-                  <span>TOTAL</span>
-                  <span>${(parseFloat(d.expenseTotal)||0).toFixed(2)}</span>
+                  <span>TOTAL</span><span>${(parseFloat(d.expenseTotal) || 0).toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -490,34 +489,26 @@ export default function ViewSubmissionPage() {
         <div style={{ margin: '0 12px 12px' }}>
           <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
             <div style={{ background: '#1a2332', color: '#fff', padding: '10px 16px', borderRadius: '8px 8px 0 0', fontWeight: 700, fontSize: 14 }}>
-              DAILY INSPECTION
-              {d.inspectionType && <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, opacity: 0.8 }}>— {d.inspectionType}</span>}
+              DAILY INSPECTION {d.inspectionType && <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.8 }}>— {d.inspectionType}</span>}
             </div>
             <div style={{ padding: 16 }}>
               {d.odometer && <div style={{ marginBottom: 8, fontSize: 14 }}><strong>Odometer:</strong> {d.odometer}</div>}
               <div style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
-                  <div style={{ background: d.allPass ? '#dcfce7' : '#fee2e2', color: d.allPass ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13 }}>
-                    {d.allPass ? '✓ All Passed' : '⚠️ '+d.failCount+' Item(s) Failed'}
-                  </div>
-                </div>
+                <span style={{ padding: '4px 12px', borderRadius: 20, fontWeight: 700, fontSize: 13, background: d.allPass ? '#dcfce7' : '#fee2e2', color: d.allPass ? '#166534' : '#991b1b' }}>
+                  {d.allPass ? 'All Passed' : (d.failCount + ' Item(s) Failed')}
+                </span>
               </div>
-              {(d.checkItems||[]).length > 0 && (
-                <div>
-                  {(d.checkItems||[]).map(function(item, i) { return (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f5f5f5', fontSize: 14 }}>
-                      <span>{item.label || item.name || 'Item '+(i+1)}</span>
-                      <span style={{ fontWeight: 700, color: item.pass===false ? '#dc2626' : '#16a34a' }}>
-                        {item.pass===false ? '✗ FAIL' : '✓ PASS'}
-                      </span>
-                    </div>
-                  )})}
+              {(d.checkItems || []).map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f5f5f5', fontSize: 14 }}>
+                  <span>{item.label || item.name || ('Item ' + (i + 1))}</span>
+                  <span style={{ fontWeight: 700, color: item.pass === false ? '#dc2626' : '#16a34a' }}>{item.pass === false ? 'FAIL' : 'PASS'}</span>
                 </div>
-              )}
-              {d.defects && <div style={{ marginTop: 10, padding: 10, background: '#fef2f2', borderRadius: 6, fontSize: 14 }}><strong>Defects/Notes:</strong> {d.defects}</div>}
+              ))}
+              {d.defects && <div style={{ marginTop: 10, padding: 10, background: '#fef2f2', borderRadius: 6, fontSize: 14 }}><strong>Defects:</strong> {d.defects}</div>}
             </div>
           </div>
         </div>
+      )}
       )}
       {sub.photos && sub.photos.length > 0 && (() => {
         const videoSections = ['arrival-video', 'departure-video']
