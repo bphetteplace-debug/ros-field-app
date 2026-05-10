@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { saveSubmission, uploadPhotos, getNextPmNumber, fetchSettings, DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS, queueOfflineSubmission } from '../lib/submissions'
+import { saveSubmission, uploadPhotos, getNextPmNumber, getNextWoNumber, fetchSettings, DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS, queueOfflineSubmission } from '../lib/submissions'
 import { PARTS_CATALOG } from '../data/catalog'
 
 // Customers loaded dynamically from app_settings (fallback to DEFAULT_CUSTOMERS)
@@ -88,6 +88,7 @@ export default function FormPage() {
   const jobTypeParam = (typeParam === 'sc' || typeParam === 'service') ? 'Service Call' : 'PM'
 
   const [pmNumber, setPmNumber] = useState(null)
+  const [woNumber, setWoNumber] = useState(null)
   // Dynamic lists from app_settings table (fallback to hardcoded defaults)
   const [CUSTOMERS, setCUSTOMERS] = useState(DEFAULT_CUSTOMERS)
   const [TRUCKS,    setTRUCKS]    = useState(DEFAULT_TRUCKS)
@@ -182,6 +183,17 @@ export default function FormPage() {
   })
 
   useEffect(() => { getNextPmNumber().then(setPmNumber).catch(() => setPmNumber(9136)) }, [])
+
+  // Auto-assign W/O number — shared counter across PM + SC, never repeats, starts at 10000
+  useEffect(() => {
+    getNextWoNumber().then(n => {
+      setWoNumber(n)
+      setCustomerWorkOrder(String(n))
+    }).catch(() => {
+      setWoNumber(10000)
+      setCustomerWorkOrder('10000')
+    })
+  }, [])
   // Load dynamic lists from app_settings
   useEffect(() => {
     fetchSettings().then(s => {
@@ -551,7 +563,7 @@ export default function FormPage() {
       <div style={{ background:'#1a2332', padding:'12px 16px', position:'sticky', top:0, zIndex:100, marginBottom:12 }}>
         <div style={{ color:'#e65c00', fontWeight:800, fontSize:17 }}>ReliableTrack</div>
           <div style={{ color:'#aaa', fontSize:10, fontWeight:400, letterSpacing:0.3 }}>Built for Reliable Oilfield Services</div>
-        <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} #{pmNumber||'...'} - {jobType}</div>
+        <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} #{pmNumber||'...'} &nbsp;&bull;&nbsp; W/O #{woNumber||'...'}</div>
       </div>
 
       {!navigator.onLine && (
@@ -605,7 +617,7 @@ export default function FormPage() {
           </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Contact</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} /></div>
-            <div style={fld}><label style={lbl}>Work Order #</label><input style={inp} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>Work Order # <span style={{fontSize:10,color:'#16a34a',fontWeight:700,marginLeft:4}}>✓ Auto-assigned</span></label><div style={{...inp,background:'#f0fdf4',border:'1px solid #86efac',color:'#15803d',fontWeight:700,display:'flex',alignItems:'center',gap:6,cursor:'default'}}>🔒 {woNumber || '...'}</div></div>
           </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Type of Work</label>
