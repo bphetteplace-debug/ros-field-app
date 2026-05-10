@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchSubmission, getPhotoUrl, deleteSubmission } from '../lib/submissions'
 import { useAuth } from '../lib/auth'
+import NavBar from '../components/NavBar'
 
 const COND_COLOR = { Good: '#16a34a', Fair: '#d97706', Poor: '#dc2626', Replaced: '#7c3aed' }
 
@@ -137,12 +138,7 @@ export default function ViewSubmissionPage() {
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 640, margin: '0 auto', padding: '0 0 40px', background: '#f0f2f5', minHeight: '100vh' }}>
 
-      {/* Back */}
-      <div style={{ padding: '12px 16px', background: '#fff', borderBottom: '1px solid #eee' }}>
-        <button onClick={() => navigate('/submissions')} style={{ background: 'none', border: 'none', color: '#e65c00', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: 0 }}>
-          ← Submissions
-        </button>
-      </div>
+      <NavBar />
 
       {/* Header */}
       <div style={{ background: '#1a2332', color: '#fff', padding: '20px 16px', marginBottom: 12 }}>
