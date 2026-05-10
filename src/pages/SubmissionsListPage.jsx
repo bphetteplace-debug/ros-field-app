@@ -51,7 +51,8 @@ export default function SubmissionsListPage() {
     if (syncing) return
     setSyncing(true); setSyncMsg('')
     try {
-      const count = await processOfflineQueue(user?.id)
+      const result = await processOfflineQueue(user?.id)
+      const count = (result && result.success) || 0
       setSyncMsg(count > 0 ? count + ' submission' + (count !== 1 ? 's' : '') + ' synced!' : 'All caught up!')
       setQueueCount(0)
       if (user) {
