@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import NavBar from '../components/NavBar'
 import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission } from '../lib/submissions'
 
 function getTypeLabel(s) {
@@ -142,8 +143,14 @@ function ExpenseAnalytics({ submissions }) {
   )
 }
 export default function AdminPage() {
-  const { isAdmin, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
+  const { user, isAdmin, loading: authLoading, logout } = useAuth()
+  const navigate = u  const [loggingOut, setLoggingOut] = useState(false)
+  const handleLogout = useCallback(async () => {
+    setLoggingOut(true)
+    try { await logout() } catch(e) {}
+    setLoggingOut(false)
+  }, [logout])
+seNavigate()
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -219,7 +226,6 @@ export default function AdminPage() {
   const expCount = filtered.filter(s => getTypeLabel(s) === 'EXP').length
   const inspCount = filtered.filter(s => getTypeLabel(s) === 'INSP').length
 
-  const navBar = { background: '#1a2332', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }
   const statCard = (label, value, color) => (
     <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 11, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
@@ -230,13 +236,7 @@ export default function AdminPage() {
   const clearFilters = () => { setSearch(''); setFilterType('ALL'); setFilterStatus('ALL'); setFilterTech('ALL'); setDateFrom(''); setDateTo('') }
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
-      <div style={navBar}>
-        <span style={{ color: '#e65c00', fontWeight: 700, fontSize: 16 }}>🛡 Admin — All Submissions</span>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Link to="/settings" style={{ color: '#aaa', fontSize: 13, textDecoration: 'none' }}>⚙ Settings</Link>
-          <Link to="/submissions" style={{ color: '#aaa', fontSize: 13, textDecoration: 'none' }}>← My Submissions</Link>
-        </div>
-      </div>
+      <NavBar user={user} isAdmin={isAdmin} onLogout={handleLogout} loggingOut={loggingOut} />
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '12px 12px 80px' }}>
 
