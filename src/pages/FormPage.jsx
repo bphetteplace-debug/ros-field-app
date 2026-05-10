@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import NavBar from '../components/NavBar'
 import { saveSubmission, uploadPhotos, getNextPmNumber, getNextWoNumber, fetchSettings, DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS, queueOfflineSubmission } from '../lib/submissions'
 import { PARTS_CATALOG } from '../data/catalog'
 
@@ -81,8 +82,14 @@ const SC_EQUIP_TYPES = [
 ]
 
 export default function FormPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
+  const [loggingOut, setLoggingOut] = useState(false)
+  const handleLogout = useCallback(async () => {
+    setLoggingOut(true)
+    try { await logout() } catch(e) {}
+    setLoggingOut(false)
+  }, [logout])
   const [searchParams] = useSearchParams()
   const typeParam = searchParams.get('type') || 'pm'
   const jobTypeParam = (typeParam === 'sc' || typeParam === 'service') ? 'Service Call' : 'PM'
@@ -555,14 +562,9 @@ export default function FormPage() {
   const row = { display:'flex', gap:12, marginBottom:10 }
 
   return (
-    <div style={{ maxWidth:600, margin:'0 auto', padding:'0 0 40px', fontFamily:'system-ui,sans-serif' }}>
-
-      {/* STICKY HEADER */}
-      <div style={{ background:'#1a2332', padding:'12px 16px', position:'sticky', top:0, zIndex:100, marginBottom:12 }}>
-        <div style={{ color:'#e65c00', fontWeight:800, fontSize:17 }}>ReliableTrack</div>
-          <div style={{ color:'#aaa', fontSize:10, fontWeight:400, letterSpacing:0.3 }}>Built for Reliable Oilfield Services</div>
-        <div style={{ color:'#fff', fontSize:14, fontWeight:700 }}>{jobType==='PM'?'PM':'SC'} W/O #{woNumber||'...'}</div>
-      </div>
+    <div style={{ fontFamily: 'system-ui,sans-serif' }}>
+      <NavBar user={user} isAdmin={isAdmin} onLogout={handleLogout} loggingOut={loggingOut} />
+      <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 0 40px' }}>
 
       {!navigator.onLine && (
         <div style={{ margin:'0 16px 10px', background:'#dc2626', color:'#fff', borderRadius:6, padding:'8px 12px', fontSize:13, fontWeight:700, textAlign:'center' }}>
@@ -1067,6 +1069,7 @@ export default function FormPage() {
         </button>
       </div>
 
+      </div>
     </div>
   )
 }
