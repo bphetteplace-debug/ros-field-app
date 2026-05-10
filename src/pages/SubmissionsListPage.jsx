@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { fetchSubmissions } from '../lib/submissions'
@@ -46,26 +46,53 @@ export default function SubmissionsListPage() {
   const [page, setPage] = useState(1)
   const [loggingOut, setLoggingOut] = useState(false)
 
+  const handleSync = useCallback(async () => {
+    if (syncing) return
+    setSyncing(true); setSyncMsg('')
+    try {
+      const count = await processOfflineQueue(user?.id)
+      setSyncMsg(count > 0 ? count + ' submission' + (count !== 1 ? 's' : '') + ' synced!' : 'All caught up!')
+      setQueueCount(0)
+      if (user) {
+        const fresh = await fetchSubmissions(user.id); setSubmissions(fresh)
+      }
+    } catch(e) {
+      setSyncMsg('Sync failed: ' + e.message)
+    } finally {
+      setSyncing(false); setTimeout(() => setSyncMsg(''), 4000)
+    }
+  }, [user, syncing])
+
   useEffect(() => {
     const updateQueue = async () => {
       try { setQueueCount(await getQueueCount()) } catch(e) {}
     }
     updateQueue()
-    const onOnline = () => { setIsOnline(true); updateQueue() }
+    const onOnline = async () => {
+      setIsOnline(true)
+      const count = await getQueueCount()
+      setQueueCount(count)
+      if (count > 0) handleSync()
+    }
     const onOffline = () => setIsOnline(false)
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
-    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline) }
-  }, [])
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [handleSync])
 
   // Wire up SW Background Sync signal → trigger handleSync when back online
   useEffect(() => {
-    const onSyncQueue = () => { if (navigator.onLine) handleSync() }
+    const onSyncQueue = () => {
+      if (navigator.onLine) handleSync()
+    }
     window.addEventListener('ros-sync-queue', onSyncQueue)
     return () => window.removeEventListener('ros-sync-queue', onSyncQueue)
-  }, [syncing, user])
+  }, [handleSync])
 
-    useEffect(() => {
+  useEffect(() => {
     if (!user) return
     fetchSubmissions(user.id)
       .then(setSubmissions)
@@ -74,18 +101,6 @@ export default function SubmissionsListPage() {
   }, [user])
 
   useEffect(() => { setPage(1) }, [search, filterType])
-
-  const handleSync = async () => {
-    if (syncing) return
-    setSyncing(true); setSyncMsg('')
-    try {
-      const count = await processOfflineQueue(user?.id)
-      setSyncMsg(count > 0 ? count + ' submission' + (count !== 1 ? 's' : '') + ' synced!' : 'All caught up!')
-      setQueueCount(0)
-      if (user) { const fresh = await fetchSubmissions(user.id); setSubmissions(fresh) }
-    } catch(e) { setSyncMsg('Sync failed: ' + e.message) }
-    finally { setSyncing(false); setTimeout(() => setSyncMsg(''), 4000) }
-  }
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -154,7 +169,6 @@ export default function SubmissionsListPage() {
       {syncMsg && (
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
-
       {/* NAV — two rows so buttons never overflow on small screens */}
       <div style={{ background: '#1a2332', position: 'sticky', top: 0, zIndex: 100, padding: '8px 12px 10px' }}>
         {/* Row 1: logo + logout */}
@@ -170,11 +184,11 @@ export default function SubmissionsListPage() {
         </div>
         {/* Row 2: new form buttons — flex-wrap as last resort but should fit on any phone */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <Link to="/form?type=pm"  style={{ ...btnStyle, background: '#e65c00', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ PM</Link>
-          <Link to="/form?type=sc"  style={{ ...btnStyle, background: '#2563eb', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ SC</Link>
-          <Link to="/expense"       style={{ ...btnStyle, background: '#7c3aed', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Expense</Link>
-          <Link to="/inspection"    style={{ ...btnStyle, background: '#0891b2', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Inspect</Link>
-          <Link to="/jha"           style={{ ...btnStyle, background: '#059669', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ JHA</Link>
+          <Link to="/form?type=pm" style={{ ...btnStyle, background: '#e65c00', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ PM</Link>
+          <Link to="/form?type=sc" style={{ ...btnStyle, background: '#2563eb', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ SC</Link>
+          <Link to="/expense" style={{ ...btnStyle, background: '#7c3aed', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Expense</Link>
+          <Link to="/inspection" style={{ ...btnStyle, background: '#0891b2', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>+ Inspect</Link>
+          <Link to="/jha" style={{ ...btnStyle, background: '#059669', color: '#fff', flex: '1 1 auto', minWidth: 60 }}>+ JHA</Link>
         </div>
       </div>
 
@@ -188,8 +202,7 @@ export default function SubmissionsListPage() {
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 160, border: '1px solid #ddd', borderRadius: 6, padding: '8px 10px', fontSize: 14, outline: 'none' }}
           />
-          <select value={filterType} onChange={e => setFilterType(e.target.value)}
-            style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
+          <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '8px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}>
             <option value="ALL">All Types</option>
             <option value="PM">PM Only</option>
             <option value="SC">Service Calls</option>
@@ -201,7 +214,9 @@ export default function SubmissionsListPage() {
 
         {!loading && !error && (
           <div style={{ fontSize: 12, color: '#888', marginBottom: 8, paddingLeft: 4 }}>
-            {filtered.length === submissions.length ? submissions.length + ' submissions' : filtered.length + ' of ' + submissions.length + ' submissions'}
+            {filtered.length === submissions.length
+              ? submissions.length + ' submissions'
+              : filtered.length + ' of ' + submissions.length + ' submissions'}
             {search && ' matching "' + search + '"'}
             {totalPages > 1 && ' — Page ' + page + ' of ' + totalPages}
           </div>
@@ -209,18 +224,15 @@ export default function SubmissionsListPage() {
 
         {loading && <p style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Loading...</p>}
         {error && <p style={{ textAlign: 'center', color: '#e65c00', marginTop: 40 }}>Error: {error}</p>}
-
         {!loading && !error && filtered.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: 60, color: '#aaa' }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
             <p style={{ fontSize: 15 }}>{search || filterType !== 'ALL' ? 'No results found.' : 'No submissions yet.'}</p>
             {(search || filterType !== 'ALL') && (
-              <button onClick={() => { setSearch(''); setFilterType('ALL') }}
-                style={{ marginTop: 8, color: '#e65c00', background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button>
+              <button onClick={() => { setSearch(''); setFilterType('ALL') }} style={{ marginTop: 8, color: '#e65c00', background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button>
             )}
           </div>
         )}
-
         {paginated.map(s => {
           const lbl = getTypeLabel(s)
           const color = getTypeColor(s)
@@ -250,9 +262,11 @@ export default function SubmissionsListPage() {
                       {lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || 'Unknown') : (s.customer_name || 'Unknown Customer')}
                     </div>
                     <div style={{ color: '#555', fontSize: 13, marginTop: 2 }}>
-                      {lbl === 'EXP' ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
-                       : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
-                       : (s.location_name || '')}
+                      {lbl === 'EXP'
+                        ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
+                        : lbl === 'INSP'
+                          ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
+                          : (s.location_name || '')}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
