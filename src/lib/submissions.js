@@ -28,7 +28,9 @@ async function supaRest(method, path, body) {
   const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
-      method, headers, body: body ? JSON.stringify(body) : undefined, signal: controller.signal,
+      method, headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
     clearTimeout(timeoutId);
     const text = await res.text();
@@ -41,15 +43,37 @@ async function supaRest(method, path, body) {
   }
 }
 
+// ── PM REPORT NUMBER ── shared counter across PM + SC, never repeats
 export async function getNextPmNumber() {
   try {
     const data = await supaRest('GET', 'submissions?select=pm_number&order=pm_number.desc&limit=1');
     if (!data || data.length === 0) return 9136;
     return (data[0].pm_number || 9135) + 1;
-  } catch { return 9136; }
+  } catch {
+    return 9136;
+  }
 }
 
-// ── SETTINGS ──────────────────────────────────────────────────────────────────────────
+// ── WORK ORDER NUMBER ── shared counter across ALL form types, never repeats, starts at 10000
+// work_order is stored as a numeric string e.g. "10001" — we parse to int to find the max
+export async function getNextWoNumber() {
+  try {
+    // Fetch the highest work_order value stored across all submissions
+    // work_order column stores the value as text, so we cast and sort numerically
+    const data = await supaRest(
+      'GET',
+      'submissions?select=work_order&work_order=gte.10000&order=work_order.desc&limit=1'
+    );
+    if (!data || data.length === 0) return 10000;
+    const parsed = parseInt(data[0].work_order, 10);
+    if (isNaN(parsed) || parsed < 10000) return 10000;
+    return parsed + 1;
+  } catch {
+    return 10000;
+  }
+}
+
+// ── SETTINGS ────────────────────────────────────────────────────────────────────────
 export async function fetchSettings() {
   try {
     const data = await supaRest('GET', 'app_settings?select=key,value');
@@ -72,8 +96,7 @@ export async function saveSettings(key, value) {
   };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   const res = await fetch(SUPA_URL + '/rest/v1/app_settings?on_conflict=key', {
-    method: 'POST',
-    headers,
+    method: 'POST', headers,
     body: JSON.stringify({ key, value, updated_at: new Date().toISOString() }),
   });
   const text = await res.text();
@@ -85,11 +108,10 @@ export async function saveSettings(key, value) {
 // templateOverride: pass 'expense_report' or 'daily_inspection' to override automatic template detection
 export async function saveSubmission(formData, userId, templateOverride) {
   const {
-    pmNumber, jobType, warrantyWork,
-    customerName, truckNumber, locationName, customerContact, customerWorkOrder,
-    typeOfWork, glCode, assetTag, workArea, date, startTime, departureTime,
-    description, techs, equipment, parts, miles, costPerMile,
-    laborHours, hourlyRate, billableTechs,
+    pmNumber, jobType, warrantyWork, customerName, truckNumber, locationName,
+    customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
+    date, startTime, departureTime, description, techs, equipment, parts,
+    miles, costPerMile, laborHours, hourlyRate, billableTechs,
     arrestors, flares, heaters, scEquipment,
     // Expense Report fields
     expenseItems, expenseTotal,
@@ -97,12 +119,16 @@ export async function saveSubmission(formData, userId, templateOverride) {
     inspectionType, odometer, checkItems, failCount, allPass, defects,
     // GPS location
     gpsLat, gpsLng, gpsAccuracy,
-  jhaSteps, jhaPPE, jhaEmergencyContact, jhaNearestHospital,
-  jhaMeetingPoint, jhaAdditionalHazards, jhaCrewMembers, jhaSupervisor, jhaHighRiskCount,
+    jhaSteps, jhaPPE, jhaEmergencyContact, jhaNearestHospital,
+    jhaMeetingPoint, jhaAdditionalHazards, jhaCrewMembers, jhaSupervisor, jhaHighRiskCount,
   } = formData;
 
-  // Always ensure pm_number is set — expense/inspection forms pass null, so auto-generate
+  // Always ensure pm_number is set
   const effectivePmNumber = pmNumber || await getNextPmNumber();
+
+  // Work order: use the auto-generated one passed in from the form (customerWorkOrder is now numeric)
+  // If somehow empty (e.g. offline queue fallback), generate a fresh one
+  const effectiveWoNumber = customerWorkOrder || String(await getNextWoNumber());
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
@@ -134,7 +160,7 @@ export async function saveSubmission(formData, userId, templateOverride) {
     truck_number: truckNumber,
     location_name: locationName,
     contact: customerContact,
-    work_order: customerWorkOrder,
+    work_order: effectiveWoNumber,
     work_type: typeOfWork,
     gl_code: glCode,
     asset_tag: assetTag,
@@ -151,7 +177,7 @@ export async function saveSubmission(formData, userId, templateOverride) {
       jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
       laborHours, hourlyRate, billableTechs: effectiveBillable, description,
       glCode, assetTag, workArea, startTime, departureTime, typeOfWork,
-      customerWorkOrder, customerContact,
+      customerWorkOrder: effectiveWoNumber, customerContact,
       partsTotal, mileageTotal, laborTotal,
       grandTotal: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
       arrestors: jobType === 'PM' ? (arrestors || []) : [],
@@ -190,7 +216,7 @@ export async function saveSubmission(formData, userId, templateOverride) {
   return Array.isArray(result) ? result[0] : result;
 }
 
-// ── OFFLINE QUEUE ────────────────────────────────────────────────────────────────────
+// ── OFFLINE QUEUE ────────────────────────────────────────────────────────────────
 const IDB_NAME = 'ros-offline';
 const IDB_STORE = 'queue';
 
@@ -233,7 +259,7 @@ export async function removeFromOfflineQueue(id) {
   });
 }
 
-// ── PHOTOS ────────────────────────────────────────────────────────────────────────────
+// ── PHOTOS ────────────────────────────────────────────────────────────────────────
 export async function uploadPhotos(submissionId, photos, section = 'work') {
   const uploaded = [];
   for (let i = 0; i < photos.length; i++) {
@@ -246,7 +272,13 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       } else if (photo.dataUrl) {
         blob = await fetch(photo.dataUrl).then(r => r.blob());
       } else continue;
-      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'video/mp4' ? 'mp4' : blob.type === 'video/webm' ? 'webm' : blob.type === 'video/quicktime' ? 'mov' : blob.type.startsWith('video/') ? 'mp4' : 'jpg';
+
+      const ext = blob.type === 'image/png' ? 'png'
+        : blob.type === 'video/mp4' ? 'mp4'
+        : blob.type === 'video/webm' ? 'webm'
+        : blob.type === 'video/quicktime' ? 'mov'
+        : blob.type.startsWith('video/') ? 'mp4'
+        : 'jpg';
       const path = submissionId + '/' + section + '-' + i + '.' + ext;
       const token = getAuthToken();
       const storageHeaders = {
@@ -259,6 +291,7 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
         method: 'POST', headers: storageHeaders, body: blob
       });
       if (!upRes.ok) { console.warn('Upload err:', await upRes.text()); continue; }
+
       const metaHeaders = {
         'apikey': SUPA_KEY,
         'Content-Type': 'application/json',
@@ -266,21 +299,12 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       };
       if (token) metaHeaders['Authorization'] = 'Bearer ' + token;
       const metaRes = await fetch(SUPA_URL + '/rest/v1/photos', {
-        method: 'POST',
-        headers: metaHeaders,
-        body: JSON.stringify({
-          submission_id: submissionId,
-          storage_path: path,
-          caption: photo.caption || '',
-          display_order: i,
-          section
-        }),
+        method: 'POST', headers: metaHeaders,
+        body: JSON.stringify({ submission_id: submissionId, storage_path: path, caption: photo.caption || '', display_order: i, section }),
       });
       const metaText = await metaRes.text();
       if (metaRes.ok) uploaded.push(metaText ? JSON.parse(metaText)[0] : null);
-    } catch (e) {
-      console.warn('Photo upload error:', e);
-    }
+    } catch (e) { console.warn('Photo upload error:', e); }
   }
   return uploaded;
 }
@@ -324,25 +348,25 @@ export async function fetchAllSubmissions() {
   }
 }
 
-// ── STATUS UPDATE ────────────────────────────────────────────────────────────────────
+// ── STATUS UPDATE ────────────────────────────────────────────────────────────────
 export async function updateSubmissionStatus(id, status) {
   return supaRest('PATCH', 'submissions?id=eq.' + id, { status, updated_at: new Date().toISOString() })
 }
 
-// ── DELETE SUBMISSION ────────────────────────────────────────────────────────────────
+// ── DELETE SUBMISSION ────────────────────────────────────────────────────────────
 export async function deleteSubmission(id) {
   try { await supaRest('DELETE', 'photos?submission_id=eq.' + id) } catch(e) {}
   return supaRest('DELETE', 'submissions?id=eq.' + id)
 }
 
-// ── UPDATE (EDIT) SUBMISSION ──────────────────────────────────────────────────────────────
+// ── UPDATE (EDIT) SUBMISSION ─────────────────────────────────────────────────────
 export async function updateSubmission(id, formData) {
   const {
     jobType, warrantyWork, customerName, truckNumber, locationName,
-    customerContact, customerWorkOrder, typeOfWork, glCode, assetTag,
-    workArea, date, startTime, departureTime, lastServiceDate,
-    description, techs, equipment, parts, miles, costPerMile,
-    laborHours, hourlyRate, billableTechs, arrestors, flares, heaters, scEquipment,
+    customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
+    date, startTime, departureTime, lastServiceDate, description, techs, equipment,
+    parts, miles, costPerMile, laborHours, hourlyRate, billableTechs,
+    arrestors, flares, heaters, scEquipment,
   } = formData
   const partsTotal = (parts||[]).reduce((s,p)=>s+(p.price||0)*(p.qty||0),0)
   const mileageTotal = parseFloat(miles||0)*parseFloat(costPerMile||1.50)
@@ -371,8 +395,8 @@ export async function updateSubmission(id, formData) {
     data: {
       jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
       laborHours, hourlyRate, billableTechs: effBill, description,
-      glCode, assetTag, workArea, startTime, departureTime, typeOfWork,
-      lastServiceDate, customerWorkOrder, customerContact,
+      glCode, assetTag, workArea, startTime, departureTime, typeOfWork, lastServiceDate,
+      customerWorkOrder, customerContact,
       partsTotal, mileageTotal, laborTotal, grandTotal,
       arrestors: jobType==='PM' ? (arrestors||[]) : [],
       flares: jobType==='PM' ? (flares||[]) : [],
