@@ -71,8 +71,12 @@ function ExpenseAnalytics({ submissions }) {
   const byTech = {}
   for (const s of filtered) {
     const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
-    if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, items: [] }
-    byTech[tech].total += parseFloat(s.data?.expenseTotal || 0)
+    if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
+    const lbl2 = getTypeLabel(s)
+    const rev = lbl2 === 'EXP' ? parseFloat(s.data?.expenseTotal || 0) : parseFloat(s.data?.grandTotal || 0)
+    byTech[tech].total += rev
+    if (lbl2 === 'PM' || lbl2 === 'SC') byTech[tech].woCount += 1
+    byTech[tech].laborHours += parseFloat(s.labor_hours || 0)
     byTech[tech].count += 1
     byTech[tech].items.push(s)
   }
@@ -268,6 +272,41 @@ export default function AdminPage() {
                 {statCard('Expenses', expCount, '#7c3aed')}
                 {statCard('Inspections', inspCount, '#0891b2')}
                 {statCard('Warranty', warrantyCount, '#888')}
+              </div>
+            )}
+
+            {/* TECH PERFORMANCE */}
+            {allTechTotals.length > 0 && (
+              <div style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#333', marginBottom: 8 }}>&#128203; Tech Performance</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#f5f5f5', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555' }}>Tech</th>
+                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>WOs</th>
+                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>Hours</th>
+                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>Revenue</th>
+                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>% of Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allTechTotals.map(([tech, d], idx) => (
+                        <tr key={tech} style={{ borderTop: '1px solid #eee', background: idx === 0 ? '#fffbf0' : 'transparent' }}>
+                          <td style={{ padding: '6px 10px', fontWeight: idx === 0 ? 700 : 400 }}>
+                            {idx === 0 && <span style={{ color: '#f59e0b', marginRight: 4 }}>&#127942;</span>}{tech}
+                          </td>
+                          <td style={{ padding: '6px 10px', textAlign: 'right' }}>{d.woCount}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'right' }}>{d.laborHours.toFixed(1)}h</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>{fmt(d.total)}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'right', color: '#888' }}>
+                            {totalRevenue > 0 ? Math.round((d.total / totalRevenue) * 100) + '%' : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
