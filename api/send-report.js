@@ -7,6 +7,9 @@ const RESEND_KEY = process.env.RESEND_API_KEY;
 const TO = process.env.EMAIL_TO ? process.env.EMAIL_TO.split(',').map(e => e.trim()) : ['bphetteplace@reliableoilfieldservices.net'];
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 
+// ROS logo URL — served from the app's own domain (no CORS issues in Lambda)
+const ROS_LOGO_URL = 'https://pm.reliable-oilfield-services.com/ros-logo.png';
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { submissionId } = req.body || {};
@@ -33,28 +36,40 @@ module.exports = async function handler(req, res) {
     const photos = sub.photos || [];
     const template = sub.template || 'service_call';
 
+    // Pre-fetch ROS logo bytes (shared across all report types)
+    var logoImageBytes = null;
+    try {
+      var logoRes = await fetch(ROS_LOGO_URL);
+      if (logoRes.ok) {
+        var logoBuf = await logoRes.arrayBuffer();
+        logoImageBytes = new Uint8Array(logoBuf);
+      }
+    } catch(e) { /* logo optional — don't fail report */ }
+
     // Route to appropriate handler
     if (template === 'expense_report') {
-      return await sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+      return await sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes);
     }
     if (template === 'daily_inspection') {
-      return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+      return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes);
     }
     if (template === 'jha' || (d && d.jobType === 'JHA/JSA')) {
-      return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+      return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes);
     }
     // Default: PM or SC
-    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
-
+    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes);
   } catch (err) {
     console.error('send-report error:', err);
     return res.status(500).json({ error: err.message });
   }
 };
 
-// ── HELPERS ──────────────────────────────────────────────────────────────
+// ── HELPERS ────────────────────────────────────────────────────────────────
 function fmt(n) { return '$' + parseFloat(n || 0).toFixed(2); }
-function fmtDate(s) { if (!s) return ''; try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return s; } }
+function fmtDate(s) {
+  if (!s) return '';
+  try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return s; }
+}
 
 async function fetchPhotoBytes(storagePath) {
   try {
@@ -85,8 +100,57 @@ async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, start
   return y;
 }
 
-// ── PM / SC REPORT ───────────────────────────────────────────────────────
-async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+// ── BRANDED PAGE BUILDER ──────────────────────────────────────────────────
+// Returns an async function addPage(doc) that adds a fully-branded page
+// accentColor: rgb() value for the accent line and report-type badge
+// reportTypeLabel: short label shown in top-right badge (e.g. 'PM', 'SC', 'JHA')
+async function buildPageFactory(pdfDoc, boldFont, regFont, rgb, accentColor, reportTypeLabel, logoImageBytes) {
+  // Try to embed logo once per PDF
+  var logoImg = null;
+  if (logoImageBytes) {
+    try { logoImg = await pdfDoc.embedPng(logoImageBytes); } catch(e) {}
+  }
+  var WHITE = rgb(1, 1, 1);
+  var NAVY = rgb(0.063, 0.149, 0.290);
+  var LGRAY = rgb(0.88, 0.88, 0.88);
+
+  return function addPage(doc) {
+    var pg = doc.addPage([612, 792]);
+
+    // ── Header background ──────────────────────────────────────────────
+    pg.drawRectangle({ x: 0, y: 736, width: 612, height: 56, color: NAVY });
+
+    // ── ROS Logo ──────────────────────────────────────────────────────
+    if (logoImg) {
+      // Draw logo at left, centred vertically in header: 50x50 at x=12, y=738
+      pg.drawImage(logoImg, { x: 12, y: 738, width: 50, height: 50 });
+    } else {
+      // Fallback: draw a circle with ROS initials
+      pg.drawCircle({ x: 37, y: 763, size: 22, color: accentColor });
+      pg.drawText('ROS', { x: 25, y: 757, size: 10, font: boldFont, color: WHITE });
+    }
+
+    // ── Company name block (right of logo) ────────────────────────────
+    pg.drawText('Reliable Oilfield Services', { x: 70, y: 763, size: 15, font: boldFont, color: WHITE });
+    pg.drawText('reliable-oilfield-services.com', { x: 70, y: 749, size: 8, font: regFont, color: rgb(0.72, 0.72, 0.72) });
+
+    // ── Report type badge (right side) ────────────────────────────────
+    pg.drawRectangle({ x: 490, y: 746, width: 110, height: 24, color: accentColor });
+    pg.drawText(reportTypeLabel, { x: 496, y: 752, size: 10, font: boldFont, color: WHITE });
+
+    // ── Orange / accent underline ─────────────────────────────────────
+    pg.drawRectangle({ x: 0, y: 734, width: 612, height: 3, color: accentColor });
+
+    // ── Footer: Powered by ReliableTrack ─────────────────────────────
+    pg.drawRectangle({ x: 0, y: 0, width: 612, height: 20, color: NAVY });
+    pg.drawText('Powered by ReliableTrack™  |  Reliable Oilfield Services', { x: 160, y: 6, size: 7, font: regFont, color: LGRAY });
+
+    return pg;
+  };
+}
+
+// ── PM / SC REPORT ─────────────────────────────────────────────────────────
+async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
   const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
@@ -101,7 +165,6 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const laborTotal = parseFloat(d.laborTotal || 0);
   const grandTotal = parseFloat(d.grandTotal || 0);
 
-  // ── Build PDF ────────────────────────────────────────────────────────
   const pdfDoc = await PDFDocument.create();
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -111,36 +174,25 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const GRAY = rgb(0.5, 0.5, 0.5);
   const LGRAY = rgb(0.95, 0.95, 0.95);
 
-  function addPage(doc) {
-    const pg = doc.addPage([612, 792]);
-    // Header bar
-    pg.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
-    // Logo circle
-    pg.drawCircle({ x: 35, y: 767, size: 18, color: ORANGE });
-    pg.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
-    pg.drawText('ReliableTrack', { x: 58, y: 762, size: 14, font: boldFont, color: WHITE });
-    pg.drawText('Reliable Oilfield Services', { x: 58, y: 750, size: 8, font: regFont, color: rgb(0.7, 0.7, 0.7) });
-    // Orange accent line
-    pg.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: ORANGE });
-    return pg;
-  }
+  const reportLabel = isPM ? 'Preventive Maintenance Report' : 'Service Call Report';
+  const addPage = await buildPageFactory(pdfDoc, boldFont, regFont, rgb, ORANGE, reportLabel, logoImageBytes);
 
   const page = addPage(pdfDoc);
-  let y = 725;
+  let y = 720;
 
-  function drawField(label, value, x, fieldY, w) {
-    page.drawText(label, { x, y: fieldY + 13, size: 7, font: regFont, color: GRAY });
-    page.drawRectangle({ x, y: fieldY, width: w, height: 14, color: LGRAY });
+  function drawField(lbl, value, x, fieldY, w) {
+    page.drawText(lbl, { x: x, y: fieldY + 13, size: 7, font: regFont, color: GRAY });
+    page.drawRectangle({ x: x, y: fieldY, width: w, height: 14, color: LGRAY });
     page.drawText(String(value || ''), { x: x + 3, y: fieldY + 3, size: 9, font: regFont, color: NAVY });
   }
 
   // Title
-  page.drawText(label + ' - ' + (isPM ? 'Preventive Maintenance' : 'Service Call'), { x: 50, y, size: 16, font: boldFont, color: NAVY });
+  page.drawText(label + ' — ' + (isPM ? 'Preventive Maintenance' : 'Service Call'), { x: 50, y: y, size: 16, font: boldFont, color: NAVY });
   y -= 12;
-  page.drawRectangle({ x: 50, y, width: 512, height: 2, color: ORANGE });
+  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: ORANGE });
   y -= 20;
 
-  // Job info row 1
+  // Job info rows
   drawField('Customer', sub.customer_name, 50, y, 180);
   drawField('Location', sub.location_name, 240, y, 180);
   drawField('Date', fmtDate(sub.date), 430, y, 130);
@@ -156,7 +208,6 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   drawField('Techs', techs.join(', '), 440, y, 120);
   y -= 32;
 
-  // Warranty badge
   if (d.warrantyWork) {
     page.drawRectangle({ x: 50, y: y - 2, width: 110, height: 16, color: rgb(0.2, 0.6, 0.2) });
     page.drawText('WARRANTY - NO CHARGE', { x: 54, y: y + 1, size: 8, font: boldFont, color: WHITE });
@@ -164,7 +215,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   }
 
   // Description
-  page.drawText('WORK DESCRIPTION', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+  page.drawText('WORK DESCRIPTION', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
   y -= 14;
   page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
   y -= 14;
@@ -174,24 +225,19 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
     if (test.length > 90) {
-      page.drawText(line, { x: 50, y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) });
-      y -= 13;
-      line = word;
-      if (y < 150) break;
-    } else {
-      line = test;
-    }
+      page.drawText(line, { x: 50, y: y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) });
+      y -= 13; line = word; if (y < 150) break;
+    } else { line = test; }
   }
-  if (line) { page.drawText(line, { x: 50, y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) }); y -= 13; }
+  if (line) { page.drawText(line, { x: 50, y: y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) }); y -= 13; }
   y -= 10;
 
   // Parts table
   if (parts.length > 0) {
-    page.drawText('PARTS & MATERIALS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+    page.drawText('PARTS & MATERIALS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
     y -= 14;
     page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
     y -= 4;
-    // Table header
     page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
     page.drawText('SKU', { x: 54, y: y - 11, size: 8, font: boldFont, color: WHITE });
     page.drawText('Description', { x: 130, y: y - 11, size: 8, font: boldFont, color: WHITE });
@@ -200,12 +246,10 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     page.drawText('Total', { x: 530, y: y - 11, size: 8, font: boldFont, color: WHITE });
     y -= 18;
     for (let i = 0; i < parts.length; i++) {
-      const p = parts[i];
-      if (y < 80) break;
+      const p = parts[i]; if (y < 80) break;
       if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 12, width: 512, height: 14, color: LGRAY });
       page.drawText(String(p.sku || ''), { x: 54, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-      const descStr = String(p.description || p.name || '').substring(0, 50);
-      page.drawText(descStr, { x: 130, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
+      page.drawText(String(p.description || p.name || '').substring(0, 50), { x: 130, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(String(p.qty || 1), { x: 430, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(fmt(p.price), { x: 460, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(fmt((p.price || 0) * (p.qty || 1)), { x: 530, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
@@ -214,109 +258,90 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     y -= 6;
   }
 
-  // PM Equipment sections
+  // Equipment sections (PM or SC)
   if (isPM) {
     if (arrestors.length > 0) {
-      if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('ARRESTORS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      if (y < 100) { addPage(pdfDoc); y = 720; }
+      page.drawText('ARRESTORS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
       for (const a of arrestors) {
         if (y < 80) break;
-        page.drawText(String(a.id || '') + ' - ' + String(a.notes || ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-        y -= 12;
+        page.drawText(String(a.id || '') + ' - ' + String(a.notes || ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
       }
       y -= 6;
     }
     if (flares.length > 0) {
-      if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('FLARES', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      if (y < 100) { addPage(pdfDoc); y = 720; }
+      page.drawText('FLARES', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
       for (const f of flares) {
         if (y < 80) break;
         const fts = Array.isArray(f.flareTypes) ? f.flareTypes : [];
-        page.drawText(String(f.id || '') + ' - ' + fts.join(', ') + ' ' + String(f.notes || ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-        y -= 12;
+        page.drawText(String(f.id || '') + ' - ' + fts.join(', ') + ' ' + String(f.notes || ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
       }
       y -= 6;
     }
     if (heaters.length > 0) {
-      if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('HEATERS / OTHER', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      if (y < 100) { addPage(pdfDoc); y = 720; }
+      page.drawText('HEATERS / OTHER', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
       for (const h of heaters) {
         if (y < 80) break;
-        page.drawText(String(h.id || '') + ' - ' + String(h.type || '') + ' ' + String(h.notes || ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-        y -= 12;
+        page.drawText(String(h.id || '') + ' - ' + String(h.type || '') + ' ' + String(h.notes || ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
       }
       y -= 6;
     }
   } else {
-    // SC Equipment
     if (scEquipment.length > 0) {
-      if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('EQUIPMENT SERVICED', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      if (y < 100) { addPage(pdfDoc); y = 720; }
+      page.drawText('EQUIPMENT SERVICED', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
       for (const e of scEquipment) {
         if (y < 80) break;
-        page.drawText(String(e.type || '') + (e.notes ? ': ' + String(e.notes) : ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-        y -= 12;
+        page.drawText(String(e.type || '') + (e.notes ? ': ' + String(e.notes) : ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
       }
       y -= 6;
     }
   }
 
   // Cost summary
-  if (y < 140) { const pg2 = addPage(pdfDoc); y = 720; }
-  page.drawText('COST SUMMARY', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-  y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-  y -= 18;
-  page.drawText('Parts', { x: 54, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  page.drawText(fmt(partsTotal), { x: 500, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  y -= 14;
-  page.drawText('Mileage (' + parseFloat(sub.miles || 0).toFixed(0) + ' mi)', { x: 54, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  page.drawText(fmt(mileageTotal), { x: 500, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  y -= 14;
-  page.drawText('Labor', { x: 54, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  page.drawText(fmt(laborTotal), { x: 500, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY });
-  y -= 16;
-  page.drawText('TOTAL', { x: 54, y, size: 11, font: boldFont, color: NAVY });
-  page.drawText(fmt(grandTotal), { x: 495, y, size: 11, font: boldFont, color: ORANGE });
+  if (y < 140) { addPage(pdfDoc); y = 720; }
+  page.drawText('COST SUMMARY', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 18;
+  page.drawText('Parts', { x: 54, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
+  page.drawText(fmt(partsTotal), { x: 500, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) }); y -= 14;
+  page.drawText('Mileage (' + parseFloat(sub.miles || 0).toFixed(0) + ' mi)', { x: 54, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
+  page.drawText(fmt(mileageTotal), { x: 500, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) }); y -= 14;
+  page.drawText('Labor', { x: 54, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
+  page.drawText(fmt(laborTotal), { x: 500, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) }); y -= 14;
+  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY }); y -= 16;
+  page.drawText('TOTAL', { x: 54, y: y, size: 11, font: boldFont, color: NAVY });
+  page.drawText(fmt(grandTotal), { x: 495, y: y, size: 11, font: boldFont, color: ORANGE });
   y -= 24;
 
   // Photos
   const workPhotos = photos.filter(p => !p.section || p.section === 'work');
   if (workPhotos.length > 0 && y > 120) {
-    page.drawText('PHOTOS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-    y -= 14;
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-    y -= 14;
+    page.drawText('PHOTOS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
     await embedPhotosOnPage(pdfDoc, page, photos, 'work', rgb, 200, y);
   }
 
   const pdfBytes = await pdfDoc.save();
   const pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
-  // Build email HTML
+  // ── Build email HTML ────────────────────────────────────────────────────
   const partsRows = parts.map(function(p) {
     return '<tr><td>' + (p.sku||'') + '</td><td>' + (p.description||p.name||'') + '</td><td>' + (p.qty||1) + '</td><td>' + fmt(p.price) + '</td><td>' + fmt((p.price||0)*(p.qty||1)) + '</td></tr>';
   }).join('');
 
   const html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">'
-    + '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">'
-    + '<span style="display:inline-block;background:#ef6600;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>'
-    + '<span style="color:#fff;font-size:20px;font-weight:bold">ReliableTrack</span>'
-    + '<span style="color:rgba(255,255,255,0.7);font-size:13px;margin-left:12px">Reliable Oilfield Services</span>'
+    + '<div style="background:#102558;padding:16px 24px;border-radius:6px 6px 0 0;display:flex;align-items:center">'
+    + '<img src="https://pm.reliable-oilfield-services.com/ros-logo.png" style="width:52px;height:52px;margin-right:14px;filter:invert(1);flex-shrink:0" />'
+    + '<div>'
+    + '<div style="color:#fff;font-size:19px;font-weight:bold;line-height:1.2">Reliable Oilfield Services</div>'
+    + '<div style="color:rgba(255,255,255,0.6);font-size:11px">reliable-oilfield-services.com</div>'
+    + '</div>'
     + '</div>'
     + '<div style="background:#ef6600;height:4px"></div>'
     + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
@@ -334,11 +359,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     + '</div>'
     + (parts.length > 0 ? '<h3 style="color:#102558;border-bottom:2px solid #ef6600;padding-bottom:6px">Parts &amp; Materials</h3>'
       + '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">'
-      + '<thead><tr style="background:#102558;color:#fff">'
-      + '<th style="padding:8px;text-align:left">SKU</th><th style="padding:8px;text-align:left">Description</th>'
-      + '<th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:right">Unit</th><th style="padding:8px;text-align:right">Total</th>'
-      + '</tr></thead><tbody>' + partsRows + '</tbody>'
-      + '</table>' : '')
+      + '<thead><tr style="background:#102558;color:#fff"><th style="padding:8px;text-align:left">SKU</th><th style="padding:8px;text-align:left">Description</th><th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:right">Unit</th><th style="padding:8px;text-align:right">Total</th></tr></thead>'
+      + '<tbody>' + partsRows + '</tbody></table>' : '')
     + '<h3 style="color:#102558;border-bottom:2px solid #ef6600;padding-bottom:6px">Cost Summary</h3>'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px">'
     + '<tr><td style="padding:6px">Parts</td><td style="padding:6px;text-align:right">' + fmt(partsTotal) + '</td></tr>'
@@ -347,7 +369,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     + '<tr style="background:#102558;color:#fff;font-weight:bold"><td style="padding:8px">TOTAL</td><td style="padding:8px;text-align:right;color:#ef6600">' + fmt(grandTotal) + '</td></tr>'
     + '</table>'
     + '</div>'
-    + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack • Reliable Oilfield Services</div>'
+    + '<div style="text-align:center;padding:10px;color:#999;font-size:11px;border-top:1px solid #eee">Powered by ReliableTrack™ &bull; Reliable Oilfield Services</div>'
     + '</div>';
 
   // SC video links
@@ -369,21 +391,19 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: FROM,
-      to: TO,
+      from: FROM, to: TO,
       subject: label + ' - ' + (sub.customer_name||'') + ' - ' + fmtDate(sub.date),
       html: html + videoEmailHtml2,
       attachments: [{ filename: label.replace('#','').replace(' ','-') + '-report.pdf', content: pdfB64 }],
     }),
   });
-
   const emailData = await emailResp.json();
   if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-// ── EXPENSE REPORT ───────────────────────────────────────────────────────
-async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+// ── EXPENSE REPORT ────────────────────────────────────────────────────────
+async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes) {
   const items = Array.isArray(d.expenseItems) ? d.expenseItems : [];
   const total = parseFloat(d.expenseTotal || 0);
   const techName = d.techs && d.techs.length ? d.techs[0] : (sub.created_by || '');
@@ -396,19 +416,16 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   const WHITE = rgb(1, 1, 1);
   const LGRAY = rgb(0.95, 0.95, 0.95);
 
-  const page = pdfDoc.addPage([612, 792]);
-  page.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
-  page.drawCircle({ x: 35, y: 767, size: 18, color: PURPLE });
-  page.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
-  page.drawText('ReliableTrack - Expense Report', { x: 58, y: 756, size: 14, font: boldFont, color: WHITE });
-  page.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: PURPLE });
-
+  const addPage = await buildPageFactory(pdfDoc, boldFont, regFont, rgb, PURPLE, 'Expense Report', logoImageBytes);
+  const page = addPage(pdfDoc);
   let y = 720;
-  page.drawText('Technician: ' + (sub.truck_number || techName || ''), { x: 50, y, size: 10, font: regFont, color: NAVY });
-  page.drawText('Date: ' + fmtDate(sub.date), { x: 350, y, size: 10, font: regFont, color: NAVY });
+
+  page.drawText('EXPENSE REPORT', { x: 50, y: y, size: 16, font: boldFont, color: NAVY }); y -= 12;
+  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: PURPLE }); y -= 20;
+  page.drawText('Technician: ' + (sub.truck_number || techName || ''), { x: 50, y: y, size: 10, font: regFont, color: NAVY });
+  page.drawText('Date: ' + fmtDate(sub.date), { x: 350, y: y, size: 10, font: regFont, color: NAVY });
   y -= 20;
 
-  // Table header
   page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
   page.drawText('Category', { x: 54, y: y - 11, size: 8, font: boldFont, color: WHITE });
   page.drawText('Vendor / Description', { x: 160, y: y - 11, size: 8, font: boldFont, color: WHITE });
@@ -416,30 +433,26 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   y -= 18;
 
   for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    if (y < 80) break;
+    const it = items[i]; if (y < 80) break;
     if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 12, width: 512, height: 14, color: LGRAY });
     page.drawText(String(it.category || ''), { x: 54, y: y - 9, size: 8, font: regFont, color: NAVY });
     page.drawText(String(it.description || '').substring(0, 60), { x: 160, y: y - 9, size: 8, font: regFont, color: NAVY });
     page.drawText(fmt(it.amount), { x: 530, y: y - 9, size: 8, font: regFont, color: NAVY });
     y -= 14;
   }
-
   y -= 6;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY });
-  y -= 14;
-  page.drawText('TOTAL', { x: 54, y, size: 11, font: boldFont, color: NAVY });
-  page.drawText(fmt(total), { x: 525, y, size: 11, font: boldFont, color: PURPLE });
+  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY }); y -= 14;
+  page.drawText('TOTAL', { x: 54, y: y, size: 11, font: boldFont, color: NAVY });
+  page.drawText(fmt(total), { x: 525, y: y, size: 11, font: boldFont, color: PURPLE });
 
   if (sub.summary) {
     y -= 24;
-    page.drawText('Notes: ' + String(sub.summary).substring(0, 120), { x: 50, y, size: 9, font: regFont, color: rgb(0.4,0.4,0.4) });
+    page.drawText('Notes: ' + String(sub.summary).substring(0, 120), { x: 50, y: y, size: 9, font: regFont, color: rgb(0.4,0.4,0.4) });
   }
 
   const pdfBytes = await pdfDoc.save();
   const pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
-  // Photo HTML
   const photoHtml = photos.slice(0, 8).map(function(p) {
     const url = SUPA_URL + '/storage/v1/object/public/submission-photos/' + p.storage_path;
     return '<img src="' + url + '" style="max-width:200px;max-height:150px;margin:6px;border-radius:4px;border:1px solid #ddd" />';
@@ -452,12 +465,14 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   }).join('');
 
   const html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">'
-    + '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">'
-    + '<span style="display:inline-block;background:#7c2fcb;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>'
-    + '<span style="color:#fff;font-size:20px;font-weight:bold">Expense Report</span>'
+    + '<div style="background:#102558;padding:16px 24px;border-radius:6px 6px 0 0;display:flex;align-items:center">'
+    + '<img src="https://pm.reliable-oilfield-services.com/ros-logo.png" style="width:52px;height:52px;margin-right:14px;filter:invert(1);flex-shrink:0" />'
+    + '<div><div style="color:#fff;font-size:19px;font-weight:bold;line-height:1.2">Reliable Oilfield Services</div>'
+    + '<div style="color:rgba(255,255,255,0.6);font-size:11px">reliable-oilfield-services.com</div></div>'
     + '</div>'
     + '<div style="background:#7c2fcb;height:4px"></div>'
     + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
+    + '<h2 style="color:#102558;margin:0 0 16px">Expense Report</h2>'
     + '<table style="width:100%;font-size:13px;margin-bottom:20px"><tr>'
     + '<td><strong>Tech:</strong> ' + (sub.truck_number || techName) + '</td>'
     + '<td><strong>Date:</strong> ' + fmtDate(sub.date) + '</td>'
@@ -469,7 +484,9 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
     + '</table>'
     + (sub.summary ? '<p style="color:#666;font-size:13px"><strong>Notes:</strong> ' + sub.summary + '</p>' : '')
     + (photoHtml ? '<h3 style="color:#102558">Receipt &amp; Item Photos</h3><div>' + photoHtml + '</div>' : '')
-    + '</div></div>';
+    + '</div>'
+    + '<div style="text-align:center;padding:10px;color:#999;font-size:11px;border-top:1px solid #eee">Powered by ReliableTrack™ &bull; Reliable Oilfield Services</div>'
+    + '</div>';
 
   const emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -477,7 +494,7 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
     body: JSON.stringify({
       from: FROM, to: TO,
       subject: 'Expense Report - ' + (sub.truck_number || techName) + ' - ' + fmtDate(sub.date) + ' - ' + fmt(total),
-      html,
+      html: html,
       attachments: [{ filename: 'expense-report-' + (sub.date||'') + '.pdf', content: pdfB64 }],
     }),
   });
@@ -486,8 +503,8 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-// ── DAILY INSPECTION REPORT ──────────────────────────────────────────────
-async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+// ── DAILY INSPECTION REPORT ───────────────────────────────────────────────
+async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes) {
   const checks = Array.isArray(d.checkItems) ? d.checkItems : [];
   const failCount = parseInt(d.failCount || 0);
   const allPass = d.allPass !== false;
@@ -504,17 +521,17 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
   const WHITE = rgb(1, 1, 1);
   const LGRAY = rgb(0.95, 0.95, 0.95);
 
-  const page = pdfDoc.addPage([612, 792]);
-  page.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
-  page.drawCircle({ x: 35, y: 767, size: 18, color: TEAL });
-  page.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
-  page.drawText('Daily Vehicle Inspection', { x: 58, y: 756, size: 14, font: boldFont, color: WHITE });
-  page.drawText(inspType + ' | ' + (sub.truck_number || '') + ' | ' + fmtDate(sub.date), { x: 58, y: 744, size: 9, font: regFont, color: rgb(0.7,0.7,0.7) });
-  page.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: TEAL });
-
+  const addPage = await buildPageFactory(pdfDoc, boldFont, regFont, rgb, TEAL, 'Vehicle Inspection', logoImageBytes);
+  const page = addPage(pdfDoc);
   let y = 720;
-  page.drawText('Tech: ' + techName, { x: 50, y, size: 10, font: regFont, color: NAVY });
-  page.drawText('Odometer: ' + (d.odometer || 'N/A'), { x: 250, y, size: 10, font: regFont, color: NAVY });
+
+  page.drawText('DAILY VEHICLE INSPECTION', { x: 50, y: y, size: 14, font: boldFont, color: NAVY }); y -= 12;
+  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: TEAL }); y -= 20;
+
+  page.drawText('Tech: ' + techName, { x: 50, y: y, size: 10, font: regFont, color: NAVY });
+  page.drawText('Odometer: ' + (d.odometer || 'N/A'), { x: 250, y: y, size: 10, font: regFont, color: NAVY });
+  page.drawText(inspType + ' | Truck: ' + (sub.truck_number || ''), { x: 50, y: y - 14, size: 9, font: regFont, color: NAVY });
+
   if (!allPass) {
     page.drawRectangle({ x: 420, y: y - 2, width: 140, height: 16, color: RED });
     page.drawText(failCount + ' DEFECT(S) FOUND', { x: 425, y: y + 1, size: 9, font: boldFont, color: WHITE });
@@ -522,9 +539,8 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
     page.drawRectangle({ x: 420, y: y - 2, width: 140, height: 16, color: GREEN });
     page.drawText('ALL ITEMS PASSED', { x: 425, y: y + 1, size: 9, font: boldFont, color: WHITE });
   }
-  y -= 24;
+  y -= 30;
 
-  // Group checks by section
   const sections = {};
   for (const c of checks) {
     const sec = c.section || 'General';
@@ -533,11 +549,9 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
   }
 
   for (const [secName, items] of Object.entries(sections)) {
-    if (y < 60) { pdfDoc.addPage([612, 792]); y = 750; }
-    page.drawText(secName.toUpperCase(), { x: 50, y, size: 9, font: boldFont, color: NAVY });
-    y -= 4;
-    page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 1, color: TEAL });
-    y -= 10;
+    if (y < 60) { addPage(pdfDoc); y = 720; }
+    page.drawText(secName.toUpperCase(), { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 4;
+    page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 1, color: TEAL }); y -= 10;
     for (const item of items) {
       if (y < 60) break;
       const statusColor = item.status === 'Fail' ? RED : item.status === 'N/A' ? rgb(0.5,0.5,0.5) : GREEN;
@@ -551,15 +565,13 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
 
   if (d.defects && y > 60) {
     y -= 6;
-    page.drawText('DEFECT NOTES:', { x: 50, y, size: 9, font: boldFont, color: RED });
-    y -= 12;
-    page.drawText(String(d.defects).substring(0, 120), { x: 50, y, size: 8, font: regFont, color: RED });
+    page.drawText('DEFECT NOTES:', { x: 50, y: y, size: 9, font: boldFont, color: RED }); y -= 12;
+    page.drawText(String(d.defects).substring(0, 120), { x: 50, y: y, size: 8, font: regFont, color: RED });
   }
 
   const pdfBytes = await pdfDoc.save();
   const pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
-  // Build checklist HTML table by section
   let checklistHtml = '';
   for (const [secName, items] of Object.entries(sections)) {
     checklistHtml += '<h4 style="color:#102558;margin:12px 0 4px">' + secName + '</h4>'
@@ -577,12 +589,14 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
     : '<span style="background:#dc2626;color:#fff;padding:4px 12px;border-radius:12px;font-weight:bold">&#9888; ' + failCount + ' DEFECT(S)</span>';
 
   const html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">'
-    + '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">'
-    + '<span style="display:inline-block;background:#0ea5a5;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>'
-    + '<span style="color:#fff;font-size:20px;font-weight:bold">Daily Vehicle Inspection</span>'
+    + '<div style="background:#102558;padding:16px 24px;border-radius:6px 6px 0 0;display:flex;align-items:center">'
+    + '<img src="https://pm.reliable-oilfield-services.com/ros-logo.png" style="width:52px;height:52px;margin-right:14px;filter:invert(1);flex-shrink:0" />'
+    + '<div><div style="color:#fff;font-size:19px;font-weight:bold;line-height:1.2">Reliable Oilfield Services</div>'
+    + '<div style="color:rgba(255,255,255,0.6);font-size:11px">reliable-oilfield-services.com</div></div>'
     + '</div>'
     + '<div style="background:#0ea5a5;height:4px"></div>'
     + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
+    + '<h2 style="color:#102558;margin:0 0 16px">Daily Vehicle Inspection</h2>'
     + '<table style="width:100%;font-size:13px;margin-bottom:16px"><tr>'
     + '<td><strong>Tech:</strong> ' + techName + '</td>'
     + '<td><strong>Truck:</strong> ' + (sub.truck_number||'') + '</td>'
@@ -594,15 +608,18 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
     + '</tr></table>'
     + checklistHtml
     + (d.defects ? '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px;margin-top:16px;border-radius:4px"><strong style="color:#dc2626">Defect Notes:</strong><p style="margin:6px 0 0;color:#444">' + d.defects + '</p></div>' : '')
-    + '</div></div>';
+    + '</div>'
+    + '<div style="text-align:center;padding:10px;color:#999;font-size:11px;border-top:1px solid #eee">Powered by ReliableTrack™ &bull; Reliable Oilfield Services</div>'
+    + '</div>';
 
   const emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: FROM, to: TO,
-      subject: (allPass ? '\u2713 All Pass - Vehicle Inspection' : '\u26a0\ufe0f URGENT: ' + failCount + ' DEFECT(S) FOUND - Vehicle Inspection') + ' - ' + (sub.truck_number||'') + ' - ' + techName + ' - ' + fmtDate(sub.date),
-      html,
+      subject: (allPass ? '✓ All Pass - Vehicle Inspection' : '⚠️ URGENT: ' + failCount + ' DEFECT(S) FOUND - Vehicle Inspection')
+        + ' - ' + (sub.truck_number||'') + ' - ' + techName + ' - ' + fmtDate(sub.date),
+      html: html,
       attachments: [{ filename: 'inspection-' + (sub.truck_number||'truck') + '-' + (sub.date||'') + '.pdf', content: pdfB64 }],
     }),
   });
@@ -611,9 +628,8 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-
-// -- JHA / JSA REPORT --
-async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+// ── JHA / JSA REPORT ─────────────────────────────────────────────────────
+async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes) {
   var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
   var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
   var techName = d.techs && d.techs.length ? d.techs[0] : '';
@@ -623,180 +639,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   var hospital = d.jhaNearestHospital || '';
   var muster = d.jhaMeetingPoint || '';
   var extraNotes = d.jhaAdditionalHazards || '';
-  var highRisk = steps.filter(function(s){return s.risk === 'High' || s.risk === 'Critical';}).length;
-
-  var pdfDoc = await PDFDocument.create();
-  var boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  var regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  var NAVY = rgb(0.063, 0.149, 0.290);
-  var GREEN = rgb(0.024, 0.588, 0.416);
-  var RED = rgb(0.85, 0.1, 0.1);
-  var ORANGE = rgb(0.937, 0.400, 0.000);
-  var WHITE = rgb(1, 1, 1);
-  var LGRAY = rgb(0.95, 0.95, 0.95);
-
-  var page = pdfDoc.addPage([612, 792]);
-  page.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
-  page.drawCircle({ x: 35, y: 767, size: 18, color: GREEN });
-  page.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
-  page.drawText('Job Hazard Analysis / JSA', { x: 58, y: 756, size: 14, font: boldFont, color: WHITE });
-  page.drawText(fmtDate(sub.date) + ' | ' + (sub.location_name || sub.customer_name || ''), { x: 58, y: 744, size: 9, font: regFont, color: rgb(0.7,0.7,0.7) });
-  page.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: GREEN });
-
-  var y = 720;
-  if (highRisk > 0) {
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 16, color: RED });
-    page.drawText('WARNING: ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) - SUPERVISOR APPROVAL REQUIRED', { x: 54, y: y + 1, size: 9, font: boldFont, color: WHITE });
-    y -= 24;
-  }
-
-  page.drawText('Lead Tech: ' + techName, { x: 50, y, size: 9, font: regFont, color: NAVY });
-  page.drawText('Date: ' + fmtDate(sub.date), { x: 250, y, size: 9, font: regFont, color: NAVY });
-  page.drawText('Truck: ' + (sub.truck_number || ''), { x: 400, y, size: 9, font: regFont, color: NAVY });
-  y -= 13;
-  page.drawText('Site: ' + (sub.location_name || sub.customer_name || ''), { x: 50, y, size: 9, font: regFont, color: NAVY });
-  if (supervisor) page.drawText('Supervisor: ' + supervisor, { x: 300, y, size: 9, font: regFont, color: NAVY });
-  y -= 13;
-  if (crew) { page.drawText('Crew: ' + crew, { x: 50, y, size: 9, font: regFont, color: NAVY }); y -= 13; }
-  y -= 6;
-
-  // Hazard Steps
-  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-  y -= 6;
-  page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 2, color: GREEN });
-  y -= 12;
-
-  // Table headers
-  page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
-  page.drawText('#', { x: 54, y: y - 11, size: 7, font: boldFont, color: WHITE });
-  page.drawText('Task Step', { x: 68, y: y - 11, size: 7, font: boldFont, color: WHITE });
-  page.drawText('Hazard', { x: 210, y: y - 11, size: 7, font: boldFont, color: WHITE });
-  page.drawText('Controls', { x: 340, y: y - 11, size: 7, font: boldFont, color: WHITE });
-  page.drawText('Risk', { x: 540, y: y - 11, size: 7, font: boldFont, color: WHITE });
-  y -= 18;
-
-  for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    if (y < 60) break;
-    var riskColor = (s.risk === 'Critical' || s.risk === 'High') ? RED : (s.risk === 'Medium' ? ORANGE : GREEN);
-    if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: LGRAY });
-    page.drawText(String(i + 1), { x: 54, y: y - 10, size: 7, font: regFont, color: NAVY });
-    page.drawText(String(s.taskStep || '').substring(0, 20), { x: 68, y: y - 10, size: 7, font: regFont, color: NAVY });
-    page.drawText(String(s.hazard || '').substring(0, 20), { x: 210, y: y - 10, size: 7, font: regFont, color: NAVY });
-    page.drawText(String(s.controls || '').substring(0, 28), { x: 340, y: y - 10, size: 7, font: regFont, color: NAVY });
-    page.drawText(String(s.risk || 'Med'), { x: 540, y: y - 10, size: 7, font: boldFont, color: riskColor });
-    y -= 16;
-  }
-  y -= 8;
-
-  // PPE
-  if (ppeList.length > 0 && y > 80) {
-    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 50, y, size: 8, font: regFont, color: NAVY });
-    y -= 14;
-  }
-
-  // Emergency
-  if ((emergency || hospital) && y > 80) {
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: RED });
-    y -= 10;
-    page.drawText('EMERGENCY INFO', { x: 50, y, size: 9, font: boldFont, color: RED });
-    y -= 12;
-    if (emergency) { page.drawText('Contact: ' + emergency, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
-    if (hospital) { page.drawText('Hospital: ' + hospital, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
-    if (muster) { page.drawText('Muster Point: ' + muster, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
-  }
-
-  if (extraNotes && y > 80) {
-    y -= 6;
-    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
-  }
-
-  var pdfBytes = await pdfDoc.save();
-  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
-
-  // Build step rows HTML
-  var stepRows = steps.map(function(s, i) {
-    var riskBg = s.risk === 'Critical' ? '#7c3aed' : s.risk === 'High' ? '#dc2626' : s.risk === 'Medium' ? '#d97706' : '#16a34a';
-    return '<tr>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:bold;width:24px">' + (i+1) + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px">' + (s.taskStep||'') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;color:#dc2626">' + (s.hazard||'') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;color:#16a34a">' + (s.controls||'') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center"><span style="background:' + riskBg + ';color:#fff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:bold">' + (s.risk||'Med') + '</span></td>' +
-      '</tr>';
-  }).join('');
-
-  var ppeHtml = ppeList.length > 0 ? ppeList.map(function(p){return '<span style="display:inline-block;background:#eef2ff;border:1px solid #1a2332;color:#1a2332;padding:3px 10px;border-radius:12px;font-size:12px;margin:3px">' + p + '</span>';}).join('') : '<em style="color:#888">None specified</em>';
-
-  var subjectFlag = highRisk > 0 ? '[HIGH RISK] ' : '';
-
-  var html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">' +
-    '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">' +
-    '<span style="display:inline-block;background:#059669;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>' +
-    '<span style="color:#fff;font-size:20px;font-weight:bold">Job Hazard Analysis / JSA</span>' +
-    '</div>' +
-    '<div style="background:#059669;height:4px"></div>' +
-    '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">' +
-    (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:12px;margin-bottom:16px;font-weight:bold;color:#dc2626;text-align:center">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED &mdash; SUPERVISOR APPROVAL REQUIRED BEFORE STARTING WORK</div>' : '<div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:6px;padding:10px;margin-bottom:16px;font-weight:bold;color:#16a34a;text-align:center">&#10003; All Risk Levels Acceptable</div>') +
-    '<table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px">' +
-    '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Lead Tech</td><td style="padding:5px">' + techName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold">Date</td><td style="padding:5px">' + fmtDate(sub.date) + '</td></tr>' +
-    '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Site / Location</td><td style="padding:5px" colspan="3">' + (sub.location_name || sub.customer_name || '') + '</td></tr>' +
-    (supervisor ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Supervisor</td><td style="padding:5px" colspan="3">' + supervisor + '</td></tr>' : '') +
-    (crew ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Crew</td><td style="padding:5px" colspan="3">' + crew + '</td></tr>' : '') +
-    (sub.work_order ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Work Order</td><td style="padding:5px" colspan="3">' + sub.work_order + '</td></tr>' : '') +
-    (sub.summary ? '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Job Description</td><td style="padding:5px" colspan="3">' + sub.summary + '</td></tr>' : '') +
-    '</table>' +
-    '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Hazard Identification &amp; Controls</h3>' +
-    '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">' +
-    '<thead><tr style="background:#102558;color:#fff">' +
-    '<th style="padding:8px;text-align:left;width:24px">#</th>' +
-    '<th style="padding:8px;text-align:left">Task Step</th>' +
-    '<th style="padding:8px;text-align:left;color:#fca5a5">Hazard(s)</th>' +
-    '<th style="padding:8px;text-align:left;color:#86efac">Control Measures</th>' +
-    '<th style="padding:8px;text-align:center;width:70px">Risk</th>' +
-    '</tr></thead><tbody>' + stepRows + '</tbody></table>' +
-    '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Required PPE</h3>' +
-    '<div style="margin-bottom:20px">' + ppeHtml + '</div>' +
-    '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:14px;border-radius:4px;margin-bottom:16px">' +
-    '<strong style="color:#dc2626">Emergency Information</strong><br><br>' +
-    (emergency ? '<b>Contact:</b> ' + emergency + '<br>' : '') +
-    (hospital ? '<b>Nearest Hospital:</b> ' + hospital + '<br>' : '') +
-    (muster ? '<b>Muster Point:</b> ' + muster : '') +
-    '</div>' +
-    (extraNotes ? '<div style="background:#f0f4ff;border-left:4px solid #102558;padding:12px;border-radius:4px;margin-bottom:16px"><strong style="color:#102558">Additional Hazards / Notes</strong><p style="margin:6px 0 0;color:#444;font-size:13px">' + extraNotes + '</p></div>' : '') +
-    '</div>' +
-    '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack \u2022 Reliable Oilfield Services</div>' +
-    '</div>';
-
-  var emailResp = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: FROM,
-      to: TO,
-      subject: subjectFlag + 'JHA/JSA - ' + (sub.location_name || sub.customer_name || '') + ' - ' + techName + ' - ' + fmtDate(sub.date),
-      html: html,
-      attachments: [{ filename: 'JHA-' + (sub.date||'') + '-' + techName.replace(/ /g,'-') + '.pdf', content: pdfB64 }],
-    }),
-  });
-  var emailData = await emailResp.json();
-  if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
-  return res.status(200).json({ ok: true, emailId: emailData.id });
-}
-
-
-// -- JHA / JSA REPORT --
-async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
-  var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
-  var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
-  var techName = d.techs && d.techs.length ? d.techs[0] : (sub.location_name || '');
-  var crew = d.jhaCrewMembers || '';
-  var supervisor = d.jhaSupervisor || '';
-  var emergency = d.jhaEmergencyContact || '';
-  var hospital = d.jhaNearestHospital || '';
-  var muster = d.jhaMeetingPoint || '';
-  var extraNotes = d.jhaAdditionalHazards || '';
-  var highRisk = steps.filter(function(s){return s.risk === 'High' || s.risk === 'Critical';}).length;
+  var highRisk = steps.filter(function(s){ return s.risk === 'High' || s.risk === 'Critical'; }).length;
   var siteName = sub.location_name || sub.customer_name || '';
 
   var pdfDoc = await PDFDocument.create();
@@ -809,33 +652,32 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   var WHITE = rgb(1, 1, 1);
   var LGRAY = rgb(0.95, 0.95, 0.95);
 
-  var page = pdfDoc.addPage([612, 792]);
-  page.drawRectangle({ x: 0, y: 742, width: 612, height: 50, color: NAVY });
-  page.drawCircle({ x: 35, y: 767, size: 18, color: GREEN });
-  page.drawText('R', { x: 29, y: 761, size: 14, font: boldFont, color: WHITE });
-  page.drawText('Job Hazard Analysis / JSA', { x: 58, y: 756, size: 14, font: boldFont, color: WHITE });
-  page.drawText(fmtDate(sub.date) + ' | ' + siteName, { x: 58, y: 744, size: 9, font: regFont, color: rgb(0.7,0.7,0.7) });
-  page.drawRectangle({ x: 0, y: 740, width: 612, height: 2, color: GREEN });
-
+  var addPage = await buildPageFactory(pdfDoc, boldFont, regFont, rgb, GREEN, 'Job Hazard Analysis', logoImageBytes);
+  var page = addPage(pdfDoc);
   var y = 720;
+
+  page.drawText('JOB HAZARD ANALYSIS / JSA', { x: 50, y: y, size: 14, font: boldFont, color: NAVY }); y -= 12;
+  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: GREEN }); y -= 18;
+
   if (highRisk > 0) {
     page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 16, color: RED });
     page.drawText('WARNING: ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) - SUPERVISOR APPROVAL REQUIRED', { x: 54, y: y + 1, size: 8, font: boldFont, color: WHITE });
     y -= 22;
   }
-  page.drawText('Lead Tech: ' + techName, { x: 50, y, size: 9, font: regFont, color: NAVY });
-  page.drawText('Date: ' + fmtDate(sub.date), { x: 250, y, size: 9, font: regFont, color: NAVY });
-  page.drawText('Truck: ' + (sub.truck_number || ''), { x: 400, y, size: 9, font: regFont, color: NAVY });
+
+  page.drawText('Lead Tech: ' + techName, { x: 50, y: y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Date: ' + fmtDate(sub.date), { x: 250, y: y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Truck: ' + (sub.truck_number || ''), { x: 400, y: y, size: 9, font: regFont, color: NAVY });
   y -= 13;
-  page.drawText('Site: ' + siteName, { x: 50, y, size: 9, font: regFont, color: NAVY });
-  if (supervisor) page.drawText('Supervisor: ' + supervisor, { x: 300, y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Site: ' + siteName, { x: 50, y: y, size: 9, font: regFont, color: NAVY });
+  if (supervisor) page.drawText('Supervisor: ' + supervisor, { x: 300, y: y, size: 9, font: regFont, color: NAVY });
   y -= 13;
-  if (crew) { page.drawText('Crew: ' + crew, { x: 50, y, size: 9, font: regFont, color: NAVY }); y -= 13; }
+  if (crew) { page.drawText('Crew: ' + crew, { x: 50, y: y, size: 9, font: regFont, color: NAVY }); y -= 13; }
   y -= 6;
-  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-  y -= 6;
-  page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 2, color: GREEN });
-  y -= 14;
+
+  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 6;
+  page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 2, color: GREEN }); y -= 14;
+
   page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
   page.drawText('#', { x: 54, y: y - 11, size: 7, font: boldFont, color: WHITE });
   page.drawText('Task Step', { x: 68, y: y - 11, size: 7, font: boldFont, color: WHITE });
@@ -843,9 +685,9 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   page.drawText('Controls', { x: 345, y: y - 11, size: 7, font: boldFont, color: WHITE });
   page.drawText('Risk', { x: 543, y: y - 11, size: 7, font: boldFont, color: WHITE });
   y -= 18;
+
   for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    if (y < 60) break;
+    var s = steps[i]; if (y < 60) break;
     var rc = (s.risk === 'Critical' || s.risk === 'High') ? RED : (s.risk === 'Medium' ? AMBER : GREEN);
     if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: LGRAY });
     page.drawText(String(i + 1), { x: 54, y: y - 10, size: 7, font: regFont, color: NAVY });
@@ -856,46 +698,52 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
     y -= 16;
   }
   y -= 8;
+
   if (ppeList.length > 0 && y > 80) {
-    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 50, y, size: 8, font: regFont, color: NAVY });
-    y -= 14;
+    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 50, y: y, size: 8, font: regFont, color: NAVY }); y -= 14;
   }
+
   if ((emergency || hospital) && y > 80) {
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: RED });
-    y -= 10;
-    page.drawText('EMERGENCY INFO', { x: 50, y, size: 9, font: boldFont, color: RED });
-    y -= 12;
-    if (emergency) { page.drawText('Contact: ' + emergency, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
-    if (hospital) { page.drawText('Hospital: ' + hospital, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
-    if (muster) { page.drawText('Muster: ' + muster, { x: 54, y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: RED }); y -= 10;
+    page.drawText('EMERGENCY INFO', { x: 50, y: y, size: 9, font: boldFont, color: RED }); y -= 12;
+    if (emergency) { page.drawText('Contact: ' + emergency, { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    if (hospital) { page.drawText('Hospital: ' + hospital, { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 11; }
+    if (muster) { page.drawText('Muster: ' + muster, { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 11; }
   }
+
   if (extraNotes && y > 80) {
     y -= 6;
-    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
+    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y: y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
   }
+
   var pdfBytes = await pdfDoc.save();
   var pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
-  // Build step rows for HTML
   var stepRows = steps.map(function(s, i) {
     var riskColor = s.risk === 'Critical' ? '#7c3aed' : s.risk === 'High' ? '#dc2626' : s.risk === 'Medium' ? '#d97706' : '#16a34a';
     return '<tr><td style="padding:7px 8px;border-bottom:1px solid #eee;font-weight:700;color:#102558">' + (i+1) + '</td>'
-      + '<td style="padding:7px 8px;border-bottom:1px solid #eee">' + (s.taskStep||'')+'</td>'
-      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;color:#dc2626">' + (s.hazard||'')+'</td>'
-      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;color:#16a34a">' + (s.controls||'')+'</td>'
-      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;font-weight:700;color:' + riskColor + '">' + (s.risk||'Med')+'</td></tr>';
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee">' + (s.taskStep||'') + '</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;color:#dc2626">' + (s.hazard||'') + '</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;color:#16a34a">' + (s.controls||'') + '</td>'
+      + '<td style="padding:7px 8px;border-bottom:1px solid #eee;font-weight:700;color:' + riskColor + '">' + (s.risk||'Med') + '</td></tr>';
   }).join('');
 
-  var subjectPrefix = highRisk > 0 ? ('\u26a0\ufe0f URGENT JHA - ' + highRisk + ' HIGH RISK - ') : '\u2713 JHA/JSA - ';
+  var ppeHtml = ppeList.length > 0
+    ? ppeList.map(function(p){ return '<span style="display:inline-block;background:#eef2ff;border:1px solid #1a2332;color:#1a2332;padding:3px 10px;border-radius:12px;font-size:12px;margin:3px">' + p + '</span>'; }).join('')
+    : '<em style="color:#888">None specified</em>';
+
+  var subjectPrefix = highRisk > 0 ? '⚠️ URGENT JHA - ' + highRisk + ' HIGH RISK - ' : '✓ JHA/JSA - ';
 
   var html = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">'
-    + '<div style="background:#102558;padding:20px 24px;border-radius:6px 6px 0 0">'
-    + '<span style="display:inline-block;background:#059669;color:#fff;font-weight:bold;font-size:18px;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;margin-right:12px">R</span>'
-    + '<span style="color:#fff;font-size:20px;font-weight:bold">Job Hazard Analysis / JSA</span>'
+    + '<div style="background:#102558;padding:16px 24px;border-radius:6px 6px 0 0;display:flex;align-items:center">'
+    + '<img src="https://pm.reliable-oilfield-services.com/ros-logo.png" style="width:52px;height:52px;margin-right:14px;filter:invert(1);flex-shrink:0" />'
+    + '<div><div style="color:#fff;font-size:19px;font-weight:bold;line-height:1.2">Reliable Oilfield Services</div>'
+    + '<div style="color:rgba(255,255,255,0.6);font-size:11px">reliable-oilfield-services.com</div></div>'
     + '</div>'
     + '<div style="background:#059669;height:4px"></div>'
     + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
-    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED — Supervisor approval required before starting work</div>' : '')
+    + '<h2 style="color:#102558;margin:0 0 16px">Job Hazard Analysis / JSA</h2>'
+    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">⚠️ ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED — Supervisor approval required before starting work</div>' : '')
     + '<table style="width:100%;font-size:13px;margin-bottom:20px;border-collapse:collapse">'
     + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Lead Tech</td><td style="padding:5px">' + techName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Date</td><td style="padding:5px">' + fmtDate(sub.date) + '</td></tr>'
     + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Site / Location</td><td style="padding:5px">' + siteName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold">Truck</td><td style="padding:5px">' + (sub.truck_number||'') + '</td></tr>'
@@ -907,7 +755,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px">'
     + '<thead><tr style="background:#102558;color:#fff"><th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Task Step</th><th style="padding:8px;text-align:left">Hazard(s)</th><th style="padding:8px;text-align:left">Control Measures</th><th style="padding:8px;text-align:left">Risk</th></tr></thead>'
     + '<tbody>' + stepRows + '</tbody></table>'
-    + (ppeList.length > 0 ? '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Required PPE</h3><p style="font-size:13px">' + ppeList.join(' &bull; ') + '</p>' : '')
+    + (ppeList.length > 0 ? '<h3 style="color:#102558;border-bottom:2px solid #059669;padding-bottom:6px">Required PPE</h3><div style="margin-bottom:20px">' + ppeHtml + '</div>' : '')
     + '<h3 style="color:#dc2626;border-bottom:2px solid #dc2626;padding-bottom:6px">Emergency Information</h3>'
     + '<table style="width:100%;font-size:13px;border-collapse:collapse">'
     + (emergency ? '<tr><td style="padding:5px;background:#fff5f5;font-weight:bold;width:180px">Emergency Contact</td><td style="padding:5px">' + emergency + '</td></tr>' : '')
@@ -915,14 +763,15 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
     + (muster ? '<tr><td style="padding:5px;background:#fff5f5;font-weight:bold">Muster Point</td><td style="padding:5px">' + muster + '</td></tr>' : '')
     + '</table>'
     + (extraNotes ? '<div style="background:#f0f9ff;border-left:4px solid #0891b2;padding:12px;margin-top:16px;border-radius:4px"><strong>Additional Hazards / Notes:</strong><p style="margin:6px 0 0;color:#444">' + extraNotes + '</p></div>' : '')
-    + '</div><div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack &bull; Reliable Oilfield Services</div></div>';
+    + '</div>'
+    + '<div style="text-align:center;padding:10px;color:#999;font-size:11px;border-top:1px solid #eee">Powered by ReliableTrack™ &bull; Reliable Oilfield Services</div>'
+    + '</div>';
 
   var emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: FROM,
-      to: TO,
+      from: FROM, to: TO,
       subject: subjectPrefix + siteName + ' - ' + techName + ' - ' + fmtDate(sub.date),
       html: html,
       attachments: [{ filename: 'jha-' + (sub.date||'') + '.pdf', content: pdfB64 }],
