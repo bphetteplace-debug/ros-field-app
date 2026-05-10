@@ -58,16 +58,12 @@ export async function getNextPmNumber() {
 // work_order is stored as a numeric string e.g. "10001" — we parse to int to find the max
 export async function getNextWoNumber() {
   try {
-    // Fetch the highest work_order value stored across all submissions
-    // work_order column stores the value as text, so we cast and sort numerically
-    const data = await supaRest(
-      'GET',
-      'submissions?select=work_order&work_order=gte.10000&order=work_order.desc&limit=1'
-    );
-    if (!data || data.length === 0) return 10000;
-    const parsed = parseInt(data[0].work_order, 10);
-    if (isNaN(parsed) || parsed < 10000) return 10000;
-    return parsed + 1;
+    // Use atomic DB counter — claims a number instantly, before form is submitted
+    // Two techs opening forms simultaneously will always get different numbers
+    const result = await supaRest('POST', 'rpc/claim_next_wo_number', {});
+    const num = typeof result === 'number' ? result : (result && result.claim_next_wo_number);
+    if (typeof num === 'number' && num >= 10000) return num;
+    return 10000;
   } catch {
     return 10000;
   }
