@@ -17,7 +17,13 @@ export default function ViewSubmissionPage() {
   
   const [deleting, setDeleting] = useState(false)
   const [deleteMsg, setDeleteMsg] = useState('')
-  const { isAdmin, user } = useAuth()
+  const { isAdmin, user, signOut } = useAuth()
+  const [loggingOut, setLoggingOut] = useState(false)
+  const handleLogout = async () => {
+    setLoggingOut(true)
+    try { await signOut() } catch(e) {}
+    navigate('/login')
+  }
 
   const handleResend = async () => {
     if (!sub) return
@@ -138,7 +144,7 @@ export default function ViewSubmissionPage() {
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 640, margin: '0 auto', padding: '0 0 40px', background: '#f0f2f5', minHeight: '100vh' }}>
 
-      <NavBar />
+      <NavBar user={user} isAdmin={isAdmin} onLogout={handleLogout} loggingOut={loggingOut} />
 
       {/* Header */}
       <div style={{ background: '#1a2332', color: '#fff', padding: '20px 16px', marginBottom: 12 }}>
