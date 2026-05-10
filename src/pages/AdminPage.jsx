@@ -238,6 +238,23 @@ export default function AdminPage() {
   )
   const hasFilters = search || filterType !== 'ALL' || filterStatus !== 'ALL' || filterTech !== 'ALL' || dateFrom || dateTo
   const clearFilters = () => { setSearch(''); setFilterType('ALL'); setFilterStatus('ALL'); setFilterTech('ALL'); setDateFrom(''); setDateTo('') }
+  // Tech performance (all submissions)
+  const byTech = {}
+  for (const s of submissions) {
+    const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
+    if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
+    const lbl2 = getTypeLabel(s)
+    const rev = lbl2 === 'EXP' ? parseFloat(s.data?.expenseTotal || 0) : parseFloat(s.data?.grandTotal || 0)
+    byTech[tech].total += rev
+    if (lbl2 === 'PM' || lbl2 === 'SC') byTech[tech].woCount += 1
+    byTech[tech].laborHours += parseFloat(s.labor_hours || 0)
+    byTech[tech].count += 1
+    byTech[tech].items.push(s)
+  }
+  const allTechTotals = Object.entries(byTech).sort((a, b) => b[1].total - a[1].total)
+  const grandTotal = allTechTotals.reduce((sum, [, v]) => sum + v.total, 0)
+  const fmt = n => '$' + (n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
       <NavBar user={user} isAdmin={isAdmin} onLogout={handleLogout} loggingOut={loggingOut} />
