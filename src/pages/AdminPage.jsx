@@ -144,13 +144,13 @@ function ExpenseAnalytics({ submissions }) {
 }
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading, logout } = useAuth()
-  const navigate = u  const [loggingOut, setLoggingOut] = useState(false)
+  const navigate = useNavigate()
+  const [loggingOut, setLoggingOut] = useState(false)
   const handleLogout = useCallback(async () => {
     setLoggingOut(true)
     try { await logout() } catch(e) {}
     setLoggingOut(false)
   }, [logout])
-seNavigate()
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
