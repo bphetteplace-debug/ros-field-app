@@ -466,6 +466,7 @@ export default function ViewSubmissionPage() {
             </div>
           )}
         </div>
+      )}
       {isExpense && (
         <div style={{ margin: '0 12px 12px' }}>
           <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 8, marginBottom: 12 }}>
@@ -514,7 +515,6 @@ export default function ViewSubmissionPage() {
             </div>
           </div>
         </div>
-      )}
       )}
       {sub.photos && sub.photos.length > 0 && (() => {
         const videoSections = ['arrival-video', 'departure-video']
