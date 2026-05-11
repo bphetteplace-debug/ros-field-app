@@ -112,32 +112,27 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 
   var logoImg = null;
   try {
-    var logoResp = await fetch('https://pm.reliable-oilfield-services.com/ros-logo.png');
-    if (logoResp.ok) {
-      var logoBytes = await logoResp.arrayBuffer();
-      logoImg = await pdfDoc.embedPng(new Uint8Array(logoBytes));
+    var brandResp = await fetch(SUPA_URL + '/rest/v1/app_settings?key=eq.branding&select=value', { headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY } });
+    var brandData = brandResp.ok ? await brandResp.json() : [];
+    var brandVal = (brandData[0] && brandData[0].value) || {};
+    var logoUrl = brandVal.logo_url || 'https://pm.reliable-oilfield-services.com/ros-logo.png';
+    var logoBytes = null;
+    if (logoUrl.startsWith('data:')) {
+      var b64 = logoUrl.split(',')[1];
+      var binaryStr = atob(b64);
+      var arr = new Uint8Array(binaryStr.length);
+      for (var bi = 0; bi < binaryStr.length; bi++) arr[bi] = binaryStr.charCodeAt(bi);
+      logoBytes = arr;
+    } else {
+      var logoResp = await fetch(logoUrl);
+      if (logoResp.ok) logoBytes = new Uint8Array(await logoResp.arrayBuffer());
     }
-  } catch (e) { logoImg = null; }
-
-  async function embedImg(bytes) {
-    if (!bytes || !bytes.length) return null;
-    try { return await pdfDoc.embedJpg(bytes); } catch (e1) {}
-    try { return await pdfDoc.embedPng(bytes); } catch (e2) {}
-    return null;
-  }
-
-  var PAGE_W = 612;
-  var PAGE_H = 792;
-  var MARGIN = 36;
-  var CONTENT_W = PAGE_W - MARGIN * 2;
-  var HEADER_H = 78;
-  var FOOTER_H = 22;
-  var pageNum = 0;
-
-  function drawHeader(pg) {
-    pageNum++;
-    if (logoImg) {
-      var logoDims = logoImg.scale(0.17);
+    if (logoBytes) {
+      try { logoImg = await pdfDoc.embedPng(logoBytes); } catch(e2) {
+        try { logoImg = await pdfDoc.embedJpg(logoBytes); } catch(e3) { logoImg = null; }
+      }
+    }
+  } catch (e) { logoImg = null; }var logoDims = logoImg.scale(0.17);
       pg.drawImage(logoImg, { x: MARGIN, y: PAGE_H - MARGIN - logoDims.height, width: logoDims.width, height: logoDims.height });
     } else {
       pg.drawCircle({ x: MARGIN + 22, y: PAGE_H - MARGIN - 22, size: 22, borderColor: BLACK, borderWidth: 2, color: WHITE });
