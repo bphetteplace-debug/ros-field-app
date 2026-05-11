@@ -23,15 +23,14 @@ export default function NavBar({ user, isAdmin, onLogout, loggingOut }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <Link to='/form?type=pm' style={{ ...btn, background: '#e65c00', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ PM</Link>
-        <Link to='/form?type=sc' style={{ ...btn, background: '#2563eb', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ SC</Link>
-        <Link to='/form?type=expense' style={{ ...btn, background: '#059669', color: '#fff', flex: '1 1 auto', minWidth: 65 }}>+ Expense</Link>
-        <Link to='/form?type=inspection' style={{ ...btn, background: '#7c3aed', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ Insp</Link>
+        <Link to='/form' style={{ ...btn, background: '#e65c00', color: '#fff', flex: '1 1 auto', minWidth: 90 }}>+ Work Order</Link>
+        <Link to='/expense' style={{ ...btn, background: '#059669', color: '#fff', flex: '1 1 auto', minWidth: 65 }}>+ Expense</Link>
+        <Link to='/inspection' style={{ ...btn, background: '#7c3aed', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ Insp</Link>
         <Link to='/jha' style={{ ...btn, background: '#b45309', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ JHA</Link>
         <Link to='/inventory' style={{ ...btn, background: '#0d9488', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>Inventory</Link>
         <Link to='/quote' style={{ ...btn, background: '#d97706', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>+ Quote</Link>
         <Link to='/submissions' style={{ ...btn, background: 'rgba(255,255,255,0.10)', color: '#fff', flex: '1 1 auto', minWidth: 80 }}>My Jobs</Link>
-        {isAdmin && <Link to='/admin' style={{ ...btn, background: 'rgba(255,255,255,0.10)', color: '#fff', flex: '1 1 auto', minWidth: 70 }}>Admin</Link>}
+        {isAdmin && <Link to='/admin' style={{ ...btn, background: 'rgba(255,255,255,0.15)', color: '#fff', flex: '1 1 auto', minWidth: 55 }}>Admin</Link>}
       </div>
     </div>
   )
