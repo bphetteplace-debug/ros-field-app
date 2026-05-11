@@ -129,7 +129,9 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
         try { logoImg = await pdfDoc.embedJpg(logoBytes); } catch(e3) { logoImg = null; }
       }
     }
-  } catch (e) { logoImg = null; }var logoDims = logoImg.scale(0.17);
+  } catch (e) { logoImg = null; }
+  var logoDims = logoImg ? logoImg.scale(0.17) : null;
+    if (logoImg) {
       pg.drawImage(logoImg, { x: MARGIN, y: PAGE_H - MARGIN - logoDims.height, width: logoDims.width, height: logoDims.height });
     } else {
       pg.drawCircle({ x: MARGIN + 22, y: PAGE_H - MARGIN - 22, size: 22, borderColor: BLACK, borderWidth: 2, color: WHITE });
