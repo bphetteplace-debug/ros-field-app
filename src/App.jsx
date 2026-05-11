@@ -12,6 +12,8 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import ExpenseReportPage from './pages/ExpenseReportPage.jsx';
 import DailyInspectionPage from './pages/DailyInspectionPage.jsx';
 import JHAPage from './pages/JHAPage.jsx';
+import InventoryPage from './pages/InventoryPage.jsx';
+import QuotePage from './pages/QuotePage.jsx';
 
 export default function App() {
   const { user, loading, isAdmin } = useAuth();
@@ -41,6 +43,8 @@ export default function App() {
         <Route path="/expense" element={<ExpenseReportPage />} />
         <Route path="/inspection" element={<DailyInspectionPage />} />
         <Route path="/jha" element={<JHAPage />} />
+            <Route path="/inventory" element={user ? <InventoryPage /> : <Navigate to="/login" replace />} />
+            <Route path="/quote" element={user ? <QuotePage /> : <Navigate to="/login" replace />} />
         <Route path="/preview" element={<PreviewPage />} />
         <Route path="/view/:id" element={<ViewSubmissionPage />} />
         <Route path="/edit/:id" element={isAdmin ? <EditSubmissionPage /> : <Navigate to="/submissions" replace />} />
