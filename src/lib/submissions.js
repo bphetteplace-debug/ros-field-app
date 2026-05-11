@@ -105,7 +105,7 @@ export async function saveSettings(key, value) {
 export async function saveSubmission(formData, userId, templateOverride) {
   const {
     pmNumber, jobType, warrantyWork, customerName, truckNumber, locationName,
-    customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
+    customerContact, customerWorkOrder, woNumber, typeOfWork, glCode, assetTag, workArea,
     date, startTime, departureTime, description, techs, equipment, parts,
     miles, costPerMile, laborHours, hourlyRate, billableTechs,
     arrestors, flares, heaters, scEquipment,
@@ -124,7 +124,7 @@ export async function saveSubmission(formData, userId, templateOverride) {
 
   // Work order: use the auto-generated one passed in from the form (customerWorkOrder is now numeric)
   // If somehow empty (e.g. offline queue fallback), generate a fresh one
-  const effectiveWoNumber = customerWorkOrder || String(await getNextWoNumber());
+  const effectiveWoNumber = woNumber || String(await getNextWoNumber());
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
@@ -374,7 +374,6 @@ export async function updateSubmission(id, formData) {
     truck_number: truckNumber,
     location_name: locationName,
     contact: customerContact,
-    work_order: customerWorkOrder,
     work_type: typeOfWork,
     gl_code: glCode,
     asset_tag: assetTag,
