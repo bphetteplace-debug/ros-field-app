@@ -88,8 +88,9 @@ async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, start
 // ââ PM / SC REPORT âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const isPM = sub.template === 'pm_flare_combustor';
-  const pmNum = sub.pm_number || '';
-  const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
+  const woNum = sub.work_order || sub.pm_number || '';
+  const label = 'Work Order #' + woNum;
+  const jobTypeLabel = d.jobType || (isPM ? 'Preventive Maintenance' : 'Service Call');
   const techs = Array.isArray(d.techs) ? d.techs : [];
   const parts = Array.isArray(d.parts) ? d.parts : [];
   const arrestors = Array.isArray(d.arrestors) ? d.arrestors : [];
@@ -135,7 +136,9 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   }
 
   // Title
-  page.drawText(label + ' - ' + (isPM ? 'Preventive Maintenance' : 'Service Call'), { x: 50, y, size: 16, font: boldFont, color: NAVY });
+  page.drawText(label, { x: 50, y, size: 18, font: boldFont, color: NAVY });
+  page.drawText(jobTypeLabel, { x: 50, y: y - 18, size: 10, font: regFont, color: rgb(0.4, 0.4, 0.4) });
+  y -= 12;
   y -= 12;
   page.drawRectangle({ x: 50, y, width: 512, height: 2, color: ORANGE });
   y -= 20;
