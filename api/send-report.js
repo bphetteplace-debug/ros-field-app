@@ -66,7 +66,7 @@ async function fetchPhotoBytes(storagePath) {
 }
 
 async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, startY) {
-  const sectionPhotos = photos.filter(p => p.section === section || (!p.section && section === 'work'));
+  const sectionPhotos = photos.filter(p => p.section === section || (section === 'general' && (!p.section || p.section === 'work' || p.section === 'general')));
   let y = startY;
   for (const photo of sectionPhotos.slice(0, 6)) {
     if (y < 80) break;
@@ -303,15 +303,39 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   page.drawText(fmt(grandTotal), { x: 492, y, size: 11, font: boldFont, color: ORANGE });
   y -= 32;
 
-  // Photos
-  const workPhotos = photos.filter(p => !p.section || p.section === 'work');
-  if (workPhotos.length > 0 && y > 120) {
+  // Photos — embed all sections
+  const generalPhotos = photos.filter(p => !p.section || p.section === 'work' || p.section === 'general');
+  const equipPhotos = photos.filter(p => p.section && p.section !== 'work' && p.section !== 'general' && !p.section.startsWith('arrival') && !p.section.startsWith('departure'));
+  const hasPhotos = generalPhotos.length > 0 || equipPhotos.length > 0;
+  if (hasPhotos) {
+    if (y < 120) { page = addPage(pdfDoc); y = 720; }
     y -= 20;
     page.drawText('PHOTOS', { x: 60, y, size: 9, font: boldFont, color: NAVY });
     y -= 18;
     page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
-    y -= 18;
-    await embedPhotosOnPage(pdfDoc, page, photos, 'work', rgb, 200, y);
+    y -= 20;
+    // Embed 3 photos per row, 180x135 each
+    const allDisplayPhotos = [...generalPhotos, ...equipPhotos];
+    const IMG_W = 155; const IMG_H = 116; const GAP = 8; const COLS = 3;
+    let col = 0;
+    for (const photo of allDisplayPhotos) {
+      if (y < IMG_H + 30) { page = addPage(pdfDoc); y = 720; col = 0; }
+      const bytes = await fetchPhotoBytes(photo.storage_path);
+      if (!bytes) { continue; }
+      try {
+        const ext = (photo.storage_path || '').split('.').pop().toLowerCase();
+        const img = ext === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+        const scale = Math.min(IMG_W / img.width, IMG_H / img.height);
+        const w = img.width * scale; const h = img.height * scale;
+        const xPos = 56 + col * (IMG_W + GAP);
+        if (col === 0 && col > 0) { y -= (IMG_H + GAP + 16); }
+        page.drawImage(img, { x: xPos, y: y - h, width: w, height: h });
+        if (photo.caption) { page.drawText(String(photo.caption).substring(0, 28), { x: xPos, y: y - h - 10, size: 7, font: regFont, color: rgb(0.4,0.4,0.4) }); }
+        col++;
+        if (col >= COLS) { col = 0; y -= (IMG_H + GAP + 16); }
+      } catch(e) { /* skip bad photo */ }
+    }
+    if (col > 0) { y -= (IMG_H + GAP + 16); }
   }
 
   const pdfBytes = await pdfDoc.save();
