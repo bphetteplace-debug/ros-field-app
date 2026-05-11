@@ -201,12 +201,12 @@ function Section({ icon, title, children, accent=T.navyMid, collapsible=false, d
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function FormPage() {
-  const { user, profile, isAdmin, isDemo, logout } = useAuth()
+  const { user, profile, isAdmin, isDemo, signOut } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const handleLogout = useCallback(async () => {
-    setLoggingOut(true); try { await logout() } catch(e) {}; setLoggingOut(false)
-  }, [logout])
+    setLoggingOut(true); try { await signOut() } catch(e) {}; setLoggingOut(false)
+  }, [signOut])
 
   const [searchParams] = useSearchParams()
   const initType = URL_PARAM_MAP[searchParams.get('type')||''] || 'PM'
