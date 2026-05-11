@@ -33,7 +33,7 @@ function getTypeColor(s) {
 }
 
 export default function SubmissionsListPage() {
-  const { user, signOut, isAdmin } = useAuth()
+  const { user, signOut, isAdmin, isDemo } = useAuth()
   const navigate = useNavigate()
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -172,7 +172,7 @@ export default function SubmissionsListPage() {
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
       {/* NAV — two rows so buttons never overflow on small screens */}
-      <NavBar user={user} isAdmin={isAdmin} onLogout={handleLogout} loggingOut={loggingOut} />
+      <NavBar user={user} isAdmin={isAdmin} isDemo={isDemo} onLogout={handleLogout} loggingOut={loggingOut} />
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '12px 12px 80px' }}>
         {/* SEARCH + FILTER */}
@@ -258,7 +258,7 @@ export default function SubmissionsListPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
                   <div style={{ fontSize: 12, color: '#888' }}>{techs.join(', ') || (s.data?.techName || '')}</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: rightColor }}>{rightValue}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: rightColor }}>{isDemo && lbl !== 'INSP' ? '—' : rightValue}</div>
                 </div>
               </Link>
               <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 14px', display: 'flex', justifyContent: 'flex-end' }}>
