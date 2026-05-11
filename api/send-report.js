@@ -151,466 +151,458 @@ async function buildPageFactory(pdfDoc, boldFont, regFont, rgb, accentColor, rep
 
 // ── PM / SC REPORT ─────────────────────────────────────────────────────────
 async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, logoImageBytes) {
-  const isPM      = sub.template === 'pm_flare_combustor'
-  const jobLabel  = d.jobType || (isPM ? 'Preventive Maintenance' : 'Service Call')
-  const woNum     = sub.work_order || sub.pm_number || ''
-  const label     = 'WO #' + woNum
+  const isPM = sub.template === 'pm_flare_combustor';
+  const jobLabel = d.jobType || (isPM ? 'Preventive Maintenance' : 'Service Call');
+  const woNum = sub.work_order || sub.pm_number || '';
+  const woLabel = 'WO #' + woNum;
 
-  // ── Colours ────────────────────────────────────────────────────────────────
-  const NAVY    = rgb(0.059, 0.122, 0.220)   // #0f1f38
-  const NAVYMD  = rgb(0.102, 0.180, 0.290)   // #1a2e4a
-  const ORANGE  = rgb(0.902, 0.361, 0.000)   // #e65c00
-  const GREEN   = rgb(0.102, 0.431, 0.235)   // #1a6e3c — PM accent
-  const ACCNT   = isPM ? GREEN : ORANGE
-  const WHITE   = rgb(1, 1, 1)
-  const LTGRAY  = rgb(0.94, 0.94, 0.96)
-  const MDGRAY  = rgb(0.55, 0.55, 0.60)
-  const DKGRAY  = rgb(0.25, 0.25, 0.30)
-  const AMBER   = rgb(0.87, 0.42, 0.00)
+  // Colors
+  const NAVY   = rgb(0.059, 0.122, 0.220);
+  const NAVYMD = rgb(0.102, 0.180, 0.290);
+  const ORANGE = rgb(0.902, 0.361, 0.000);
+  const GREEN  = rgb(0.102, 0.431, 0.235);
+  const ACCNT  = isPM ? GREEN : ORANGE;
+  const WHITE  = rgb(1, 1, 1);
+  const LTGRAY = rgb(0.94, 0.94, 0.96);
+  const MDGRAY = rgb(0.55, 0.55, 0.60);
+  const DKGRAY = rgb(0.25, 0.25, 0.30);
 
-  // ── Create PDF ──────────────────────────────────────────────────────────────
-  const pdfDoc  = await PDFDocument.create()
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  const regFont  = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  // PDF setup
+  const pdfDoc  = await PDFDocument.create();
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regFont  = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const PW = 612, PH = 792;
+  const ML = 48, MR = 48, MT = 36;
 
-  const PW = 612, PH = 792
-  const ML = 48, MR = 48, MT = 36
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
+  // Helper: add a new page
   function newPage() {
-    const p = pdfDoc.addPage([PW, PH])
-    return { page: p, y: PH - MT }
+    const p = pdfDoc.addPage([PW, PH]);
+    // Navy footer bar on every page
+    p.drawRectangle({ x: 0, y: 0, width: PW, height: 24, color: NAVY });
+    p.drawText('Powered by ReliableTrack | Reliable Oilfield Services', { x: 148, y: 8, size: 7, font: regFont, color: WHITE });
+    p.drawText(woLabel, { x: PW - MR - 60, y: 8, size: 7, font: boldFont, color: WHITE });
+    return { page: p, y: PH - MT };
   }
 
+  // Helper: safe text draw (clips to maxWidth)
   function safeText(page, text, opts) {
-    if (!text) return
-    const str = String(text)
-    // Clip to page width so nothing overflows
-    const maxW = opts.maxWidth || (PW - ML - MR)
-    const size = opts.size || 10
-    const font = opts.font || regFont
-    const measured = font.widthOfTextAtSize(str, size)
-    if (measured > maxW) {
-      // Truncate with ellipsis
-      let s = str
-      while (s.length > 3 && font.widthOfTextAtSize(s + '…', size) > maxW) s = s.slice(0, -1)
-      page.drawText(s + '…', { ...opts, text: undefined })
-      return
+    if (!text) return;
+    var str = String(text);
+    var maxW = opts.maxWidth || (PW - ML - MR);
+    var sz = opts.size || 10;
+    var ft = opts.font || regFont;
+    var approxW = str.length * sz * 0.55;
+    if (approxW > maxW) {
+      var charsPerLine = Math.floor(maxW / (sz * 0.55));
+      str = str.slice(0, Math.max(charsPerLine - 1, 3)) + '...';
     }
-    page.drawText(str, opts)
+    page.drawText(str, { x: opts.x, y: opts.y, size: sz, font: ft, color: opts.color || DKGRAY });
   }
 
-  function sectionHeader(page, y, title, accent) {
-    // Colored left bar + bold title
-    page.drawRectangle({ x: ML, y: y - 2, width: 4, height: 16, color: accent || ACCNT })
-    page.drawRectangle({ x: ML + 4, y: y - 2, width: PW - ML - MR - 4, height: 16, color: LTGRAY })
-    safeText(page, title.toUpperCase(), { x: ML + 10, y: y + 2, size: 8, font: boldFont, color: NAVYMD })
-    return y - 26
+  // Helper: section header bar
+  function sectionHeader(page, y, title) {
+    page.drawRectangle({ x: ML, y: y - 2, width: 4, height: 16, color: ACCNT });
+    page.drawRectangle({ x: ML + 4, y: y - 2, width: PW - ML - MR - 4, height: 16, color: LTGRAY });
+    safeText(page, title.toUpperCase(), { x: ML + 10, y: y + 2, size: 8, font: boldFont, color: NAVYMD });
+    return y - 26;
   }
 
+  // Helper: field block (label + value box)
   function field(page, y, label, value, x, w) {
-    safeText(page, label, { x: x, y: y + 12, size: 7, font: regFont, color: MDGRAY })
-    page.drawRectangle({ x: x, y: y, width: w, height: 14, color: LTGRAY })
-    safeText(page, String(value || '—'), { x: x + 4, y: y + 3, size: 9, font: regFont, color: DKGRAY, maxWidth: w - 8 })
-    return y - 28
+    safeText(page, label, { x: x, y: y + 12, size: 7, font: regFont, color: MDGRAY });
+    page.drawRectangle({ x: x, y: y, width: w, height: 14, color: LTGRAY });
+    safeText(page, String(value || '--'), { x: x + 4, y: y + 3, size: 9, font: regFont, color: DKGRAY, maxWidth: w - 8 });
+    return y - 28;
   }
 
+  // Helper: horizontal divider
   function hline(page, y) {
-    page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 0.5, color: LTGRAY })
+    page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 0.5, color: LTGRAY });
   }
 
-  function dollar(n) { return '$' + (parseFloat(n) || 0).toFixed(2) }
-  function fmtD(s) { if (!s) return '' ; try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) } catch(e) { return s } }
+  // Helper: dollar format
+  function dollar(n) { return '$' + (parseFloat(n) || 0).toFixed(2); }
 
-  // ══════════════════════════════════════════════════════════════════
-  // PAGE 1
-  // ══════════════════════════════════════════════════════════════════
-  let { page, y } = newPage()
+  // Helper: date format
+  function fmtD(s) {
+    if (!s) return '';
+    try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    catch (e) { return s; }
+  }
 
-  // ── Hero banner ─────────────────────────────────────────────────────────
-  const bannerH = 72
-  // Background gradient-like: navy rect + accent strip
-  page.drawRectangle({ x: 0, y: PH - bannerH, width: PW, height: bannerH, color: NAVY })
-  page.drawRectangle({ x: 0, y: PH - bannerH, width: 6, height: bannerH, color: ACCNT })
+  // Data arrays
+  var parts     = Array.isArray(d.parts) ? d.parts.filter(function(p) { return p && p.name; }) : [];
+  var techs     = Array.isArray(d.techs) ? d.techs.filter(function(t) { return t && t.name; }) : [];
+  var arrestors = Array.isArray(d.arrestors) ? d.arrestors.filter(function(a) { return a && a.id; }) : [];
+  var flares    = Array.isArray(d.flares) ? d.flares.filter(function(f) { return f && f.flareId; }) : [];
+  var heaters   = Array.isArray(d.heaterTreaters) ? d.heaterTreaters.filter(function(h) { return h && h.id; }) : [];
+  var scEq      = Array.isArray(d.equipmentWorkedOn) ? d.equipmentWorkedOn.filter(function(e) { return e; }) : [];
 
-  // Logo
+  // === PAGE 1 ===
+  var np0 = newPage();
+  var page = np0.page;
+  var y = np0.y;
+
+  // --- Hero Banner ---
+  var bannerH = 80;
+  page.drawRectangle({ x: 0, y: PH - bannerH, width: PW, height: bannerH, color: NAVY });
+  page.drawRectangle({ x: 0, y: PH - bannerH, width: PW, height: 6, color: ACCNT });
+
+  // Logo (if available)
   if (logoImageBytes) {
     try {
-      const logoImg = await pdfDoc.embedPng(logoImageBytes).catch(() => pdfDoc.embedJpg(logoImageBytes))
-      page.drawImage(logoImg, { x: ML, y: PH - bannerH + 14, width: 40, height: 40 })
-    } catch(e) {}
+      var logoImg = await pdfDoc.embedPng(logoImageBytes);
+      page.drawImage(logoImg, { x: ML, y: PH - bannerH + 16, width: 36, height: 36 });
+    } catch (e) { /* logo optional */ }
   }
 
-  // "WORK ORDER REPORT" small label
-  page.drawText('WORK ORDER REPORT', { x: ML + 50, y: PH - 24, size: 8, font: boldFont, color: ACCNT })
-  // Company
-  page.drawText('Reliable Oilfield Services', { x: ML + 50, y: PH - 35, size: 9, font: boldFont, color: WHITE })
-
-  // WO Number — large and prominent
-  const woLabel = 'WO #' + woNum
-  page.drawText(woLabel, { x: PW / 2 - 60, y: PH - 34, size: 22, font: boldFont, color: WHITE })
-
+  // Report title
+  safeText(page, 'WORK ORDER REPORT', { x: ML + 46, y: PH - bannerH + 52, size: 8, font: boldFont, color: ACCNT });
+  // WO Number
+  safeText(page, woLabel, { x: ML + 46, y: PH - bannerH + 30, size: 22, font: boldFont, color: WHITE });
   // Job type pill
-  const pillW = 140
-  page.drawRectangle({ x: PW / 2 - 60, y: PH - bannerH + 10, width: pillW, height: 16, color: ACCNT })
-  safeText(page, jobLabel, { x: PW / 2 - 56, y: PH - bannerH + 14, size: 8, font: boldFont, color: WHITE, maxWidth: pillW - 8 })
+  var pillW = jobLabel.length * 7 + 16;
+  page.drawRectangle({ x: ML + 46, y: PH - bannerH + 10, width: pillW, height: 16, color: ACCNT });
+  safeText(page, jobLabel, { x: ML + 50, y: PH - bannerH + 14, size: 8, font: boldFont, color: WHITE, maxWidth: pillW - 8 });
 
-  // Date top right
-  page.drawText(fmtD(sub.date), { x: PW - MR - 90, y: PH - 26, size: 9, font: regFont, color: WHITE })
-  page.drawText('Generated ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), { x: PW - MR - 110, y: PH - 38, size: 7, font: regFont, color: rgb(0.6,0.6,0.7) })
+  y = PH - bannerH - 10;
 
-  y = PH - bannerH - 20
+  // --- Job Information ---
+  y = sectionHeader(page, y, 'Job Information');
 
+  // Row 1: Customer | Location
+  field(page, y, 'Customer', sub.customer_name, ML, 240);
+  field(page, y, 'Location / Site', sub.location_name, ML + 252, 264);
+  y -= 30;
 
-  // ── JOB INFORMATION ──────────────────────────────────────────────────────
-  y = sectionHeader(page, y, 'Job Information')
+  // Row 2: Date | WO Number | Truck
+  field(page, y, 'Date', fmtD(sub.date), ML, 150);
+  field(page, y, 'WO Number', sub.work_order || sub.pm_number, ML + 162, 150);
+  field(page, y, 'Truck / Unit', sub.truck_number, ML + 324, 180);
+  y -= 30;
 
-  // Row 1: Customer | Location | Date
-  field(page, y, 'Customer', sub.customer_name, ML, 175)
-  field(page, y, 'Location / Well', sub.location_name, ML + 183, 175)
-  field(page, y, 'Date', fmtD(sub.date), ML + 366, 150)
-  y -= 28
+  // Row 3: Job Type | Warranty | Work Area
+  field(page, y, 'Job Type', jobLabel, ML, 150);
+  field(page, y, 'Warranty', d.warrantyWork ? 'Yes - No Charge' : 'No - Standard Billing', ML + 162, 180);
+  field(page, y, 'Work Area', sub.work_area, ML + 354, 150);
+  y -= 30;
 
-  // Row 2: Contact | Work Order | Truck #
-  field(page, y, 'Contact', sub.contact, ML, 175)
-  field(page, y, 'WO Number', sub.work_order || sub.pm_number, ML + 183, 120)
-  field(page, y, 'Truck #', sub.truck_number, ML + 311, 100)
-  field(page, y, 'Start Time', sub.start_time || '', ML + 419, 97)
-  y -= 28
-
-  // Row 3: Work Type | GL Code | Asset Tag | Work Area
-  field(page, y, 'Type of Work', sub.work_type, ML, 120)
-  field(page, y, 'GL Code', sub.gl_code, ML + 128, 90)
-  field(page, y, 'Asset Tag', sub.asset_tag, ML + 226, 110)
-  field(page, y, 'Work Area', sub.work_area, ML + 344, 172)
-  y -= 36
-
-  // Warranty badge
+  // Warranty notice banner
   if (d.warrantyWork) {
-    page.drawRectangle({ x: ML, y: y + 4, width: 130, height: 16, color: GREEN })
-    page.drawText('WARRANTY — NO CHARGE', { x: ML + 4, y: y + 7, size: 8, font: boldFont, color: WHITE })
-    y -= 24
+    page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 16, color: ORANGE });
+    safeText(page, 'WARRANTY WORK -- NO CHARGE', { x: ML + 4, y: y + 7, size: 8, font: boldFont, color: WHITE });
+    y -= 20;
   }
 
+  y -= 8;
 
-  // ── TECHNICIANS ────────────────────────────────────────────────────────────
-  y = sectionHeader(page, y, 'Technicians')
-  const techs = Array.isArray(d.techs) ? d.techs : []
-  if (techs.length === 0) {
-    safeText(page, 'No technicians listed', { x: ML + 6, y: y, size: 9, font: regFont, color: MDGRAY })
-    y -= 18
-  } else {
-    // Two columns of tech names
+  // --- Technicians ---
+  y = sectionHeader(page, y, 'Technicians');
+  if (techs.length > 0) {
     techs.forEach(function(t, idx) {
-      const techName = typeof t === 'string' ? t : (t.name || t.tech || JSON.stringify(t))
-      const col = idx % 2
-      const row = Math.floor(idx / 2)
-      const tx = ML + col * 250
-      const ty = y - row * 16
-      if (ty < 60) return
-      page.drawRectangle({ x: tx, y: ty - 2, width: 6, height: 6, color: ACCNT })
-      safeText(page, techName, { x: tx + 10, y: ty, size: 9, font: regFont, color: DKGRAY, maxWidth: 230 })
-    })
-    y -= Math.ceil(techs.length / 2) * 16 + 6
-  }
-  y -= 8
-
-  // ── WORK DESCRIPTION ───────────────────────────────────────────────────────
-  y = sectionHeader(page, y, 'Work Description')
-  const descLines = (sub.summary || '').match(/.{1,95}/g) || ['No description provided']
-  descLines.slice(0, 8).forEach(function(ln) {
-    if (y < 80) return
-    safeText(page, ln, { x: ML + 4, y: y, size: 9, font: regFont, color: DKGRAY })
-    y -= 14
-  })
-  y -= 10
-
-  // ── REPORTED ISSUE / ROOT CAUSE (SC/Repair) ────────────────────────────────
-  if (!isPM && (d.reportedIssue || d.rootCause)) {
-    y = sectionHeader(page, y, 'Issue Details')
-    if (d.reportedIssue) {
-      safeText(page, 'Reported Issue:', { x: ML + 4, y: y, size: 8, font: boldFont, color: DKGRAY })
-      y -= 14
-      const riLines = String(d.reportedIssue).match(/.{1,90}/g) || []
-      riLines.slice(0, 4).forEach(function(ln) {
-        safeText(page, ln, { x: ML + 12, y: y, size: 9, font: regFont, color: DKGRAY })
-        y -= 13
-      })
-    }
-    if (d.rootCause) {
-      safeText(page, 'Root Cause:', { x: ML + 4, y: y, size: 8, font: boldFont, color: DKGRAY })
-      y -= 14
-      const rcLines = String(d.rootCause).match(/.{1,90}/g) || []
-      rcLines.slice(0, 4).forEach(function(ln) {
-        safeText(page, ln, { x: ML + 12, y: y, size: 9, font: regFont, color: DKGRAY })
-        y -= 13
-      })
-    }
-    y -= 8
+      var col = idx % 2;
+      var row = Math.floor(idx / 2);
+      var tx = ML + col * 250;
+      var ty = y - row * 16;
+      page.drawRectangle({ x: tx, y: ty - 2, width: 6, height: 6, color: ACCNT });
+      safeText(page, t.name, { x: tx + 10, y: ty, size: 9, font: regFont, color: DKGRAY, maxWidth: 230 });
+    });
+    y -= (Math.ceil(techs.length / 2) * 16) + 8;
+  } else {
+    safeText(page, 'No technicians recorded', { x: ML + 4, y: y, size: 9, font: regFont, color: MDGRAY });
+    y -= 18;
   }
 
+  y -= 8;
 
-  // ── EQUIPMENT WORKED ON (SC/Repair) ────────────────────────────────────────
-  const scEq = Array.isArray(d.scEquipment) ? d.scEquipment : []
+  // --- Work Description ---
+  y = sectionHeader(page, y, 'Work Description');
+  var descText = d.description || d.workPerformed || 'No description provided.';
+  var descLines = descText.split('\n').slice(0, 8);
+  descLines.forEach(function(ln) {
+    if (y < 100) { var npD = newPage(); page = npD.page; y = npD.y; }
+    safeText(page, ln, { x: ML + 4, y: y, size: 9, font: regFont, color: DKGRAY });
+    y -= 14;
+  });
+
+  if (d.reportedIssue) {
+    y -= 6;
+    safeText(page, 'Reported Issue:', { x: ML + 4, y: y, size: 8, font: boldFont, color: DKGRAY });
+    y -= 14;
+    safeText(page, d.reportedIssue, { x: ML + 8, y: y, size: 9, font: regFont, color: DKGRAY });
+    y -= 14;
+  }
+  if (d.rootCause) {
+    safeText(page, 'Root Cause:', { x: ML + 4, y: y, size: 8, font: boldFont, color: DKGRAY });
+    y -= 14;
+    safeText(page, d.rootCause, { x: ML + 8, y: y, size: 9, font: regFont, color: DKGRAY });
+    y -= 14;
+  }
+
+  y -= 8;
+
+  // --- Equipment Worked On (SC only) ---
   if (!isPM && scEq.length > 0) {
-    if (y < 120) { let np = newPage(); page = np.page; y = np.y }
-    y = sectionHeader(page, y, 'Equipment Worked On')
-    scEq.slice(0, 12).forEach(function(eq, i) {
-      const eqName = typeof eq === 'string' ? eq : (eq.name || eq.label || JSON.stringify(eq))
-      const col = i % 3
-      const row = Math.floor(i / 3)
-      const ex = ML + col * 170
-      const ey = y - row * 16
-      if (ey < 60) return
-      page.drawRectangle({ x: ex, y: ey - 2, width: 6, height: 6, color: ACCNT })
-      safeText(page, eqName, { x: ex + 10, y: ey, size: 9, font: regFont, color: DKGRAY, maxWidth: 155 })
-    })
-    y -= Math.ceil(scEq.length / 3) * 16 + 10
+    if (y < 140) { var npEq = newPage(); page = npEq.page; y = npEq.y; }
+    y = sectionHeader(page, y, 'Equipment Worked On');
+    scEq.forEach(function(e, idx) {
+      var col = idx % 3;
+      var row = Math.floor(idx / 3);
+      var ex = ML + col * 170;
+      var ey = y - row * 16;
+      if (ey < 100) return;
+      page.drawRectangle({ x: ex, y: ey - 2, width: 4, height: 4, color: ACCNT });
+      safeText(page, String(e), { x: ex + 8, y: ey, size: 9, font: regFont, color: DKGRAY, maxWidth: 158 });
+    });
+    y -= (Math.ceil(scEq.length / 3) * 16) + 8;
   }
 
-  // ── PARTS / MATERIALS ──────────────────────────────────────────────────────
-  const parts = Array.isArray(d.parts) ? d.parts.filter(function(p){ return p && p.name }) : []
+  // --- Parts Used ---
   if (parts.length > 0) {
-    if (y < 140) { let np = newPage(); page = np.page; y = np.y }
-    y = sectionHeader(page, y, 'Parts & Materials')
-
+    if (y < 160) { var npPt = newPage(); page = npPt.page; y = npPt.y; }
+    y = sectionHeader(page, y, 'Parts Used');
     // Table header
-    page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 16, color: NAVYMD })
-    page.drawText('Part / Description', { x: ML + 4, y: y + 4, size: 8, font: boldFont, color: WHITE })
-    page.drawText('Qty', { x: ML + 300, y: y + 4, size: 8, font: boldFont, color: WHITE })
-    page.drawText('Unit $', { x: ML + 355, y: y + 4, size: 8, font: boldFont, color: WHITE })
-    page.drawText('Total', { x: ML + 420, y: y + 4, size: 8, font: boldFont, color: WHITE })
-    y -= 18
+    page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 16, color: NAVYMD });
+    safeText(page, 'Part Description', { x: ML + 4, y: y + 4, size: 7, font: boldFont, color: WHITE });
+    safeText(page, 'Qty', { x: ML + 310, y: y + 4, size: 7, font: boldFont, color: WHITE });
+    safeText(page, 'Unit Price', { x: ML + 350, y: y + 4, size: 7, font: boldFont, color: WHITE });
+    safeText(page, 'Total', { x: ML + 420, y: y + 4, size: 7, font: boldFont, color: WHITE });
+    y -= 18;
 
-    parts.slice(0, 30).forEach(function(p, i) {
-      if (y < 60) return
-      const rowBg = i % 2 === 0 ? WHITE : LTGRAY
-      page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 15, color: rowBg })
-      safeText(page, p.name || '', { x: ML + 4, y: y + 2, size: 8, font: regFont, color: DKGRAY, maxWidth: 285 })
-      safeText(page, String(p.qty || ''), { x: ML + 304, y: y + 2, size: 8, font: regFont, color: DKGRAY })
-      safeText(page, p.unitPrice != null ? dollar(p.unitPrice) : '', { x: ML + 355, y: y + 2, size: 8, font: regFont, color: DKGRAY })
-      const tot = (parseFloat(p.qty)||0) * (parseFloat(p.unitPrice)||0)
-      safeText(page, tot > 0 ? dollar(tot) : '', { x: ML + 420, y: y + 2, size: 8, font: boldFont, color: DKGRAY })
-      hline(page, y - 2)
-      y -= 15
-    })
-    y -= 8
+    parts.slice(0, 20).forEach(function(p, i) {
+      if (y < 80) { var npPt2 = newPage(); page = npPt2.page; y = npPt2.y; }
+      var rowBg = i % 2 === 0 ? WHITE : LTGRAY;
+      page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 15, color: rowBg });
+      safeText(page, p.name, { x: ML + 4, y: y + 2, size: 8, font: regFont, color: DKGRAY, maxWidth: 300 });
+      safeText(page, String(p.qty || 1), { x: ML + 314, y: y + 2, size: 8, font: regFont, color: DKGRAY });
+      var unitP = parseFloat(p.unitPrice || p.price || 0);
+      var tot = unitP * (parseFloat(p.qty) || 1);
+      if (unitP > 0) safeText(page, dollar(unitP), { x: ML + 350, y: y + 2, size: 8, font: regFont, color: DKGRAY });
+      if (tot > 0) safeText(page, dollar(tot), { x: ML + 420, y: y + 2, size: 8, font: boldFont, color: DKGRAY });
+      y -= 16;
+    });
+    y -= 8;
   }
 
-
-  // ── PM EQUIPMENT ────────────────────────────────────────────────────────────
+  // --- PM Equipment (PM only) ---
   if (isPM) {
-    const arrestors = Array.isArray(d.arrestors) ? d.arrestors.filter(function(a){ return a && a.arrestorId }) : []
-    const flares    = Array.isArray(d.flares)    ? d.flares.filter(function(f){ return f && f.flareId }) : []
-    const heaters   = Array.isArray(d.heaters)   ? d.heaters.filter(function(h){ return h && h.heaterId }) : []
 
+    // Flame Arrestors
     if (arrestors.length > 0) {
-      if (y < 120) { let np = newPage(); page = np.page; y = np.y }
-      y = sectionHeader(page, y, 'Flame Arrestors')
-      page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 14, color: NAVYMD })
-      page.drawText('ID', { x: ML + 4, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Condition', { x: ML + 100, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Filter Changed', { x: ML + 230, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Notes', { x: ML + 340, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      y -= 16
+      if (y < 160) { var npAr = newPage(); page = npAr.page; y = npAr.y; }
+      y = sectionHeader(page, y, 'Flame Arrestors');
+      page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 14, color: NAVYMD });
+      safeText(page, 'ID', { x: ML + 4, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Type', { x: ML + 80, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Condition', { x: ML + 160, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Cleaned', { x: ML + 260, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Filter Changed', { x: ML + 330, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      y -= 16;
       arrestors.slice(0, 15).forEach(function(a, i) {
-        if (y < 60) return
-        const bg = i % 2 === 0 ? WHITE : LTGRAY
-        page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 14, color: bg })
-        safeText(page, a.arrestorId, { x: ML + 4, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 90 })
-        safeText(page, a.condition || '', { x: ML + 100, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 125 })
-        safeText(page, a.filterChanged ? 'Yes' : 'No', { x: ML + 230, y: y + 1, size: 8, font: regFont, color: DKGRAY })
-        safeText(page, a.notes || '', { x: ML + 340, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 170 })
-        y -= 14
-      })
-      y -= 10
+        if (y < 80) { var npAr2 = newPage(); page = npAr2.page; y = npAr2.y; }
+        var bg = i % 2 === 0 ? WHITE : LTGRAY;
+        page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 14, color: bg });
+        safeText(page, String(a.id || ''), { x: ML + 4, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 72 });
+        safeText(page, String(a.type || ''), { x: ML + 80, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 76 });
+        safeText(page, String(a.condition || ''), { x: ML + 160, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 96 });
+        safeText(page, a.cleaned ? 'Yes' : 'No', { x: ML + 260, y: y + 1, size: 8, font: regFont, color: DKGRAY });
+        safeText(page, a.filterChanged ? 'Yes' : 'No', { x: ML + 330, y: y + 1, size: 8, font: regFont, color: DKGRAY });
+        y -= 15;
+      });
+      y -= 8;
     }
 
+    // Flares
     if (flares.length > 0) {
-      if (y < 120) { let np = newPage(); page = np.page; y = np.y }
-      y = sectionHeader(page, y, 'Flares / Combustors')
-      page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 14, color: NAVYMD })
-      page.drawText('ID', { x: ML + 4, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Condition', { x: ML + 100, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Pilot Lit', { x: ML + 240, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Notes', { x: ML + 310, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      y -= 16
+      if (y < 160) { var npFl = newPage(); page = npFl.page; y = npFl.y; }
+      y = sectionHeader(page, y, 'Flares');
+      page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 14, color: NAVYMD });
+      safeText(page, 'Flare ID', { x: ML + 4, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Type', { x: ML + 100, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Condition', { x: ML + 200, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Cleaned', { x: ML + 320, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      y -= 16;
       flares.slice(0, 15).forEach(function(f, i) {
-        if (y < 60) return
-        const bg = i % 2 === 0 ? WHITE : LTGRAY
-        page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 14, color: bg })
-        safeText(page, f.flareId, { x: ML + 4, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 90 })
-        safeText(page, f.condition || '', { x: ML + 100, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 135 })
-        safeText(page, f.pilotLit ? 'Yes' : 'No', { x: ML + 240, y: y + 1, size: 8, font: regFont, color: DKGRAY })
-        safeText(page, f.notes || '', { x: ML + 310, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 200 })
-        y -= 14
-      })
-      y -= 10
+        if (y < 80) { var npFl2 = newPage(); page = npFl2.page; y = npFl2.y; }
+        var bg = i % 2 === 0 ? WHITE : LTGRAY;
+        page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 14, color: bg });
+        safeText(page, String(f.flareId || ''), { x: ML + 4, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 92 });
+        safeText(page, String(f.type || ''), { x: ML + 100, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 96 });
+        safeText(page, String(f.condition || ''), { x: ML + 200, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 116 });
+        safeText(page, f.cleaned ? 'Yes' : 'No', { x: ML + 320, y: y + 1, size: 8, font: regFont, color: DKGRAY });
+        y -= 15;
+      });
+      y -= 8;
     }
 
+    // Heater Treaters
     if (heaters.length > 0) {
-      if (y < 120) { let np = newPage(); page = np.page; y = np.y }
-      y = sectionHeader(page, y, 'Heater Treaters')
-      page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 14, color: NAVYMD })
-      page.drawText('ID', { x: ML + 4, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Condition', { x: ML + 100, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Last Cleaned', { x: ML + 240, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Firetubes', { x: ML + 340, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      page.drawText('Notes', { x: ML + 400, y: y + 3, size: 7, font: boldFont, color: WHITE })
-      y -= 16
+      if (y < 160) { var npHt = newPage(); page = npHt.page; y = npHt.y; }
+      y = sectionHeader(page, y, 'Heater Treaters');
+      page.drawRectangle({ x: ML, y: y, width: PW - ML - MR, height: 14, color: NAVYMD });
+      safeText(page, 'ID', { x: ML + 4, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Type', { x: ML + 80, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Condition', { x: ML + 200, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      safeText(page, 'Firetubes', { x: ML + 340, y: y + 3, size: 7, font: boldFont, color: WHITE });
+      y -= 16;
       heaters.slice(0, 15).forEach(function(h, i) {
-        if (y < 60) return
-        const bg = i % 2 === 0 ? WHITE : LTGRAY
-        page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 14, color: bg })
-        safeText(page, h.heaterId, { x: ML + 4, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 90 })
-        safeText(page, h.condition || '', { x: ML + 100, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 135 })
-        safeText(page, h.lastCleanDate ? fmtD(h.lastCleanDate) : '', { x: ML + 240, y: y + 1, size: 8, font: regFont, color: DKGRAY })
-        safeText(page, String(h.firetubeCnt || ''), { x: ML + 340, y: y + 1, size: 8, font: regFont, color: DKGRAY })
-        safeText(page, h.notes || '', { x: ML + 400, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 110 })
-        y -= 14
-      })
-      y -= 10
+        if (y < 80) { var npHt2 = newPage(); page = npHt2.page; y = npHt2.y; }
+        var bg = i % 2 === 0 ? WHITE : LTGRAY;
+        page.drawRectangle({ x: ML, y: y - 2, width: PW - ML - MR, height: 14, color: bg });
+        safeText(page, String(h.id || ''), { x: ML + 4, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 72 });
+        safeText(page, String(h.type || ''), { x: ML + 80, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 116 });
+        safeText(page, String(h.condition || ''), { x: ML + 200, y: y + 1, size: 8, font: regFont, color: DKGRAY, maxWidth: 136 });
+        safeText(page, String(h.firetubeCnt || ''), { x: ML + 340, y: y + 1, size: 8, font: regFont, color: DKGRAY });
+        y -= 15;
+      });
+      y -= 8;
     }
-  }
+  } // end isPM equipment
 
+  // --- Cost Summary ---
+  if (y < 200) { var npCost = newPage(); page = npCost.page; y = npCost.y; }
+  y -= 8;
+  y = sectionHeader(page, y, 'Cost Summary');
 
-  // ── COST SUMMARY ────────────────────────────────────────────────────────────
-  if (y < 160) { let np = newPage(); page = np.page; y = np.y }
-  y = sectionHeader(page, y, 'Cost Summary')
-
-  const summaryW = 260
-  const summaryX = PW - MR - summaryW
+  var summaryW = 260;
+  var summaryX = PW - MR - summaryW;
 
   function costRow(label, amount, isBold, isTotal) {
-    if (y < 60) return
-    const bg = isTotal ? ACCNT : (isBold ? NAVYMD : WHITE)
-    const fc = isTotal || isBold ? WHITE : DKGRAY
-    page.drawRectangle({ x: summaryX, y: y - 2, width: summaryW, height: 16, color: bg })
-    safeText(page, label, { x: summaryX + 8, y: y + 2, size: isTotal ? 10 : 9, font: isBold||isTotal ? boldFont : regFont, color: fc, maxWidth: summaryW - 80 })
-    safeText(page, dollar(amount), { x: summaryX + summaryW - 65, y: y + 2, size: isTotal ? 10 : 9, font: isBold||isTotal ? boldFont : regFont, color: fc })
-    hline(page, y - 2)
-    y -= 18
+    if (y < 60) return;
+    var bg = isTotal ? ACCNT : (isBold ? NAVYMD : WHITE);
+    var fc = (isTotal || isBold) ? WHITE : DKGRAY;
+    page.drawRectangle({ x: summaryX, y: y - 2, width: summaryW, height: 16, color: bg });
+    safeText(page, label, { x: summaryX + 8, y: y + 2, size: isTotal ? 10 : 9, font: (isBold || isTotal) ? boldFont : regFont, color: fc, maxWidth: summaryW - 80 });
+    safeText(page, dollar(amount), { x: summaryX + summaryW - 65, y: y + 2, size: isTotal ? 10 : 9, font: (isBold || isTotal) ? boldFont : regFont, color: fc });
+    hline(page, y - 2);
+    y -= 18;
   }
 
   if (d.warrantyWork) {
-    page.drawRectangle({ x: summaryX, y: y - 2, width: summaryW, height: 16, color: GREEN })
-    safeText(page, 'WARRANTY — NO CHARGE', { x: summaryX + 8, y: y + 2, size: 9, font: boldFont, color: WHITE })
-    y -= 20
+    costRow('TOTAL DUE (WARRANTY)', 0, false, true);
   } else {
-    costRow('Parts & Materials', d.partsTotal, false)
-    costRow('Mileage (' + (sub.miles||'0') + ' mi)', d.mileageTotal, false)
-    costRow('Labor', d.laborTotal, false)
-    costRow('TOTAL DUE', d.grandTotal, false, true)
+    costRow('Parts', d.partsTotal, false, false);
+    costRow('Labor', d.laborTotal, false, false);
+    costRow('Mileage (' + (sub.miles || '0') + ' mi)', d.mileageTotal, false, false);
+    costRow('TOTAL DUE', d.grandTotal, false, true);
   }
 
-  y -= 20
+  // --- Serialize PDF ---
+  var pdfBytes = await pdfDoc.save();
+  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
-  // ── FOOTER ──────────────────────────────────────────────────────────────────
-  // Draw footer on every page
-  pdfDoc.getPages().forEach(function(pg) {
-    pg.drawRectangle({ x: 0, y: 0, width: PW, height: 28, color: NAVY })
-    pg.drawRectangle({ x: 0, y: 28, width: PW, height: 1, color: ACCNT })
-    pg.drawText('Powered by ReliableTrack  |  Reliable Oilfield Services', { x: ML, y: 10, size: 7, font: regFont, color: rgb(0.5,0.55,0.65) })
-    pg.drawText('WO #' + woNum + '  |  ' + fmtD(sub.date), { x: PW - MR - 150, y: 10, size: 7, font: regFont, color: rgb(0.5,0.55,0.65) })
-  })
+  // --- Build Email HTML ---
+  var partsRows = parts.map(function(p) {
+    var unitP = parseFloat(p.unitPrice || p.price || 0);
+    var tot = unitP * (parseFloat(p.qty) || 1);
+    return '<tr><td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">' + (p.name || '') + '</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center">' + (p.qty || 1) + '</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right">' + (unitP > 0 ? dollar(unitP) : '') + '</td>'
+      + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">' + (tot > 0 ? dollar(tot) : '') + '</td></tr>';
+  }).join('');
 
-  // ── Serialize PDF ───────────────────────────────────────────────────────────
-  const pdfBytes = await pdfDoc.save()
-  const pdfB64   = Buffer.from(pdfBytes).toString('base64')
+  var accentHex = isPM ? '#1a6e3c' : '#e65c00';
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+    + 'body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;padding:0}'
+    + '.wrap{max-width:640px;margin:0 auto;background:#fff}'
+    + '.hero{background:linear-gradient(135deg,#0f1f38 0%,' + (isPM ? '#1a3a28' : '#2a1200') + ' 100%);padding:32px;color:#fff}'
+    + '.hero-label{font-size:11px;font-weight:700;letter-spacing:2px;color:' + accentHex + ';text-transform:uppercase;margin-bottom:8px}'
+    + '.hero-wo{font-size:32px;font-weight:900;margin-bottom:6px}'
+    + '.hero-pill{display:inline-block;background:' + accentHex + ';color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px}'
+    + '.body{padding:24px 32px}'
+    + '.section{margin-bottom:20px}'
+    + '.sec-title{font-size:11px;font-weight:700;letter-spacing:1px;color:#0f1f38;text-transform:uppercase;border-left:4px solid ' + accentHex + ';padding-left:8px;margin-bottom:10px}'
+    + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}'
+    + '.field label{font-size:10px;color:#666;display:block;margin-bottom:2px}'
+    + '.field span{font-size:13px;font-weight:600;color:#111}'
+    + '.tbl{width:100%;border-collapse:collapse;font-size:13px}'
+    + '.tbl th{background:#0f1f38;color:#fff;padding:8px;text-align:left;font-size:11px}'
+    + '.cost-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:16px;max-width:280px;margin-left:auto}'
+    + '.cost-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:13px}'
+    + '.cost-total{display:flex;justify-content:space-between;padding:10px 12px;background:' + accentHex + ';color:#fff;border-radius:4px;font-weight:700;font-size:15px;margin-top:8px}'
+    + '.footer{background:#0f1f38;color:#aaa;text-align:center;font-size:11px;padding:14px}'
+    + '</style></head><body><div class="wrap">';
 
-  // ── Build email HTML ────────────────────────────────────────────────────────
-  const parts = Array.isArray(d.parts) ? d.parts.filter(function(p){ return p && p.name }) : []
-  const partsRows = parts.map(function(p) {
-    const tot = (parseFloat(p.qty)||0) * (parseFloat(p.unitPrice)||0)
-    return `<tr><td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;">${p.name||''}</td><td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:center;">${p.qty||''}</td><td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right;">${tot>0?dollar(tot):''}</td></tr>`
-  }).join('')
+  html += '<div class="hero">'
+    + '<div class="hero-label">Work Order Report</div>'
+    + '<div class="hero-wo">' + woLabel + '</div>'
+    + '<div class="hero-pill">' + jobLabel + '</div>'
+    + '</div>';
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    body{margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-    .wrap{max-width:640px;margin:24px auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
-    .hero{background:linear-gradient(135deg,#0f1f38 0%,${isPM?'#1a6e3c':'#c25c00'} 100%);padding:32px 32px 28px;color:#fff}
-    .hero-label{font-size:11px;font-weight:700;letter-spacing:2px;opacity:.6;text-transform:uppercase;margin-bottom:6px}
-    .hero-wo{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin-bottom:8px}
-    .hero-type{display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:3px 14px;font-size:12px;font-weight:600;margin-bottom:4px}
-    .hero-meta{font-size:12px;opacity:.7;margin-top:8px}
-    .body{padding:24px 32px}
-    .section{margin-bottom:22px}
-    .section-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${isPM?'#1a6e3c':'#c25c00'};border-left:3px solid ${isPM?'#1a6e3c':'#c25c00'};padding-left:10px;margin-bottom:10px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
-    .field label{display:block;font-size:10px;color:#888;font-weight:600;margin-bottom:2px;text-transform:uppercase}
-    .field span{display:block;font-size:13px;color:#1a2332;font-weight:500}
-    table{width:100%;border-collapse:collapse}
-    th{background:#1a2332;color:#fff;padding:8px;font-size:11px;text-align:left;font-weight:600}
-    .cost-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
-    .cost-total{background:${isPM?'#1a6e3c':'#e65c00'};color:#fff;font-weight:700;font-size:14px;border-radius:0 0 6px 6px;padding:10px 12px;display:flex;justify-content:space-between}
-    .footer{background:#0f1f38;color:rgba(255,255,255,0.4);font-size:11px;padding:14px 32px;text-align:center}
-  </style></head><body>
-  <div class="wrap">
-    <div class="hero">
-      <div class="hero-label">Work Order Report &mdash; Reliable Oilfield Services</div>
-      <div class="hero-wo">WO #${woNum}</div>
-      <div class="hero-type">${jobLabel}</div>
-      <div class="hero-meta">${fmtD(sub.date)} &nbsp;&bull;&nbsp; ${sub.customer_name||''} &nbsp;&bull;&nbsp; ${sub.location_name||''}</div>
-    </div>
-    <div class="body">
-      <div class="section">
-        <div class="section-title">Job Information</div>
-        <div class="grid">
-          <div class="field"><label>Customer</label><span>${sub.customer_name||'—'}</span></div>
-          <div class="field"><label>Location</label><span>${sub.location_name||'—'}</span></div>
-          <div class="field"><label>WO Number</label><span>${sub.work_order||sub.pm_number||'—'}</span></div>
-          <div class="field"><label>Truck #</label><span>${sub.truck_number||'—'}</span></div>
-          <div class="field"><label>Date</label><span>${fmtD(sub.date)}</span></div>
-          <div class="field"><label>Contact</label><span>${sub.contact||'—'}</span></div>
-          <div class="field"><label>Type of Work</label><span>${sub.work_type||'—'}</span></div>
-          <div class="field"><label>Work Area</label><span>${sub.work_area||'—'}</span></div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-title">Work Description</div>
-        <div style="font-size:13px;color:#1a2332;line-height:1.6;">${(sub.summary||'').replace(/\n/g,'<br>')}</div>
-      </div>
-      ${parts.length>0?`<div class="section"><div class="section-title">Parts & Materials</div><table><thead><tr><th>Part / Description</th><th>Qty</th><th style="text-align:right">Total</th></tr></thead><tbody>${partsRows}</tbody></table></div>`:''}
-      <div class="section">
-        <div class="section-title">Cost Summary</div>
-        <div style="background:#f8f9fa;border-radius:6px;overflow:hidden;border:1px solid #eee">
-          ${d.warrantyWork?
-            '<div style="background:#1a6e3c;color:#fff;padding:12px;font-weight:700;text-align:center;font-size:13px">WARRANTY — NO CHARGE</div>'
-            :`<div class="cost-row"><span>Parts &amp; Materials</span><span>${dollar(d.partsTotal)}</span></div>
-               <div class="cost-row"><span>Mileage</span><span>${dollar(d.mileageTotal)}</span></div>
-               <div class="cost-row"><span>Labor</span><span>${dollar(d.laborTotal)}</span></div>
-               <div class="cost-total"><span>TOTAL DUE</span><span>${dollar(d.grandTotal)}</span></div>`
-          }
-        </div>
-      </div>
-    </div>
-    <div class="footer">Powered by ReliableTrack &nbsp;&bull;&nbsp; Reliable Oilfield Services</div>
-  </div>
-  </body></html>`
+  html += '<div class="body">';
 
-  // ── Video links (SC/Repair) ─────────────────────────────────────────────────
-  let videoEmailHtml2 = ''
-  const vidKeys = Object.keys(photos).filter(function(k){ return k.startsWith('video_') })
-  if (vidKeys.length > 0) {
-    videoEmailHtml2 = '<div style="max-width:640px;margin:12px auto;padding:16px 24px;background:#fff;border-radius:8px;"><strong style="color:#e65c00">Video Links</strong><ul style="margin:8px 0;padding-left:20px;">' +
-      vidKeys.map(function(k){ return '<li><a href="' + photos[k] + '" style="color:#2563eb">' + k.replace('video_','').replace('_',' ') + '</a></li>' }).join('') +
-      '</ul></div>'
+  html += '<div class="section"><div class="sec-title">Job Details</div><div class="grid">'
+    + '<div class="field"><label>WO Number</label><span>' + (sub.work_order || sub.pm_number || '--') + '</span></div>'
+    + '<div class="field"><label>Date</label><span>' + fmtD(sub.date) + '</span></div>'
+    + '<div class="field"><label>Customer</label><span>' + (sub.customer_name || '--') + '</span></div>'
+    + '<div class="field"><label>Location</label><span>' + (sub.location_name || '--') + '</span></div>'
+    + '<div class="field"><label>Job Type</label><span>' + jobLabel + '</span></div>'
+    + '<div class="field"><label>Truck</label><span>' + (sub.truck_number || '--') + '</span></div>'
+    + '<div class="field"><label>Work Area</label><span>' + (sub.work_area || '--') + '</span></div>'
+    + '<div class="field"><label>Warranty</label><span>' + (d.warrantyWork ? 'Yes - No Charge' : 'No - Standard Billing') + '</span></div>'
+    + '</div></div>';
+
+  if (techs.length > 0) {
+    html += '<div class="section"><div class="sec-title">Technicians</div>'
+      + techs.map(function(t) { return '<span style="margin-right:12px;font-size:13px">' + t.name + '</span>'; }).join('')
+      + '</div>';
   }
 
-  // ── Send via Resend ─────────────────────────────────────────────────────────
-  const emailResp = await fetch('https://api.resend.com/emails', {
+  if (parts.length > 0) {
+    html += '<div class="section"><div class="sec-title">Parts Used</div>'
+      + '<table class="tbl"><thead><tr>'
+      + '<th>Part Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Total</th>'
+      + '</tr></thead><tbody>' + partsRows + '</tbody></table></div>';
+  }
+
+  html += '<div class="section"><div class="sec-title">Cost Summary</div>'
+    + '<div class="cost-box">';
+
+  if (d.warrantyWork) {
+    html += '<div class="cost-total"><span>WARRANTY - NO CHARGE</span><span>$0.00</span></div>';
+  } else {
+    html += '<div class="cost-row"><span>Parts</span><span>' + dollar(d.partsTotal) + '</span></div>';
+    html += '<div class="cost-row"><span>Labor</span><span>' + dollar(d.laborTotal) + '</span></div>';
+    html += '<div class="cost-row"><span>Mileage</span><span>' + dollar(d.mileageTotal) + '</span></div>';
+    html += '<div class="cost-total"><span>TOTAL DUE</span><span>' + dollar(d.grandTotal) + '</span></div>';
+  }
+
+  html += '</div></div>';
+  html += '</div>';
+
+  html += '<div class="footer">Powered by ReliableTrack | Reliable Oilfield Services | ' + woLabel + '</div>';
+  html += '</div></body></html>';
+
+  // --- Video links (SC only) ---
+  var videoHtml = '';
+  if (!isPM && photos) {
+    var vidKeys = Object.keys(photos).filter(function(k) { return k.startsWith('video_') && photos[k]; });
+    if (vidKeys.length > 0) {
+      videoHtml += '<div style="padding:16px 32px"><strong>Video Links:</strong><ul>';
+      vidKeys.forEach(function(k) {
+        videoHtml += '<li><a href="' + photos[k] + '" style="color:#2563eb">' + k.replace('video_', '').replace(/_/g, ' ') + '</a></li>';
+      });
+      videoHtml += '</ul></div>';
+    }
+  }
+
+  // --- Send via Resend ---
+  var RESEND_KEY = process.env.RESEND_API_KEY;
+  var FROM = 'ReliableTrack <reports@pm.reliable-oilfield-services.com>';
+  var TO = 'bphetteplace@reliableoilfieldservices.net';
+  var emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: FROM, to: TO,
-      subject: label + ' - ' + (sub.customer_name||'') + ' - ' + fmtD(sub.date),
-      html: html + videoEmailHtml2,
+      subject: woLabel + ' - ' + (sub.customer_name || '') + ' - ' + fmtD(sub.date),
+      html: html + videoHtml,
       attachments: [{ filename: 'WorkOrder_' + woNum + '.pdf', content: pdfB64 }]
     })
-  })
-  const emailData = await emailResp.json()
-  if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData })
-  return res.status(200).json({ ok: true, emailId: emailData.id })
+  });
+  var emailData = await emailResp.json();
+  if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
+  return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
 
