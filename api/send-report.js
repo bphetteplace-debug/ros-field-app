@@ -127,76 +127,78 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   }
 
   const page = addPage(pdfDoc);
-  let y = 710;
+  let y = 680;
 
   function drawField(label, value, x, fieldY, w) {
-    page.drawText(label, { x, y: fieldY + 15, size: 7, font: regFont, color: GRAY });
-    page.drawRectangle({ x, y: fieldY, width: w, height: 16, color: LGRAY });
-    page.drawText(String(value || ''), { x: x + 5, y: fieldY + 4, size: 9, font: regFont, color: NAVY });
+    page.drawText(label, { x, y: fieldY + 18, size: 7, font: regFont, color: GRAY });
+    page.drawRectangle({ x, y: fieldY, width: w, height: 20, color: LGRAY });
+    page.drawText(String(value || ''), { x: x + 6, y: fieldY + 6, size: 9, font: regFont, color: NAVY });
   }
 
   // Title
-  page.drawText(label, { x: 54, y, size: 18, font: boldFont, color: NAVY });
-  page.drawText(jobTypeLabel, { x: 54, y: y - 20, size: 10, font: regFont, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText(label, { x: 60, y, size: 18, font: boldFont, color: NAVY });
+  page.drawText(jobTypeLabel, { x: 60, y: y - 20, size: 10, font: regFont, color: rgb(0.4, 0.4, 0.4) });
   y -= 12;
   y -= 12;
-  page.drawRectangle({ x: 54, y, width: 504, height: 2, color: ORANGE });
-  y -= 28;
+  page.drawRectangle({ x: 54, y, width: 500, height: 2, color: ORANGE });
+  y -= 40;
 
   // Job info row 1
-  drawField('Customer', sub.customer_name, 54, y, 182);
-  drawField('Location', sub.location_name, 244, y, 182);
-  drawField('Date', fmtDate(sub.date), 434, y, 122);
-  y -= 38;
-  drawField('Contact', sub.contact, 54, y, 130);
-  drawField('Work Order', sub.work_order, 192, y, 130);
-  drawField('Type of Work', sub.work_type, 330, y, 120);
-  drawField('Truck', sub.truck_number, 458, y, 100);
-  y -= 38;
-  drawField('GL Code', sub.gl_code, 54, y, 120);
-  drawField('Asset Tag', sub.asset_tag, 182, y, 120);
-  drawField('Work Area', sub.work_area, 312, y, 120);
-  drawField('Techs', techs.join(', '), 440, y, 118);
-  y -= 38;
+  drawField('Customer', sub.customer_name, 60, y, 176);
+  drawField('Location', sub.location_name, 248, y, 176);
+  drawField('Date', fmtDate(sub.date), 436, y, 116);
+  y -= 44;
+  drawField('Contact', sub.contact, 60, y, 125);
+  drawField('Work Order', sub.work_order, 196, y, 125);
+  drawField('Type of Work', sub.work_type, 332, y, 115);
+  drawField('Truck', sub.truck_number, 458, y, 96);
+  y -= 44;
+  drawField('GL Code', sub.gl_code, 60, y, 116);
+  drawField('Asset Tag', sub.asset_tag, 188, y, 116);
+  drawField('Work Area', sub.work_area, 316, y, 116);
+  drawField('Techs', techs.join(', '), 444, y, 110);
+  y -= 44;
 
   // Warranty badge
   if (d.warrantyWork) {
     page.drawRectangle({ x: 50, y: y - 2, width: 110, height: 16, color: rgb(0.2, 0.6, 0.2) });
     page.drawText('WARRANTY - NO CHARGE', { x: 54, y: y + 1, size: 8, font: boldFont, color: WHITE });
-    y -= 26;
+    y -= 30;
   }
 
   // Description
-  page.drawText('WORK DESCRIPTION', { x: 54, y, size: 9, font: boldFont, color: NAVY });
-  y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-  y -= 14;
+  y -= 10;
+  page.drawText('WORK DESCRIPTION', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+  y -= 18;
+  page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+  y -= 18;
   const desc = String(sub.summary || d.description || '');
   const words = desc.split(' ');
   let line = '';
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
     if (test.length > 90) {
-      page.drawText(line, { x: 50, y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) });
-      y -= 13;
+      page.drawText(line, { x: 60, y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) });
+      y -= 15;
       line = word;
       if (y < 150) break;
     } else {
       line = test;
     }
   }
-  if (line) { page.drawText(line, { x: 50, y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) }); y -= 13; }
-  y -= 10;
+  if (line) { page.drawText(line, { x: 60, y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) }); y -= 15; }
+  y -= 20;
 
   // Parts table
   if (parts.length > 0) {
-    page.drawText('PARTS & MATERIALS', { x: 54, y, size: 9, font: boldFont, color: NAVY });
-    y -= 14;
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-    y -= 4;
+    y -= 10;
+    page.drawText('PARTS & MATERIALS', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+    y -= 18;
+    page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+    y -= 10;
     // Table header
-    page.drawRectangle({ x: 54, y: y - 14, width: 504, height: 18, color: NAVY });
-    page.drawText('SKU', { x: 58, y: y - 12, size: 8, font: boldFont, color: WHITE });
+    page.drawRectangle({ x: 56, y: y - 16, width: 500, height: 22, color: NAVY });
+    page.drawText('SKU', { x: 62, y: y - 13, size: 8, font: boldFont, color: WHITE });
     page.drawText('Description', { x: 130, y: y - 12, size: 8, font: boldFont, color: WHITE });
     page.drawText('Qty', { x: 432, y: y - 12, size: 8, font: boldFont, color: WHITE });
     page.drawText('Unit Price', { x: 462, y: y - 12, size: 8, font: boldFont, color: WHITE });
@@ -206,25 +208,26 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
       const p = parts[i];
       if (y < 80) break;
       if (i % 2 === 1) page.drawRectangle({ x: 54, y: y - 12, width: 504, height: 16, color: LGRAY });
-      page.drawText(String(p.sku || ''), { x: 58, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
+      page.drawText(String(p.sku || ''), { x: 62, y: y - 10, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       const descStr = String(p.description || p.name || '').substring(0, 50);
-      page.drawText(descStr, { x: 130, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-      page.drawText(String(p.qty || 1), { x: 430, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-      page.drawText(fmt(p.price), { x: 460, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
+      page.drawText(descStr, { x: 134, y: y - 10, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
+      page.drawText(String(p.qty || 1), { x: 430, y: y - 10, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
+      page.drawText(fmt(p.price), { x: 460, y: y - 10, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(fmt((p.price || 0) * (p.qty || 1)), { x: 530, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-      y -= 18;
+      y -= 22;
     }
-    y -= 12;
+    y -= 16;
   }
 
   // PM Equipment sections
   if (isPM) {
     if (arrestors.length > 0) {
       if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('ARRESTORS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      y -= 8;
+      page.drawText('ARRESTORS', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+      y -= 18;
+      page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+      y -= 18;
       for (const a of arrestors) {
         if (y < 80) break;
         page.drawText(String(a.id || '') + ' - ' + String(a.notes || ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
@@ -234,10 +237,11 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     }
     if (flares.length > 0) {
       if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('FLARES', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      y -= 8;
+      page.drawText('FLARES', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+      y -= 18;
+      page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+      y -= 18;
       for (const f of flares) {
         if (y < 80) break;
         const fts = Array.isArray(f.flareTypes) ? f.flareTypes : [];
@@ -248,10 +252,11 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     }
     if (heaters.length > 0) {
       if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('HEATERS / OTHER', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      y -= 8;
+      page.drawText('HEATERS / OTHER', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+      y -= 18;
+      page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+      y -= 18;
       for (const h of heaters) {
         if (y < 80) break;
         page.drawText(String(h.id || '') + ' - ' + String(h.type || '') + ' ' + String(h.notes || ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
@@ -263,10 +268,11 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     // SC Equipment
     if (scEquipment.length > 0) {
       if (y < 100) { const pg2 = addPage(pdfDoc); y = 720; }
-      page.drawText('EQUIPMENT SERVICED', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-      y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-      y -= 14;
+      y -= 8;
+      page.drawText('EQUIPMENT SERVICED', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+      y -= 18;
+      page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+      y -= 18;
       for (const e of scEquipment) {
         if (y < 80) break;
         page.drawText(String(e.type || '') + (e.notes ? ': ' + String(e.notes) : ''), { x: 54, y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
@@ -278,32 +284,34 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 
   // Cost summary
   if (y < 140) { const pg2 = addPage(pdfDoc); y = 720; }
-  page.drawText('COST SUMMARY', { x: 54, y, size: 9, font: boldFont, color: NAVY });
-  y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
+  y -= 10;
+  page.drawText('COST SUMMARY', { x: 60, y, size: 9, font: boldFont, color: NAVY });
   y -= 18;
+  page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+  y -= 22;
   page.drawText('Parts', { x: 54, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
   page.drawText(fmt(partsTotal), { x: 500, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  y -= 14;
+  y -= 20;
   page.drawText('Mileage (' + parseFloat(sub.miles || 0).toFixed(0) + ' mi)', { x: 54, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
   page.drawText(fmt(mileageTotal), { x: 500, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  y -= 14;
+  y -= 20;
   page.drawText('Labor', { x: 54, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
   page.drawText(fmt(laborTotal), { x: 500, y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
-  y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY });
-  y -= 16;
-  page.drawText('TOTAL', { x: 54, y, size: 11, font: boldFont, color: NAVY });
-  page.drawText(fmt(grandTotal), { x: 495, y, size: 11, font: boldFont, color: ORANGE });
-  y -= 24;
+  y -= 20;
+  page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 1, color: NAVY });
+  y -= 22;
+  page.drawText('TOTAL', { x: 60, y, size: 11, font: boldFont, color: NAVY });
+  page.drawText(fmt(grandTotal), { x: 492, y, size: 11, font: boldFont, color: ORANGE });
+  y -= 32;
 
   // Photos
   const workPhotos = photos.filter(p => !p.section || p.section === 'work');
   if (workPhotos.length > 0 && y > 120) {
-    page.drawText('PHOTOS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
-    y -= 14;
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
-    y -= 14;
+    y -= 8;
+    page.drawText('PHOTOS', { x: 60, y, size: 9, font: boldFont, color: NAVY });
+    y -= 18;
+    page.drawRectangle({ x: 56, y: y - 2, width: 500, height: 2, color: ORANGE });
+    y -= 18;
     await embedPhotosOnPage(pdfDoc, page, photos, 'work', rgb, 200, y);
   }
 
