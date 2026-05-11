@@ -25,6 +25,19 @@ export default function LoginPage() {
     }
   }
 
+  async function handleDemoLogin() {
+    setError('');
+    setLoading(true);
+    try {
+      await signIn('demo@reliable-oilfield-services.com', 'DemoAccess2026!');
+      navigate('/');
+    } catch (err) {
+      setError('Demo login failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
       <div className="w-full max-w-sm">
@@ -83,6 +96,18 @@ export default function LoginPage() {
           >
             {loading ? 'SIGNING IN…' : 'SIGN IN'}
           </button>
+
+          <div style={{ textAlign: 'center', margin: '12px 0 4px', color: '#aaa', fontSize: 12 }}>or</div>
+
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={loading || !isCloudMode}
+            className="w-full bg-slate-700 hover:bg-slate-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-md text-sm transition"
+          >
+            👁️ Demo / Guest Login
+          </button>
+          <p className="text-center text-slate-400 text-xs mt-2">Admin access — read-only demo account</p>
         </form>
       </div>
     </div>
