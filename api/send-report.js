@@ -93,7 +93,7 @@ async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, start
       const scale = Math.min(maxW / img.width, 120 / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
-      page.drawImage(img, { x: 50, y: y - h, width: w, height: h });
+      page.drawImage(img, { x: 54, y: y - h, width: w, height: h });
       y -= (h + 10);
     } catch { /* skip bad photo */ }
   }
@@ -187,37 +187,37 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   }
 
   // Title
-  page.drawText(label + ' — ' + (isPM ? 'Preventive Maintenance' : 'Service Call'), { x: 50, y: y, size: 16, font: boldFont, color: NAVY });
+  page.drawText(label + ' — ' + (isPM ? 'Preventive Maintenance' : 'Service Call'), { x: 54, y: y, size: 16, font: boldFont, color: NAVY });
   y -= 12;
-  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: ORANGE });
+  page.drawRectangle({ x: 54, y: y, width: 504, height: 2, color: ORANGE });
   y -= 20;
 
   // Job info rows
-  drawField('Customer', sub.customer_name, 50, y, 180);
+  drawField('Customer', sub.customer_name, 54, y, 180);
   drawField('Location', sub.location_name, 240, y, 180);
   drawField('Date', fmtDate(sub.date), 430, y, 130);
   y -= 32;
-  drawField('Contact', sub.contact, 50, y, 130);
+  drawField('Contact', sub.contact, 54, y, 130);
   drawField('Work Order', sub.work_order, 190, y, 130);
   drawField('Type of Work', sub.work_type, 330, y, 120);
   drawField('Truck', sub.truck_number, 460, y, 100);
   y -= 32;
-  drawField('GL Code', sub.gl_code, 50, y, 120);
+  drawField('GL Code', sub.gl_code, 54, y, 120);
   drawField('Asset Tag', sub.asset_tag, 180, y, 120);
   drawField('Work Area', sub.work_area, 310, y, 120);
   drawField('Techs', techs.join(', '), 440, y, 120);
   y -= 32;
 
   if (d.warrantyWork) {
-    page.drawRectangle({ x: 50, y: y - 2, width: 110, height: 16, color: rgb(0.2, 0.6, 0.2) });
+    page.drawRectangle({ x: 54, y: y - 2, width: 110, height: 16, color: rgb(0.2, 0.6, 0.2) });
     page.drawText('WARRANTY - NO CHARGE', { x: 54, y: y + 1, size: 8, font: boldFont, color: WHITE });
     y -= 26;
   }
 
   // Description
-  page.drawText('WORK DESCRIPTION', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
+  page.drawText('WORK DESCRIPTION', { x: 54, y: y, size: 9, font: boldFont, color: NAVY });
   y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
+  page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE });
   y -= 14;
   const desc = String(sub.summary || d.description || '');
   const words = desc.split(' ');
@@ -225,20 +225,20 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   for (const word of words) {
     const test = line ? line + ' ' + word : word;
     if (test.length > 90) {
-      page.drawText(line, { x: 50, y: y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) });
+      page.drawText(line, { x: 54, y: y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) });
       y -= 13; line = word; if (y < 150) break;
     } else { line = test; }
   }
-  if (line) { page.drawText(line, { x: 50, y: y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) }); y -= 13; }
+  if (line) { page.drawText(line, { x: 54, y: y, size: 9, font: regFont, color: rgb(0.2, 0.2, 0.2) }); y -= 13; }
   y -= 10;
 
   // Parts table
   if (parts.length > 0) {
-    page.drawText('PARTS & MATERIALS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY });
+    page.drawText('PARTS & MATERIALS', { x: 54, y: y, size: 9, font: boldFont, color: NAVY });
     y -= 14;
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
+    page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE });
     y -= 4;
-    page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
+    page.drawRectangle({ x: 54, y: y - 14, width: 504, height: 16, color: NAVY });
     page.drawText('SKU', { x: 54, y: y - 11, size: 8, font: boldFont, color: WHITE });
     page.drawText('Description', { x: 130, y: y - 11, size: 8, font: boldFont, color: WHITE });
     page.drawText('Qty', { x: 430, y: y - 11, size: 8, font: boldFont, color: WHITE });
@@ -247,7 +247,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     y -= 18;
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i]; if (y < 80) break;
-      if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 12, width: 512, height: 14, color: LGRAY });
+      if (i % 2 === 1) page.drawRectangle({ x: 54, y: y - 12, width: 504, height: 14, color: LGRAY });
       page.drawText(String(p.sku || ''), { x: 54, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(String(p.description || p.name || '').substring(0, 50), { x: 130, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(String(p.qty || 1), { x: 430, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
@@ -262,8 +262,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   if (isPM) {
     if (arrestors.length > 0) {
       if (y < 100) { addPage(pdfDoc); y = 720; }
-      page.drawText('ARRESTORS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
+      page.drawText('ARRESTORS', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE }); y -= 14;
       for (const a of arrestors) {
         if (y < 80) break;
         page.drawText(String(a.id || '') + ' - ' + String(a.notes || ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
@@ -272,8 +272,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     }
     if (flares.length > 0) {
       if (y < 100) { addPage(pdfDoc); y = 720; }
-      page.drawText('FLARES', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
+      page.drawText('FLARES', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE }); y -= 14;
       for (const f of flares) {
         if (y < 80) break;
         const fts = Array.isArray(f.flareTypes) ? f.flareTypes : [];
@@ -283,8 +283,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     }
     if (heaters.length > 0) {
       if (y < 100) { addPage(pdfDoc); y = 720; }
-      page.drawText('HEATERS / OTHER', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
+      page.drawText('HEATERS / OTHER', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE }); y -= 14;
       for (const h of heaters) {
         if (y < 80) break;
         page.drawText(String(h.id || '') + ' - ' + String(h.type || '') + ' ' + String(h.notes || ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
@@ -294,8 +294,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   } else {
     if (scEquipment.length > 0) {
       if (y < 100) { addPage(pdfDoc); y = 720; }
-      page.drawText('EQUIPMENT SERVICED', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
-      page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
+      page.drawText('EQUIPMENT SERVICED', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+      page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE }); y -= 14;
       for (const e of scEquipment) {
         if (y < 80) break;
         page.drawText(String(e.type || '') + (e.notes ? ': ' + String(e.notes) : ''), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) }); y -= 12;
@@ -306,15 +306,15 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 
   // Cost summary
   if (y < 140) { addPage(pdfDoc); y = 720; }
-  page.drawText('COST SUMMARY', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 18;
+  page.drawText('COST SUMMARY', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+  page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE }); y -= 18;
   page.drawText('Parts', { x: 54, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
   page.drawText(fmt(partsTotal), { x: 500, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) }); y -= 14;
   page.drawText('Mileage (' + parseFloat(sub.miles || 0).toFixed(0) + ' mi)', { x: 54, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
   page.drawText(fmt(mileageTotal), { x: 500, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) }); y -= 14;
   page.drawText('Labor', { x: 54, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) });
   page.drawText(fmt(laborTotal), { x: 500, y: y, size: 9, font: regFont, color: rgb(0.3,0.3,0.3) }); y -= 14;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY }); y -= 16;
+  page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 1, color: NAVY }); y -= 16;
   page.drawText('TOTAL', { x: 54, y: y, size: 11, font: boldFont, color: NAVY });
   page.drawText(fmt(grandTotal), { x: 495, y: y, size: 11, font: boldFont, color: ORANGE });
   y -= 24;
@@ -322,8 +322,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   // Photos
   const workPhotos = photos.filter(p => !p.section || p.section === 'work');
   if (workPhotos.length > 0 && y > 120) {
-    page.drawText('PHOTOS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE }); y -= 14;
+    page.drawText('PHOTOS', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 14;
+    page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 2, color: ORANGE }); y -= 14;
     await embedPhotosOnPage(pdfDoc, page, photos, 'work', rgb, 200, y);
   }
 
@@ -420,13 +420,13 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   const page = addPage(pdfDoc);
   let y = 720;
 
-  page.drawText('EXPENSE REPORT', { x: 50, y: y, size: 16, font: boldFont, color: NAVY }); y -= 12;
-  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: PURPLE }); y -= 20;
-  page.drawText('Technician: ' + (sub.truck_number || techName || ''), { x: 50, y: y, size: 10, font: regFont, color: NAVY });
+  page.drawText('EXPENSE REPORT', { x: 54, y: y, size: 16, font: boldFont, color: NAVY }); y -= 12;
+  page.drawRectangle({ x: 54, y: y, width: 504, height: 2, color: PURPLE }); y -= 20;
+  page.drawText('Technician: ' + (sub.truck_number || techName || ''), { x: 54, y: y, size: 10, font: regFont, color: NAVY });
   page.drawText('Date: ' + fmtDate(sub.date), { x: 350, y: y, size: 10, font: regFont, color: NAVY });
   y -= 20;
 
-  page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
+  page.drawRectangle({ x: 54, y: y - 14, width: 504, height: 16, color: NAVY });
   page.drawText('Category', { x: 54, y: y - 11, size: 8, font: boldFont, color: WHITE });
   page.drawText('Vendor / Description', { x: 160, y: y - 11, size: 8, font: boldFont, color: WHITE });
   page.drawText('Amount', { x: 530, y: y - 11, size: 8, font: boldFont, color: WHITE });
@@ -434,20 +434,20 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
 
   for (let i = 0; i < items.length; i++) {
     const it = items[i]; if (y < 80) break;
-    if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 12, width: 512, height: 14, color: LGRAY });
+    if (i % 2 === 1) page.drawRectangle({ x: 54, y: y - 12, width: 504, height: 14, color: LGRAY });
     page.drawText(String(it.category || ''), { x: 54, y: y - 9, size: 8, font: regFont, color: NAVY });
     page.drawText(String(it.description || '').substring(0, 60), { x: 160, y: y - 9, size: 8, font: regFont, color: NAVY });
     page.drawText(fmt(it.amount), { x: 530, y: y - 9, size: 8, font: regFont, color: NAVY });
     y -= 14;
   }
   y -= 6;
-  page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: NAVY }); y -= 14;
+  page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 1, color: NAVY }); y -= 14;
   page.drawText('TOTAL', { x: 54, y: y, size: 11, font: boldFont, color: NAVY });
   page.drawText(fmt(total), { x: 525, y: y, size: 11, font: boldFont, color: PURPLE });
 
   if (sub.summary) {
     y -= 24;
-    page.drawText('Notes: ' + String(sub.summary).substring(0, 120), { x: 50, y: y, size: 9, font: regFont, color: rgb(0.4,0.4,0.4) });
+    page.drawText('Notes: ' + String(sub.summary).substring(0, 120), { x: 54, y: y, size: 9, font: regFont, color: rgb(0.4,0.4,0.4) });
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -525,12 +525,12 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
   const page = addPage(pdfDoc);
   let y = 720;
 
-  page.drawText('DAILY VEHICLE INSPECTION', { x: 50, y: y, size: 14, font: boldFont, color: NAVY }); y -= 12;
-  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: TEAL }); y -= 20;
+  page.drawText('DAILY VEHICLE INSPECTION', { x: 54, y: y, size: 14, font: boldFont, color: NAVY }); y -= 12;
+  page.drawRectangle({ x: 54, y: y, width: 504, height: 2, color: TEAL }); y -= 20;
 
-  page.drawText('Tech: ' + techName, { x: 50, y: y, size: 10, font: regFont, color: NAVY });
+  page.drawText('Tech: ' + techName, { x: 54, y: y, size: 10, font: regFont, color: NAVY });
   page.drawText('Odometer: ' + (d.odometer || 'N/A'), { x: 250, y: y, size: 10, font: regFont, color: NAVY });
-  page.drawText(inspType + ' | Truck: ' + (sub.truck_number || ''), { x: 50, y: y - 14, size: 9, font: regFont, color: NAVY });
+  page.drawText(inspType + ' | Truck: ' + (sub.truck_number || ''), { x: 54, y: y - 14, size: 9, font: regFont, color: NAVY });
 
   if (!allPass) {
     page.drawRectangle({ x: 420, y: y - 2, width: 140, height: 16, color: RED });
@@ -550,12 +550,12 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
 
   for (const [secName, items] of Object.entries(sections)) {
     if (y < 60) { addPage(pdfDoc); y = 720; }
-    page.drawText(secName.toUpperCase(), { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 4;
-    page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 1, color: TEAL }); y -= 10;
+    page.drawText(secName.toUpperCase(), { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 4;
+    page.drawRectangle({ x: 54, y: y - 1, width: 504, height: 1, color: TEAL }); y -= 10;
     for (const item of items) {
       if (y < 60) break;
       const statusColor = item.status === 'Fail' ? RED : item.status === 'N/A' ? rgb(0.5,0.5,0.5) : GREEN;
-      page.drawRectangle({ x: 50, y: y - 10, width: 8, height: 10, color: statusColor });
+      page.drawRectangle({ x: 54, y: y - 10, width: 8, height: 10, color: statusColor });
       page.drawText(String(item.label || ''), { x: 64, y: y - 8, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(String(item.status || 'Pass'), { x: 520, y: y - 8, size: 8, font: boldFont, color: statusColor });
       y -= 12;
@@ -565,8 +565,8 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
 
   if (d.defects && y > 60) {
     y -= 6;
-    page.drawText('DEFECT NOTES:', { x: 50, y: y, size: 9, font: boldFont, color: RED }); y -= 12;
-    page.drawText(String(d.defects).substring(0, 120), { x: 50, y: y, size: 8, font: regFont, color: RED });
+    page.drawText('DEFECT NOTES:', { x: 54, y: y, size: 9, font: boldFont, color: RED }); y -= 12;
+    page.drawText(String(d.defects).substring(0, 120), { x: 54, y: y, size: 8, font: regFont, color: RED });
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -656,29 +656,29 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   var page = addPage(pdfDoc);
   var y = 720;
 
-  page.drawText('JOB HAZARD ANALYSIS / JSA', { x: 50, y: y, size: 14, font: boldFont, color: NAVY }); y -= 12;
-  page.drawRectangle({ x: 50, y: y, width: 512, height: 2, color: GREEN }); y -= 18;
+  page.drawText('JOB HAZARD ANALYSIS / JSA', { x: 54, y: y, size: 14, font: boldFont, color: NAVY }); y -= 12;
+  page.drawRectangle({ x: 54, y: y, width: 504, height: 2, color: GREEN }); y -= 18;
 
   if (highRisk > 0) {
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 16, color: RED });
+    page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 16, color: RED });
     page.drawText('WARNING: ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) - SUPERVISOR APPROVAL REQUIRED', { x: 54, y: y + 1, size: 8, font: boldFont, color: WHITE });
     y -= 22;
   }
 
-  page.drawText('Lead Tech: ' + techName, { x: 50, y: y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Lead Tech: ' + techName, { x: 54, y: y, size: 9, font: regFont, color: NAVY });
   page.drawText('Date: ' + fmtDate(sub.date), { x: 250, y: y, size: 9, font: regFont, color: NAVY });
   page.drawText('Truck: ' + (sub.truck_number || ''), { x: 400, y: y, size: 9, font: regFont, color: NAVY });
   y -= 13;
-  page.drawText('Site: ' + siteName, { x: 50, y: y, size: 9, font: regFont, color: NAVY });
+  page.drawText('Site: ' + siteName, { x: 54, y: y, size: 9, font: regFont, color: NAVY });
   if (supervisor) page.drawText('Supervisor: ' + supervisor, { x: 300, y: y, size: 9, font: regFont, color: NAVY });
   y -= 13;
-  if (crew) { page.drawText('Crew: ' + crew, { x: 50, y: y, size: 9, font: regFont, color: NAVY }); y -= 13; }
+  if (crew) { page.drawText('Crew: ' + crew, { x: 54, y: y, size: 9, font: regFont, color: NAVY }); y -= 13; }
   y -= 6;
 
-  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 50, y: y, size: 9, font: boldFont, color: NAVY }); y -= 6;
-  page.drawRectangle({ x: 50, y: y - 1, width: 512, height: 2, color: GREEN }); y -= 14;
+  page.drawText('HAZARD IDENTIFICATION & CONTROLS', { x: 54, y: y, size: 9, font: boldFont, color: NAVY }); y -= 6;
+  page.drawRectangle({ x: 54, y: y - 1, width: 504, height: 2, color: GREEN }); y -= 14;
 
-  page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
+  page.drawRectangle({ x: 54, y: y - 14, width: 504, height: 16, color: NAVY });
   page.drawText('#', { x: 54, y: y - 11, size: 7, font: boldFont, color: WHITE });
   page.drawText('Task Step', { x: 68, y: y - 11, size: 7, font: boldFont, color: WHITE });
   page.drawText('Hazard(s)', { x: 215, y: y - 11, size: 7, font: boldFont, color: WHITE });
@@ -689,7 +689,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   for (var i = 0; i < steps.length; i++) {
     var s = steps[i]; if (y < 60) break;
     var rc = (s.risk === 'Critical' || s.risk === 'High') ? RED : (s.risk === 'Medium' ? AMBER : GREEN);
-    if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: LGRAY });
+    if (i % 2 === 1) page.drawRectangle({ x: 54, y: y - 14, width: 504, height: 16, color: LGRAY });
     page.drawText(String(i + 1), { x: 54, y: y - 10, size: 7, font: regFont, color: NAVY });
     page.drawText(String(s.taskStep || '').substring(0, 22), { x: 68, y: y - 10, size: 7, font: regFont, color: NAVY });
     page.drawText(String(s.hazard || '').substring(0, 22), { x: 215, y: y - 10, size: 7, font: regFont, color: NAVY });
@@ -700,12 +700,12 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   y -= 8;
 
   if (ppeList.length > 0 && y > 80) {
-    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 50, y: y, size: 8, font: regFont, color: NAVY }); y -= 14;
+    page.drawText('REQUIRED PPE: ' + ppeList.join(', '), { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 14;
   }
 
   if ((emergency || hospital) && y > 80) {
-    page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 1, color: RED }); y -= 10;
-    page.drawText('EMERGENCY INFO', { x: 50, y: y, size: 9, font: boldFont, color: RED }); y -= 12;
+    page.drawRectangle({ x: 54, y: y - 2, width: 504, height: 1, color: RED }); y -= 10;
+    page.drawText('EMERGENCY INFO', { x: 54, y: y, size: 9, font: boldFont, color: RED }); y -= 12;
     if (emergency) { page.drawText('Contact: ' + emergency, { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 11; }
     if (hospital) { page.drawText('Hospital: ' + hospital, { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 11; }
     if (muster) { page.drawText('Muster: ' + muster, { x: 54, y: y, size: 8, font: regFont, color: NAVY }); y -= 11; }
@@ -713,7 +713,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
 
   if (extraNotes && y > 80) {
     y -= 6;
-    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y: y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
+    page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 54, y: y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
   }
 
   var pdfBytes = await pdfDoc.save();
