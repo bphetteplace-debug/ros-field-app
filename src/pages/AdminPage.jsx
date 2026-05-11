@@ -636,6 +636,111 @@ function AnalyticsAdmin({ submissions }) {
   )
 }
 
+
+// ─── PDF LAYOUT ADMIN ────────────────────────────────────────────────────────
+function PdfLayoutAdmin() {
+  const DEFAULT_SECTIONS = [
+    { id: 'customer_info', label: 'Customer Information', enabled: true },
+    { id: 'site_sign_gps', label: 'Site Sign & GPS Photo', enabled: true },
+    { id: 'description', label: 'Description of Work', enabled: true },
+    { id: 'completed_work', label: 'Completed Work Photos', enabled: true },
+    { id: 'signatures', label: 'Technician Signatures', enabled: true },
+    { id: 'parts', label: 'Parts Table', enabled: true },
+    { id: 'cost_summary', label: 'Cost Summary', enabled: true },
+  ]
+  const [sections, setSections] = useState(DEFAULT_SECTIONS)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [dragging, setDragging] = useState(null)
+  const [dragOver, setDragOver] = useState(null)
+
+  useEffect(() => {
+    fetchSettings().then(all => {
+      if (all && Array.isArray(all.pdf_layout) && all.pdf_layout.length > 0) {
+        setSections(all.pdf_layout)
+      }
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const move = (from, to) => {
+    if (from === to) return
+    setSections(prev => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }
+
+  const toggle = (id) => setSections(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s))
+
+  const save = async () => {
+    setSaving(true); setMsg('')
+    try {
+      await saveSettings('pdf_layout', sections)
+      setMsg('Saved!')
+    } catch(e) { setMsg('Error: ' + e.message) } finally { setSaving(false) }
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxWidth: 600 }}>
+      <div style={{ fontSize: 17, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>📄 PDF Section Layout</div>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>Drag to reorder sections. Toggle to show/hide. Changes apply to all new PDFs.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {sections.map((sec, i) => (
+          <div
+            key={sec.id}
+            draggable
+            onDragStart={() => setDragging(i)}
+            onDragOver={e => { e.preventDefault(); setDragOver(i) }}
+            onDrop={() => { move(dragging, i); setDragging(null); setDragOver(null) }}
+            onDragEnd={() => { setDragging(null); setDragOver(null) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 14px', borderRadius: 8,
+              border: dragOver === i ? '2px solid #0891b2' : '1.5px solid #e2e8f0',
+              background: dragging === i ? '#f0f9ff' : dragOver === i ? '#e0f2fe' : '#f8fafc',
+              cursor: 'grab', transition: 'all 0.1s', opacity: sec.enabled ? 1 : 0.5,
+              userSelect: 'none',
+            }}
+          >
+            <span style={{ fontSize: 18, color: '#9ca3af', cursor: 'grab' }}>⋮⋮</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#1a2332' }}>
+              {i + 1}. {sec.label}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button type="button" onClick={() => move(i, Math.max(0, i - 1))} disabled={i === 0}
+                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 8px', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 1, fontSize: 12, fontWeight: 700 }}>↑</button>
+              <button type="button" onClick={() => move(i, Math.min(sections.length - 1, i + 1))} disabled={i === sections.length - 1}
+                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 8px', cursor: i === sections.length - 1 ? 'not-allowed' : 'pointer', opacity: i === sections.length - 1 ? 0.3 : 1, fontSize: 12, fontWeight: 700 }}>↓</button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 13 }}>
+                <input type="checkbox" checked={sec.enabled} onChange={() => toggle(sec.id)} style={{ width: 15, height: 15, cursor: 'pointer' }} />
+                <span style={{ color: sec.enabled ? '#16a34a' : '#9ca3af', fontWeight: 700, fontSize: 12 }}>{sec.enabled ? 'ON' : 'OFF'}</span>
+              </label>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
+        <button onClick={save} disabled={saving} style={{ background: '#0f1f38', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+          {saving ? 'Saving...' : '💾 Save Layout'}
+        </button>
+        <button onClick={() => setSections(DEFAULT_SECTIONS)} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: '#555' }}>
+          Reset to Default
+        </button>
+        {msg && <span style={{ color: msg.startsWith('Error') ? '#dc2626' : '#16a34a', fontWeight: 700, fontSize: 13 }}>{msg}</span>}
+      </div>
+      <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8f9fa', borderRadius: 8, fontSize: 12, color: '#888', border: '1px solid #e5e7eb' }}>
+        💡 Tip: Drag sections up/down or use the ↑↓ buttons. Uncheck to hide a section from the PDF output.
+      </div>
+    </div>
+  )
+}
+
 function PartsCatalogAdmin() {
   const { isDemo } = useAuth()
   const [parts, setParts] = useState([])
@@ -889,6 +994,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab("branding")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "branding" ? "#0891b2" : "#fff", color: activeTab === "branding" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Branding
           </button>
+          <button onClick={() => setActiveTab('pdf-layout')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'pdf-layout' ? '#0f172a' : '#fff', color: activeTab === 'pdf-layout' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            📄 PDF Layout
+          </button>
           <button onClick={() => setActiveTab("users")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "users" ? "#dc2626" : "#fff", color: activeTab === "users" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Users
           </button>
@@ -918,6 +1026,8 @@ export default function AdminPage() {
         {/* BRANDING TAB */}
         {activeTab === "branding" && <BrandingAdmin />}
 
+        {/* PDF LAYOUT TAB */}
+        {activeTab === 'pdf-layout' && <PdfLayoutAdmin />}
         {/* USERS TAB */}
         {activeTab === "users" && <UsersAdmin />}
 
