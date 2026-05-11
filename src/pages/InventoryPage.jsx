@@ -15,7 +15,7 @@ async function supaRest(path, opts) {
 }
 
 // Autocomplete input that searches parts catalog by code or description
-function PartAutocomplete({ value, field, rowIndex, catalog, onSelect, onChange, placeholder, style }) {
+function PartAutocomplete({ value, field, rowIndex, catalog, onSelect, onChange, placeholder, style, isDemo }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState(value || '')
   const ref = useRef(null)
@@ -80,7 +80,7 @@ function PartAutocomplete({ value, field, rowIndex, catalog, onSelect, onChange,
             >
               <span style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, minWidth: 48 }}>{part.code || '—'}</span>
               <span style={{ flex: 1, color: '#1a2332', fontWeight: 500 }}>{part.description}</span>
-              {part.price > 0 && (
+              {!isDemo && part.price > 0 && (
                 <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 12 }}>${parseFloat(part.price).toFixed(2)}</span>
               )}
             </div>
@@ -267,6 +267,7 @@ export default function InventoryPage() {
                         onChange={updatePart}
                         placeholder="e.g. 41000"
                         style={inputStyle}
+                        isDemo={isDemo}
                       />
                     </td>
                     <td style={Object.assign({}, tdStyle, { minWidth: 220 })}>
@@ -279,6 +280,7 @@ export default function InventoryPage() {
                         onChange={updatePart}
                         placeholder="Part description"
                         style={Object.assign({}, inputStyle, { minWidth: 200 })}
+                        isDemo={isDemo}
                       />
                     </td>
                     <td style={tdStyle}><input type="number" value={p.qty || 0} onChange={function(e) { updatePart(i, 'qty', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 70 })} /></td>
