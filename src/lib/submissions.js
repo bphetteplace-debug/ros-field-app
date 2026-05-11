@@ -413,13 +413,35 @@ export async function fetchPartsCatalog() {
 }
 
 export async function addPart({ code, description, price, category }) {
-  return supaRest('POST', 'parts_catalog', { code: code||'', description, price: parseFloat(price)||0, category: category||'' })
+  const r = await fetch('/api/parts-catalog', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code||'', description, price: parseFloat(price)||0, category: category||'' })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(JSON.stringify(data));
+  return data;
 }
 
 export async function deletePart(id) {
-  return supaRest('DELETE', 'parts_catalog?id=eq.' + id)
+  const r = await fetch('/api/parts-catalog', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(()=>({}));
+    throw new Error(JSON.stringify(data));
+  }
 }
 
 export async function updatePart(id, { code, description, price, category }) {
-  return supaRest('PATCH', 'parts_catalog?id=eq.' + id, { code: code||'', description, price: parseFloat(price)||0, category: category||'' })
+  const r = await fetch('/api/parts-catalog', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, code: code||'', description, price: parseFloat(price)||0, category: category||'' })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(JSON.stringify(data));
+  return data;
 }
