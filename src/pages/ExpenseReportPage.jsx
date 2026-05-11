@@ -31,7 +31,7 @@ function PhotoPicker({ label, value, onChange }) {
 }
 
 export default function ExpenseReportPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, isDemo } = useAuth()
   const navigate = useNavigate()
   const [TRUCKS, setTRUCKS] = useState(DEFAULT_TRUCKS)
   const [TECHS_LIST, setTECHS_LIST] = useState(DEFAULT_TECHS)
@@ -98,6 +98,7 @@ export default function ExpenseReportPage() {
   const grandTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
 
   const handleSubmit = async () => {
+    if (isDemo) { setSaveError('Demo mode — read only'); return }
     if (!techName) { setSaveError('Tech name is required'); return }
     if (expenses.length === 0) { setSaveError('Add at least one expense'); return }
     setSaving(true); setSaveError(null)
