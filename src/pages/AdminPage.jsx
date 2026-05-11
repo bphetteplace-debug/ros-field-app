@@ -284,7 +284,8 @@ function BrandingAdmin() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchSettings('branding').then(v => {
+    fetchSettings().then(all => {
+      const v = all && all.branding;
       if (v && typeof v === 'object') setBranding(b => ({ ...b, ...v }))
       setLoading(false)
     }).catch(() => setLoading(false))
@@ -385,14 +386,13 @@ function SettingsAdmin() {
   const [newTech, setNewTech] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      fetchSettings('customers'),
-      fetchSettings('trucks'),
-      fetchSettings('techs')
-    ]).then(([c, t, te]) => {
-      setCustomers(Array.isArray(c) ? c : [])
-      setTrucks(Array.isArray(t) ? t : [])
-      setTechs(Array.isArray(te) ? te : [])
+    fetchSettings().then(all => {
+      const c = (all && Array.isArray(all.customers)) ? all.customers : [];
+      const t = (all && Array.isArray(all.trucks)) ? all.trucks : [];
+      const te = (all && Array.isArray(all.techs)) ? all.techs : [];
+      setCustomers(c)
+      setTrucks(t)
+      setTechs(te)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
