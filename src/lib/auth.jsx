@@ -7,6 +7,7 @@ const AuthContext = createContext(null);
 const ADMIN_EMAILS = [
   'bphetteplace@reliableoilfieldservices.net',
   'cphetteplace@reliableoilfieldservices.net', // Caryl — update if email differs
+  'demo@reliable-oilfield-services.com', // Demo / Guest account
 ]
 
 export function AuthProvider({ children }) {
