@@ -9,8 +9,9 @@ import {
   fetchSettings,
   DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,h
   queueOfflineSubmission,
+  fetchPartsCatalog,
 } from '../lib/submissions'
-import { PARTS_CATALOG } from '../data/catalog'
+import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -246,6 +247,7 @@ export default function FormPage() {
   const [parts,       setParts]       = useState([])
   const [partPhotos,  setPartPhotos]  = useState({})
   const [partSearch,  setPartSearch]  = useState('')
+  const [partsCatalog, setPartsCatalog] = useState(PARTS_CATALOG_STATIC)
   const [showCatalog, setShowCatalog] = useState(false)
 
   const [miles,         setMiles]         = useState('')
@@ -289,7 +291,7 @@ export default function FormPage() {
   const laborTotal   = warrantyWork?0:parseFloat(laborHours||0)*parseFloat(hourlyRate||115)*effBill
   const grandTotal   = warrantyWork?0:partsTotal+mileageTotal+laborTotal
 
-  const filteredParts = PARTS_CATALOG.filter(p=>{
+  const filteredParts = partsCatalog.filter(p=>{
     if(!partSearch) return true
     const q=partSearch.toLowerCase()
     return (p.name||p.desc||'').toLowerCase().includes(q)||(p.sku||p.code||'').toLowerCase().includes(q)
@@ -335,6 +337,7 @@ export default function FormPage() {
   useEffect(()=>{
     getNextPmNumber().then(n=>{if(n)setPmNumber(n)}).catch(()=>{})
     getNextWoNumber().then(n=>{if(n)setWoNumber(n)}).catch(()=>{})
+    fetchPartsCatalog().then(p=>{if(p&&p.length)setPartsCatalog(p.map(r=>({code:r.code||'',desc:r.description,name:r.description,price:parseFloat(r.price||0),category:r.category||''})))}).catch(()=>{})
     fetchSettings().then(s=>{
       if(!s)return
       if(s.customers?.length)setCUSTOMERS(s.customers)
