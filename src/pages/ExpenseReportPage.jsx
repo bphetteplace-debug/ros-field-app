@@ -30,7 +30,7 @@ function PhotoPicker({ label, value, onChange }) {
   )
 }
 
-export default function ExpenseReportPageexport default function ExpenseReportPage() {
+export default function ExpenseReportPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [TRUCKS, setTRUCKS] = useState(DEFAULT_TRUCKS)
