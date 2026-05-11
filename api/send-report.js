@@ -126,7 +126,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     return pg;
   }
 
-  const page = addPage(pdfDoc);
+  let page = addPage(pdfDoc);
   let y = 680;
 
   function drawField(label, value, x, fieldY, w) {
