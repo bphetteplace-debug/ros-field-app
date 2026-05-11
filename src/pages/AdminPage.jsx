@@ -366,14 +366,14 @@ function PartsCatalogAdmin() {
 }
 
 export default function AdminPage() {
-  const { user, isAdmin, isDemo, loading: authLoading, logout } = useAuth()
+  const { user, isAdmin, isDemo, loading: authLoading, signOut } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const handleLogout = useCallback(async () => {
     setLoggingOut(true)
-    try { await logout() } catch(e) {}
+    try { await signOut() } catch(e) {}
     setLoggingOut(false)
-  }, [logout])
+  }, [signOut])
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
