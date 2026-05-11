@@ -207,7 +207,6 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
       if (y < 80) break;
-      if (i % 2 === 1) page.drawRectangle({ x: 54, y: y - 12, width: 504, height: 16, color: LGRAY });
       page.drawText(String(p.sku || ''), { x: 62, y: y - 10, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       const descStr = String(p.description || p.name || '').substring(0, 50);
       page.drawText(descStr, { x: 134, y: y - 10, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
