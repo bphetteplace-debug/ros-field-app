@@ -103,12 +103,14 @@ export function AuthProvider({ children }) {
     setProfile(null);
   }
 
+  const DEMO_EMAIL = 'demo@reliable-oilfield-services.com';
   const isAdmin = profile?.role === 'admin' || ADMIN_EMAILS.includes(user?.email || '');
+  const isDemo = user?.email === DEMO_EMAIL;
 
   const value = {
     user, profile, loading,
     isCloudMode: isCloudMode(),
-    signIn, signOut, isAdmin,
+    signIn, signOut, isAdmin, isDemo,
     // Convenience: tech name from profile for auto-fill
     techName: profile?.full_name || null,
     truckNumber: profile?.truck_number || null,
