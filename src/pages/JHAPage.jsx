@@ -20,7 +20,7 @@ function mkStep() {
 const DRAFT_KEY = 'ros_jha_draft'
 
 export default function JHAPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, isDemo } = useAuth()
   const navigate = useNavigate()
   const draftTimerRef = useRef(null)
 
@@ -148,6 +148,7 @@ export default function JHAPage() {
   const highRiskCount = steps.filter(s => s.risk === 'High' || s.risk === 'Critical').length
 
   const handleSubmit = async () => {
+    if (isDemo) { setSaveError('Demo mode — read only'); return }
     if (!techName) { setSaveError('Tech name is required'); return }
     if (!jobLocation) { setSaveError('Job location is required'); return }
     if (steps.some(s => !s.taskStep || !s.hazard || !s.controls)) {
