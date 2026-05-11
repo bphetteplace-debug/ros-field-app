@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
+import { fetchPartsCatalog } from '../lib/submissions'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -13,8 +14,85 @@ async function supaRest(path, opts) {
   return res.status === 204 ? null : res.json()
 }
 
+// Autocomplete input that searches parts catalog by code or description
+function PartAutocomplete({ value, field, rowIndex, catalog, onSelect, onChange, placeholder, style }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value || '')
+  const ref = useRef(null)
+
+  // Sync external value changes (e.g. when another field triggers a fill)
+  useEffect(() => { setQuery(value || '') }, [value])
+
+  const filtered = query.length >= 1
+    ? catalog.filter(p => {
+        const q = query.toLowerCase()
+        return (p.code || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q)
+      }).slice(0, 12)
+    : []
+
+  function handleChange(e) {
+    const v = e.target.value
+    setQuery(v)
+    onChange(rowIndex, field, v)
+    setOpen(true)
+  }
+
+  function handleSelect(part) {
+    setQuery(field === 'code' ? (part.code || '') : part.description)
+    setOpen(false)
+    onSelect(rowIndex, part)
+  }
+
+  function handleBlur(e) {
+    // Delay so click on dropdown registers first
+    setTimeout(() => setOpen(false), 150)
+  }
+
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <input
+        value={query}
+        onChange={handleChange}
+        onFocus={() => query.length >= 1 && setOpen(true)}
+        onBlur={handleBlur}
+        placeholder={placeholder}
+        style={style}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, zIndex: 999,
+          background: '#fff', border: '1px solid #d1d5db', borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.13)', minWidth: 320, maxHeight: 260,
+          overflowY: 'auto', marginTop: 2
+        }}>
+          {filtered.map((part, idx) => (
+            <div
+              key={part.id || idx}
+              onMouseDown={() => handleSelect(part)}
+              style={{
+                padding: '7px 12px', cursor: 'pointer', fontSize: 13,
+                borderBottom: '1px solid #f3f4f6',
+                display: 'flex', gap: 10, alignItems: 'center'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0f7ff'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            >
+              <span style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, minWidth: 48 }}>{part.code || '—'}</span>
+              <span style={{ flex: 1, color: '#1a2332', fontWeight: 500 }}>{part.description}</span>
+              {part.price > 0 && (
+                <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 12 }}>${parseFloat(part.price).toFixed(2)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function InventoryPage() {
-  var { user, isAdmin, logout } = useAuth()
+  var { user, isAdmin, signOut } = useAuth()
   var [tab, setTab] = useState('truck')
   var [parts, setParts] = useState([])
   var [saving, setSaving] = useState(false)
@@ -22,11 +100,18 @@ export default function InventoryPage() {
   var [loggingOut, setLoggingOut] = useState(false)
   var [allInventories, setAllInventories] = useState([])
   var [selectedTech, setSelectedTech] = useState(null)
+  var [catalog, setCatalog] = useState([])
 
   var handleLogout = useCallback(async function() {
     setLoggingOut(true)
-    await logout()
-  }, [logout])
+    try { await signOut() } catch(e) {}
+    setLoggingOut(false)
+  }, [signOut])
+
+  // Load parts catalog for autocomplete
+  useEffect(function() {
+    fetchPartsCatalog().then(setCatalog).catch(() => {})
+  }, [])
 
   // Load inventory for current tab
   useEffect(function() {
@@ -40,7 +125,6 @@ export default function InventoryPage() {
       if (isAdmin && tab === 'truck' && selectedTech) {
         targetOwner = selectedTech
       } else if (tab === 'shop') {
-        // Shop: load the single shop record (owned by first admin or generic)
         var shopRec = await supaRest('inventory?inventory_type=eq.shop&select=*', {})
         if (shopRec && shopRec.length > 0) {
           setParts(shopRec[0].parts || [])
@@ -73,9 +157,7 @@ export default function InventoryPage() {
     try {
       var ownerId = user.id
       var invType = tab
-      // For truck, use current user id (techs) or selectedTech (admin viewing)
       if (tab === 'truck' && isAdmin && selectedTech) ownerId = selectedTech
-      // Upsert
       await supaRest('inventory', {
         method: 'POST',
         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' },
@@ -90,11 +172,28 @@ export default function InventoryPage() {
   }
 
   function updatePart(i, field, value) {
-    var updated = parts.map(function(p, idx) {
-      if (idx === i) { var n = Object.assign({}, p); n[field] = value; return n; }
-      return p
+    setParts(function(prev) {
+      return prev.map(function(p, idx) {
+        if (idx !== i) return p
+        var n = Object.assign({}, p)
+        n[field] = value
+        return n
+      })
     })
-    setParts(updated)
+  }
+
+  // Called when user selects a part from autocomplete — fills code, description, unit_cost
+  function selectCatalogPart(i, part) {
+    setParts(function(prev) {
+      return prev.map(function(p, idx) {
+        if (idx !== i) return p
+        return Object.assign({}, p, {
+          code: part.code || p.code,
+          description: part.description || p.description,
+          unit_cost: part.price ? parseFloat(part.price) : p.unit_cost
+        })
+      })
+    })
   }
 
   function addPart() {
@@ -108,6 +207,8 @@ export default function InventoryPage() {
   var inputStyle = { border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 6px', fontSize: 13, width: '100%' }
   var thStyle = { padding: '8px 6px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#4b5563', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }
   var tdStyle = { padding: '6px 4px', borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle' }
+
+  var lowCount = parts.filter(function(p) { return p.qty <= p.min_qty && p.min_qty > 0 }).length
 
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
@@ -128,8 +229,14 @@ export default function InventoryPage() {
           )}
         </div>
 
+        {catalog.length > 0 && (
+          <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 8, padding: '8px 14px', marginBottom: 14, fontSize: 13, color: '#0369a1', fontWeight: 600 }}>
+            💡 Start typing a part name or code — results from the parts catalog will appear automatically.
+          </div>
+        )}
+
         {/* Table */}
-        <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'visible' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -147,15 +254,38 @@ export default function InventoryPage() {
                 <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>No parts yet. Click Add Part to get started.</td></tr>
               )}
               {parts.map(function(p, i) {
+                var isLow = p.qty <= p.min_qty && p.min_qty > 0
                 return (
-                  <tr key={i} style={{ background: p.qty <= p.min_qty && p.min_qty > 0 ? '#fef9c3' : '' }}>
-                    <td style={tdStyle}><input value={p.code || ''} onChange={function(e) { updatePart(i, 'code', e.target.value) }} placeholder="e.g. 41000" style={inputStyle} /></td>
-                    <td style={tdStyle}><input value={p.description || ''} onChange={function(e) { updatePart(i, 'description', e.target.value) }} placeholder="Part description" style={Object.assign({}, inputStyle, { minWidth: 200 })} /></td>
+                  <tr key={i} style={{ background: isLow ? '#fef9c3' : '' }}>
+                    <td style={Object.assign({}, tdStyle, { minWidth: 110 })}>
+                      <PartAutocomplete
+                        value={p.code || ''}
+                        field="code"
+                        rowIndex={i}
+                        catalog={catalog}
+                        onSelect={selectCatalogPart}
+                        onChange={updatePart}
+                        placeholder="e.g. 41000"
+                        style={inputStyle}
+                      />
+                    </td>
+                    <td style={Object.assign({}, tdStyle, { minWidth: 220 })}>
+                      <PartAutocomplete
+                        value={p.description || ''}
+                        field="description"
+                        rowIndex={i}
+                        catalog={catalog}
+                        onSelect={selectCatalogPart}
+                        onChange={updatePart}
+                        placeholder="Part description"
+                        style={Object.assign({}, inputStyle, { minWidth: 200 })}
+                      />
+                    </td>
                     <td style={tdStyle}><input type="number" value={p.qty || 0} onChange={function(e) { updatePart(i, 'qty', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 70 })} /></td>
                     <td style={tdStyle}><input type="number" value={p.min_qty || 0} onChange={function(e) { updatePart(i, 'min_qty', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 70 })} /></td>
                     <td style={tdStyle}><input type="number" value={p.unit_cost || 0} onChange={function(e) { updatePart(i, 'unit_cost', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 90 })} /></td>
                     <td style={tdStyle}><input value={p.location || ''} onChange={function(e) { updatePart(i, 'location', e.target.value) }} placeholder="Shelf/bin" style={Object.assign({}, inputStyle, { width: 100 })} /></td>
-                    <td style={tdStyle}><button onClick={function() { removePart(i) }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>X</button></td>
+                    <td style={tdStyle}><button onClick={function() { removePart(i) }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>✕</button></td>
                   </tr>
                 )
               })}
@@ -163,8 +293,8 @@ export default function InventoryPage() {
           </table>
           <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb' }}>
             <button onClick={addPart} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>+ Add Part</button>
-            {parts.filter(function(p) { return p.qty <= p.min_qty && p.min_qty > 0 }).length > 0 && (
-              <span style={{ marginLeft: 16, color: '#d97706', fontWeight: 700, fontSize: 13 }}>⚠ {parts.filter(function(p) { return p.qty <= p.min_qty && p.min_qty > 0 }).length} part(s) at or below minimum quantity</span>
+            {lowCount > 0 && (
+              <span style={{ marginLeft: 16, color: '#d97706', fontWeight: 700, fontSize: 13 }}>⚠ {lowCount} part(s) at or below minimum quantity</span>
             )}
           </div>
         </div>
