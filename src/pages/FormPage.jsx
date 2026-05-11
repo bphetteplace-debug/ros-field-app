@@ -420,6 +420,10 @@ export default function FormPage() {
       }
       const submission=await saveSubmission(formData,user.id,template)
       if(submission?.id&&Object.keys(photoDataUrls).length>0) await uploadPhotos(submission.id,photoDataUrls)
+      if(submission?.id){
+        fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id})})
+          .catch(err=>console.warn('Email send failed:',err))
+      }
       try{localStorage.removeItem(draftKey)}catch(e){}
       navigate('/submissions')
     }catch(err){
@@ -472,10 +476,9 @@ export default function FormPage() {
         <div style={{background:`linear-gradient(135deg, ${T.navy} 0%, ${accent} 100%)`,borderRadius:14,padding:'20px 22px',marginBottom:20,boxShadow:'0 4px 20px rgba(0,0,0,0.22)',color:'#fff',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
           <div>
             <div style={{fontSize:10,fontWeight:800,letterSpacing:2,opacity:0.65,textTransform:'uppercase',marginBottom:4}}>Job Ticket</div>
-            <div style={{fontSize:28,fontWeight:800,lineHeight:1.1,marginBottom:6}}>{jtConfig.icon} {jobType}</div>
-            <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-              <span style={{background:'rgba(255,255,255,0.15)',backdropFilter:'blur(4px)',padding:'3px 10px',borderRadius:20,fontSize:12,fontWeight:700}}>{jtConfig.short} #{pmNumber||'…'}</span>
-              <span style={{background:'rgba(255,255,255,0.1)',backdropFilter:'blur(4px)',padding:'3px 10px',borderRadius:20,fontSize:12,fontWeight:600,opacity:0.9}}>WO #{woNumber||'…'}</span>
+            <div style={{fontSize:30,fontWeight:900,lineHeight:1.1,marginBottom:4,letterSpacing:'-0.5px'}}>WO #{woNumber||'…'}</div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
+              <span style={{background:'rgba(255,255,255,0.18)',backdropFilter:'blur(4px)',padding:'3px 12px',borderRadius:20,fontSize:13,fontWeight:700}}>{jtConfig.icon} {jobType}</span>
             </div>
           </div>
           <div style={{textAlign:'right',fontSize:12,opacity:0.8,flexShrink:0}}>
