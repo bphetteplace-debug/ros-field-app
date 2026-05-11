@@ -286,6 +286,7 @@ export default function FormPage() {
 
   const [techSignatures, setTechSignatures] = useState({})
   const [customerSig,    setCustomerSig]    = useState(null)
+  const [siteSignPhoto, setSiteSignPhoto] = useState(null)
 
   const mkArr   = () => ({ arrestorId:'', condition:'Good', filterChanged:false, notes:'', before1:null, before2:null, after1:null, after2:null })
   const mkFlare = () => ({ flareId:'', pilotLit:true, lastIgnition:'', condition:'Good', notes:'', photo1:null, photo2:null })
@@ -432,7 +433,8 @@ export default function FormPage() {
     setSaving(true);setSaveError(null)
     try{
       const photoDataUrls={}
-      if(photos.length>0) photoDataUrls['general']=await Promise.all(photos.map(async(f,i)=>({dataUrl:await toDataUrl(f),caption:photoCaptions[i]||''})))
+      if(siteSignPhoto){const u=await toDataUrl(siteSignPhoto);if(u)photoDataUrls['site-sign']=[{dataUrl:u,caption:'Site Sign'}]}
+    if(photos.length>0) photoDataUrls['general']=await Promise.all(photos.map(async(f,i)=>({dataUrl:await toDataUrl(f),caption:photoCaptions[i]||''})))
       for(const p of parts){ const pf=partPhotos[p.sku]||[]; if(pf.length) photoDataUrls[`part-${p.sku}`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption}))) }
       if(showVideos){
         if(arrivalVideo){const u=await toDataUrl(arrivalVideo);if(u)photoDataUrls['arrival-video']=[{dataUrl:u,caption:'Arrival Video'}]}
@@ -619,6 +621,21 @@ export default function FormPage() {
             {gpsError&&<div style={{fontSize:12,color:T.red,marginTop:6,fontWeight:500}}>⚠️ {gpsError}</div>}
           </div>
 
+
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>Site Sign Photo</label>
+            {siteSignPhoto ? (
+              <div style={{position:'relative',display:'inline-block'}}>
+                <img src={URL.createObjectURL(siteSignPhoto)} alt="" style={{width:120,height:90,objectFit:'cover',borderRadius:7,border:'1.5px solid '+T.border,display:'block'}} />
+                <button type="button" onClick={()=>setSiteSignPhoto(null)} style={{position:'absolute',top:4,right:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>X</button>
+              </div>
+            ) : (
+              <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
+                🚧 Site Sign Photo
+                <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e=>setSiteSignPhoto(e.target.files[0]||null)} />
+              </label>
+            )}
+          </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Contact</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} placeholder="Name / phone" /></div>
             <div style={fld}><label style={lbl}>Customer Work Order / PO #</label><input style={inp} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder="Optional" /></div>
