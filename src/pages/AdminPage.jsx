@@ -253,7 +253,6 @@ export default function AdminPage() {
   }
   const allTechTotals = Object.entries(byTech).sort((a, b) => b[1].total - a[1].total)
   const grandTotal = allTechTotals.reduce((sum, [, v]) => sum + v.total, 0)
-  const fmt = n => '$' + (n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
