@@ -146,6 +146,124 @@ function ExpenseAnalytics({ submissions }) {
     </div>
   )
 }
+// ── LIVE PRESENCE ─────────────────────────────────────────────────────────
+const SUPA_URL_P = import.meta.env.VITE_SUPABASE_URL
+const SUPA_KEY_P = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+function LivePresence() {
+  const [presence, setPresence] = useState([])
+  const [lastRefresh, setLastRefresh] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const STALE_MS = 2 * 60 * 1000 // 2 minutes
+
+  async function fetchPresence() {
+    try {
+      const res = await fetch(SUPA_URL_P + '/rest/v1/user_presence?select=*&order=updated_at.desc', {
+        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + SUPA_KEY_P }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPresence(data || [])
+      }
+    } catch(e) {}
+    setLastRefresh(new Date())
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchPresence()
+    const interval = setInterval(fetchPresence, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const now = new Date()
+  const active = presence.filter(p => (now - new Date(p.updated_at)) < STALE_MS)
+  const idle = presence.filter(p => (now - new Date(p.updated_at)) >= STALE_MS)
+
+  const formColors = { 'PM': '#e65c00', 'Service Call': '#2563eb', 'Expense Report': '#7c3aed', 'Daily Inspection': '#0891b2', 'JHA/JSA': '#059669' }
+  const getColor = (ft) => formColors[ft] || '#6b7280'
+
+  const timeAgo = (ts) => {
+    const s = Math.floor((now - new Date(ts)) / 1000)
+    if (s < 60) return s + 's ago'
+    if (s < 3600) return Math.floor(s/60) + 'm ago'
+    return Math.floor(s/3600) + 'h ago'
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+      <div style={{ background: '#0f1f38', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: active.length > 0 ? '#22c55e' : '#6b7280', boxShadow: active.length > 0 ? '0 0 0 3px rgba(34,197,94,0.3)' : 'none', animation: active.length > 0 ? 'pulse 2s infinite' : 'none' }}></span>
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>Live Activity</span>
+          {active.length > 0 && <span style={{ background: '#22c55e', color: '#fff', fontWeight: 700, fontSize: 11, padding: '2px 8px', borderRadius: 10 }}>{active.length} active</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastRefresh && <span style={{ color: '#6b7280', fontSize: 12 }}>Updated {timeAgo(lastRefresh)}</span>}
+          <button onClick={fetchPresence} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Refresh</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
+      ) : active.length === 0 && idle.length === 0 ? (
+        <div style={{ padding: 48, textAlign: 'center', color: '#aaa' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>💤</div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>No active users</div>
+          <div style={{ fontSize: 13 }}>Techs will appear here when they open a form</div>
+        </div>
+      ) : (
+        <div style={{ padding: 16 }}>
+          {active.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>● Currently Active</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                {active.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0f1f38', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                      {(p.user_name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: '#1a2332', fontSize: 14 }}>{p.user_name || 'Unknown'}</div>
+                      <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>
+                        Working on <span style={{ fontWeight: 700, color: getColor(p.form_label), background: getColor(p.form_label) + '18', padding: '1px 6px', borderRadius: 4 }}>{p.form_label || p.form_type}</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>ACTIVE</div>
+                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{timeAgo(p.updated_at)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {idle.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>◌ Recently Seen</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {idle.map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 14px', opacity: 0.7 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#6b7280', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                      {(p.user_name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: '#6b7280', fontSize: 13 }}>{p.user_name || 'Unknown'}</div>
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>Last seen in {p.form_label || p.form_type}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(p.updated_at)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── PARTS CATALOG ADMIN ───────────────────────────────────────────────
 function PartsCatalogAdmin() {
   const { isDemo } = useAuth()
@@ -388,6 +506,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('parts')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'parts' ? '#0891b2' : '#fff', color: activeTab === 'parts' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             🔧 Parts Catalog
           </button>
+          <button onClick={() => setActiveTab('live')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'live' ? '#16a34a' : '#fff', color: activeTab === 'live' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeTab === 'live' ? '#fff' : '#16a34a', boxShadow: '0 0 0 2px #16a34a' }}></span> Live
+          </button>
         </div>
 
         {/* EXPENSE ANALYTICS TAB */}
@@ -398,6 +519,11 @@ export default function AdminPage() {
         {/* PARTS CATALOG TAB */}
         {activeTab === 'parts' && !loading && !error && (
           <PartsCatalogAdmin />
+        )}
+
+        {/* LIVE PRESENCE TAB */}
+        {activeTab === 'live' && (
+          <LivePresence />
         )}
 
         {/* SUBMISSIONS TAB */}
