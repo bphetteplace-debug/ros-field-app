@@ -339,12 +339,12 @@ export default function FormPage() {
     if (!user) return
     const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-    const headers = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }
+    const headers = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }
     const formLabel = jobType || 'Work Order'
     const upsertPresence = () => {
       fetch(SUPA_URL + '/rest/v1/user_presence', {
         method: 'POST', headers,
-        body: JSON.stringify({ user_id: user.id, user_name: profile?.full_name || user.email, form_type: jobType || 'form', form_label: formLabel, updated_at: new Date().toISOString() })
+        body: JSON.stringify({ user_id: user.id, user_name: profile?.full_name || user.email, form_type: jobType || 'form', form_label: formLabel, started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       }).catch(()=>{})
     }
     upsertPresence()
