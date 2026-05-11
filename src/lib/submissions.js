@@ -400,3 +400,26 @@ export async function updateSubmission(id, formData) {
     },
   })
 }
+
+// ── PARTS CATALOG ────────────────────────────────────────────────────────────
+export async function fetchPartsCatalog() {
+  try {
+    const data = await supaRest('GET', 'parts_catalog?order=category.asc,description.asc')
+    return data || []
+  } catch(e) {
+    console.error('fetchPartsCatalog error:', e)
+    return []
+  }
+}
+
+export async function addPart({ code, description, price, category }) {
+  return supaRest('POST', 'parts_catalog', { code: code||'', description, price: parseFloat(price)||0, category: category||'' })
+}
+
+export async function deletePart(id) {
+  return supaRest('DELETE', 'parts_catalog?id=eq.' + id)
+}
+
+export async function updatePart(id, { code, description, price, category }) {
+  return supaRest('PATCH', 'parts_catalog?id=eq.' + id, { code: code||'', description, price: parseFloat(price)||0, category: category||'' })
+}
