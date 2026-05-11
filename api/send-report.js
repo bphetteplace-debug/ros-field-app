@@ -119,10 +119,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
     var logoBytes = null;
     if (logoUrl.startsWith('data:')) {
       var b64 = logoUrl.split(',')[1];
-      var binaryStr = atob(b64);
-      var arr = new Uint8Array(binaryStr.length);
-      for (var bi = 0; bi < binaryStr.length; bi++) arr[bi] = binaryStr.charCodeAt(bi);
-      logoBytes = arr;
+      logoBytes = Buffer.from(b64, 'base64');
     } else {
       var logoResp = await fetch(logoUrl);
       if (logoResp.ok) logoBytes = new Uint8Array(await logoResp.arrayBuffer());
