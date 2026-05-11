@@ -7,7 +7,7 @@ import {
   saveSubmission, uploadPhotos,
   getNextPmNumber, getNextWoNumber,
   fetchSettings,
-  DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,h
+  DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,
   queueOfflineSubmission,
   fetchPartsCatalog,
 } from '../lib/submissions'
