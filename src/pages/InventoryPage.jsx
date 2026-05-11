@@ -92,7 +92,7 @@ function PartAutocomplete({ value, field, rowIndex, catalog, onSelect, onChange,
 }
 
 export default function InventoryPage() {
-  var { user, isAdmin, signOut } = useAuth()
+  var { user, isAdmin, isDemo, signOut } = useAuth()
   var [tab, setTab] = useState('truck')
   var [parts, setParts] = useState([])
   var [saving, setSaving] = useState(false)
@@ -244,7 +244,7 @@ export default function InventoryPage() {
                 <th style={thStyle}>Description</th>
                 <th style={thStyle}>Qty on Hand</th>
                 <th style={thStyle}>Min Qty</th>
-                <th style={thStyle}>Unit Cost</th>
+                {!isDemo && <th style={thStyle}>Unit Cost</th>}
                 <th style={thStyle}>Location</th>
                 <th style={thStyle}></th>
               </tr>
@@ -283,7 +283,7 @@ export default function InventoryPage() {
                     </td>
                     <td style={tdStyle}><input type="number" value={p.qty || 0} onChange={function(e) { updatePart(i, 'qty', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 70 })} /></td>
                     <td style={tdStyle}><input type="number" value={p.min_qty || 0} onChange={function(e) { updatePart(i, 'min_qty', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 70 })} /></td>
-                    <td style={tdStyle}><input type="number" value={p.unit_cost || 0} onChange={function(e) { updatePart(i, 'unit_cost', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 90 })} /></td>
+                    {!isDemo && <td style={tdStyle}><input type="number" value={p.unit_cost || 0} onChange={function(e) { updatePart(i, 'unit_cost', parseFloat(e.target.value) || 0) }} style={Object.assign({}, inputStyle, { width: 90 })} /></td>}
                     <td style={tdStyle}><input value={p.location || ''} onChange={function(e) { updatePart(i, 'location', e.target.value) }} placeholder="Shelf/bin" style={Object.assign({}, inputStyle, { width: 100 })} /></td>
                     <td style={tdStyle}><button onClick={function() { removePart(i) }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>✕</button></td>
                   </tr>
