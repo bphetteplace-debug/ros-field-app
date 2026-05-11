@@ -334,9 +334,15 @@ function BrandingAdmin() {
           </div>
         </div>
         <div style={{ ...row, gridColumn: '1 / -1' }}>
-          <span style={label}>Logo URL (paste a public image URL)</span>
-          <input style={inp} placeholder='https://...' value={branding.logo_url} onChange={e => setBranding(b => ({ ...b, logo_url: e.target.value }))} />
-          {branding.logo_url && <img src={branding.logo_url} alt='logo preview' style={{ marginTop: 8, maxHeight: 60, borderRadius: 6, border: '1px solid #eee' }} />}
+          <span style={label}>Company Logo (used in PDF header)</span>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginTop:4}}>
+            {branding.logo_url && <img src={branding.logo_url} alt='logo preview' style={{maxHeight:80,maxWidth:200,borderRadius:6,border:'1px solid #eee',background:'#f9f9f9',padding:4}} />}
+            <label style={{cursor:'pointer',background:'#1a2332',color:'#fff',padding:'8px 16px',borderRadius:6,fontSize:13,fontWeight:600}}>
+              {branding.logo_url ? 'Change Logo' : 'Upload Logo'}
+              <input type='file' accept='image/*' style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setBranding(b=>({...b,logo_url:ev.target.result}));r.readAsDataURL(f)}} />
+            </label>
+            {branding.logo_url && <button onClick={()=>setBranding(b=>({...b,logo_url:''}))} style={{background:'#ef4444',color:'#fff',border:'none',borderRadius:6,padding:'8px 12px',cursor:'pointer',fontSize:13}}>Remove</button>}
+          </div>
         </div>
         <div style={{ ...row, gridColumn: '1 / -1' }}>
           <span style={label}>Email Footer / Signature Text</span>
