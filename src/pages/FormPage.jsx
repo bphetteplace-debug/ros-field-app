@@ -7,7 +7,7 @@ import {
   saveSubmission, uploadPhotos,
   getNextPmNumber, getNextWoNumber,
   fetchSettings,
-  DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,
+  DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,h
   queueOfflineSubmission,
 } from '../lib/submissions'
 import { PARTS_CATALOG } from '../data/catalog'
@@ -406,7 +406,7 @@ export default function FormPage() {
 
       const jtObj=JOB_TYPES.find(jt=>jt.value===jobType)
       const template=jtObj?.template||'service_call'
-      const effectiveWoNumber=woNumber||customerWorkOrder||''
+      const effectiveWoNumber=woNumber||''
       const formData={
         jobType,pmNumber,woNumber:effectiveWoNumber,warrantyWork,customerName,truckNumber,locationName,
         customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,
@@ -573,7 +573,7 @@ export default function FormPage() {
 
           <div style={row}>
             <div style={fld}><label style={lbl}>Contact</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} placeholder="Name / phone" /></div>
-            <div style={fld}><label style={lbl}>Customer W/O #</label><input style={inp} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder="Optional" /></div>
+            <div style={fld}><label style={lbl}>Customer Work Order / PO #</label><input style={inp} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder="Optional" /></div>
           </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Type of Work</label>
