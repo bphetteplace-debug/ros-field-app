@@ -256,10 +256,24 @@ export async function removeFromOfflineQueue(id) {
 }
 
 // ── PHOTOS ────────────────────────────────────────────────────────────────────────
-export async function uploadPhotos(submissionId, photos, section = 'work') {
+export async function uploadPhotos(submissionId, photosOrObj, section) {
+  // photosOrObj can be an array (legacy) or object { sectionName: [{dataUrl, caption, file}] }
+  // Build a flat list of { photo, section } entries
+  const entries = [];
+  if (Array.isArray(photosOrObj)) {
+    const sec = section || 'work';
+    photosOrObj.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
+  } else if (photosOrObj && typeof photosOrObj === 'object') {
+    for (const [sec, arr] of Object.entries(photosOrObj)) {
+      if (!Array.isArray(arr)) continue;
+      arr.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
+    }
+  }
   const uploaded = [];
-  for (let i = 0; i < photos.length; i++) {
-    const photo = photos[i];
+  const token = getAuthToken();
+  for (const entry of entries) {
+    const { photo, section: sec, order } = entry;
+    if (!photo) continue;
     if (!photo.dataUrl && !photo.file) continue;
     try {
       let blob;
@@ -268,35 +282,24 @@ export async function uploadPhotos(submissionId, photos, section = 'work') {
       } else if (photo.dataUrl) {
         blob = await fetch(photo.dataUrl).then(r => r.blob());
       } else continue;
-
       const ext = blob.type === 'image/png' ? 'png'
         : blob.type === 'video/mp4' ? 'mp4'
         : blob.type === 'video/webm' ? 'webm'
         : blob.type === 'video/quicktime' ? 'mov'
         : blob.type.startsWith('video/') ? 'mp4'
         : 'jpg';
-      const path = submissionId + '/' + section + '-' + i + '.' + ext;
-      const token = getAuthToken();
-      const storageHeaders = {
-        'apikey': SUPA_KEY,
-        'Content-Type': blob.type || 'image/jpeg',
-        'x-upsert': 'true'
-      };
+      const path = submissionId + '/' + sec + '-' + order + '.' + ext;
+      const storageHeaders = { 'apikey': SUPA_KEY, 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' };
       if (token) storageHeaders['Authorization'] = 'Bearer ' + token;
       const upRes = await fetch(SUPA_URL + '/storage/v1/object/submission-photos/' + path, {
         method: 'POST', headers: storageHeaders, body: blob
       });
       if (!upRes.ok) { console.warn('Upload err:', await upRes.text()); continue; }
-
-      const metaHeaders = {
-        'apikey': SUPA_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      };
+      const metaHeaders = { 'apikey': SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
       if (token) metaHeaders['Authorization'] = 'Bearer ' + token;
       const metaRes = await fetch(SUPA_URL + '/rest/v1/photos', {
         method: 'POST', headers: metaHeaders,
-        body: JSON.stringify({ submission_id: submissionId, storage_path: path, caption: photo.caption || '', display_order: i, section }),
+        body: JSON.stringify({ submission_id: submissionId, storage_path: path, caption: photo.caption || '', display_order: order, section: sec })
       });
       const metaText = await metaRes.text();
       if (metaRes.ok) uploaded.push(metaText ? JSON.parse(metaText)[0] : null);
