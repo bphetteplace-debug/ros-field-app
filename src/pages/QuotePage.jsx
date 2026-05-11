@@ -35,7 +35,7 @@ var PARTS_CATALOG = [
 ]
 
 export default function QuotePage() {
-  var { user, isAdmin, logout } = useAuth()
+  var { user, isAdmin, signOut } = useAuth()
   var navigate = useNavigate()
   var [loggingOut, setLoggingOut] = useState(false)
   var [customers, setCustomers] = useState([])
@@ -54,8 +54,9 @@ export default function QuotePage() {
 
   var handleLogout = useCallback(async function() {
     setLoggingOut(true)
-    await logout()
-  }, [logout])
+    try { await signOut() } catch(e) {}
+    setLoggingOut(false)
+  }, [signOut])
 
   useEffect(function() {
     supaRest('submissions?select=customer_name&status=neq.draft', {})
