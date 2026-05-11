@@ -6,6 +6,29 @@ import NavBar from '../components/NavBar'
 
 const COND_COLOR = { Good: '#16a34a', Fair: '#d97706', Poor: '#dc2626', Replaced: '#7c3aed' }
 
+// --- PhotoLightboxUrl ---
+function PhotoLightboxUrl({ photos, idx, onClose, onPrev, onNext, getUrl }) {
+  if (idx < 0 || !photos || idx >= photos.length) return null;
+  const photo = photos[idx];
+  const src = getUrl(photo.storage_path);
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{position:'relative',maxWidth:'95vw',maxHeight:'90vh',display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+        <img src={src} alt="" style={{maxWidth:'90vw',maxHeight:'78vh',objectFit:'contain',borderRadius:8}} />
+        {photo.caption && <div style={{color:'#ccc',fontSize:12}}>{photo.caption}</div>}
+        <div style={{color:'#aaa',fontSize:11}}>{idx+1} / {photos.length}</div>
+        <div style={{display:'flex',gap:8}}>
+          {idx > 0 && <button type="button" onClick={onPrev} style={{background:'#334',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700}}>Prev</button>}
+          <a href={src} download={'photo-'+(idx+1)+'.jpg'} target="_blank" rel="noreferrer"
+            style={{background:'#0891b2',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700,textDecoration:'none',display:'flex',alignItems:'center'}}>Save to Device</a>
+          {idx < photos.length-1 && <button type="button" onClick={onNext} style={{background:'#334',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700}}>Next</button>}
+        </div>
+        <button type="button" onClick={onClose} style={{position:'absolute',top:-36,right:0,background:'transparent',color:'#fff',border:'none',fontSize:22,cursor:'pointer',fontWeight:700}}>Close X</button>
+      </div>
+    </div>
+  );
+}
+
 function InfoCard({ children, accent }) {
   return (
     <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: 14, borderTop: '3px solid ' + (accent || '#1a2332') }}>
@@ -45,6 +68,8 @@ export default function ViewSubmissionPage() {
   const [error, setError] = useState('')
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState('')
+  const [lightboxPhotos, setLightboxPhotos] = useState([])
+  const [lightboxIdx, setLightboxIdx]     = useState(-1)
   const [deleting, setDeleting] = useState(false)
   const [deleteMsg, setDeleteMsg] = useState('')
   const { isAdmin, isDemo, user, signOut } = useAuth()
@@ -525,9 +550,14 @@ export default function ViewSubmissionPage() {
                   <CardHeader title={'Photos (' + regularPhotos.length + ')'} icon='📸' />
                   <CardBody>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-                      {regularPhotos.sort((a, b) => a.display_order - b.display_order).map(photo => (
-                        <div key={photo.id} style={{ borderRadius: 8, overflow: 'hidden', background: '#f0f0f0', border: '1px solid #e5e7eb' }}>
-                          <img src={getPhotoUrl(photo.storage_path)} alt={photo.caption || 'photo'} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
+                      {regularPhotos.sort((a, b) => a.display_order - b.display_order).map((photo, pIdx) => (
+                        <div key={photo.id} style={{ borderRadius: 8, overflow: 'hidden', background: '#f0f0f0', border: '1px solid #e5e7eb', position: 'relative' }}>
+                          <img src={getPhotoUrl(photo.storage_path)} alt={photo.caption || 'photo'}
+                            onClick={() => { setLightboxPhotos(regularPhotos); setLightboxIdx(pIdx); }}
+                            style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
+                          <a href={getPhotoUrl(photo.storage_path)} download={'photo-'+(pIdx+1)+'.jpg'} target="_blank" rel="noreferrer"
+                            style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(15,31,56,0.75)', color: '#fff', borderRadius: '50%', width: 22, height: 22, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+                            title="Save photo">DL</a>
                           {photo.caption && <div style={{ padding: '4px 8px', fontSize: 11, color: '#555' }}>{photo.caption}</div>}
                           {photo.section && photo.section !== 'work' && <div style={{ padding: '2px 8px', fontSize: 10, color: '#aaa', fontStyle: 'italic' }}>{photo.section}</div>}
                         </div>
@@ -540,6 +570,7 @@ export default function ViewSubmissionPage() {
           )
         })()}
 
+      <PhotoLightboxUrl photos={lightboxPhotos} idx={lightboxIdx} onClose={()=>setLightboxIdx(-1)} onPrev={()=>setLightboxIdx(i=>i-1)} onNext={()=>setLightboxIdx(i=>i+1)} getUrl={getPhotoUrl} />
       </div>
     </div>
   )
