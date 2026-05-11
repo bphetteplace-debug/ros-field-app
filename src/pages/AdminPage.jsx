@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart } from '../lib/submissions'
 
 function getTypeLabel(s) {
   if (s.template === 'pm_flare_combustor') return 'PM'
@@ -146,6 +146,106 @@ function ExpenseAnalytics({ submissions }) {
     </div>
   )
 }
+// ── PARTS CATALOG ADMIN ───────────────────────────────────────────────
+function PartsCatalogAdmin() {
+  const [parts, setParts] = useState([])
+  const [loadingParts, setLoadingParts] = useState(true)
+  const [partsSearch, setPartsSearch] = useState('')
+  const [form, setForm] = useState({ code: '', description: '', price: '', category: '' })
+  const [saving, setSaving] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState({})
+
+  const loadParts = () => {
+    setLoadingParts(true)
+    fetchPartsCatalog().then(p => { setParts(p); setLoadingParts(false) })
+  }
+  useEffect(loadParts, [])
+
+  const cats = [...new Set(parts.map(p => p.category).filter(Boolean))].sort()
+  const filteredParts = parts.filter(p => {
+    const q = partsSearch.toLowerCase()
+    return !q || (p.description||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q)
+  })
+
+  const handleAddPart = async (e) => {
+    e.preventDefault()
+    if (!form.description.trim()) return
+    setSaving(true)
+    try { await addPart(form); setForm({ code: '', description: '', price: '', category: '' }); loadParts() }
+    finally { setSaving(false) }
+  }
+
+  const handleDeletePart = async (id, desc) => {
+    if (!window.confirm('Delete ' + JSON.stringify(desc) + '?')) return
+    await deletePart(id); loadParts()
+  }
+
+  const handleEditSave = async (id) => {
+    setSaving(true)
+    try { await updatePart(id, editForm); setEditId(null); loadParts() }
+    finally { setSaving(false) }
+  }
+
+  const pinp = { border: '1px solid #ddd', borderRadius: 6, padding: '6px 10px', fontSize: 13, background: '#fff' }
+  const pbtn = (bg) => ({ background: bg, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: 12 })
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 14 }}>Parts Catalog ({parts.length} items)</div>
+      <form onSubmit={handleAddPart} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, background: '#f0f9ff', borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#0891b2', width: '100%', marginBottom: 4 }}>Add New Part</div>
+        <input style={{ ...pinp, flex: '1 1 80px', minWidth: 80 }} placeholder='Code' value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} />
+        <input style={{ ...pinp, flex: '3 1 200px', minWidth: 150 }} placeholder='Description *' required value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+        <input style={{ ...pinp, flex: '1 1 80px', minWidth: 80 }} placeholder='Price' type='number' step='0.01' value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+        <input style={{ ...pinp, flex: '2 1 120px', minWidth: 100 }} placeholder='Category' value={form.category} list='part-cats' onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+        <datalist id='part-cats'>{cats.map(c => <option key={c} value={c} />)}</datalist>
+        <button type='submit' disabled={saving} style={pbtn('#0891b2')}>+ Add Part</button>
+      </form>
+      <input style={{ ...pinp, width: '100%', marginBottom: 10, boxSizing: 'border-box' }} placeholder='Search parts...' value={partsSearch} onChange={e => setPartsSearch(e.target.value)} />
+      {loadingParts ? <div style={{ color: '#888', padding: 20, textAlign: 'center' }}>Loading...</div> : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 600 }}>Code</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 600 }}>Description</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontWeight: 600 }}>Price</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 600 }}>Category</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#555', fontWeight: 600 }}>Actions</th>
+            </tr></thead>
+            <tbody>
+              {filteredParts.map(p => editId === p.id ? (
+                <tr key={p.id} style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+                  <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 70 }} value={editForm.code||''} onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))} /></td>
+                  <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: '100%', minWidth: 150 }} value={editForm.description||''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} /></td>
+                  <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 80, textAlign: 'right' }} type='number' step='0.01' value={editForm.price||''} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} /></td>
+                  <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 120 }} value={editForm.category||''} list='part-cats' onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} /></td>
+                  <td style={{ padding: '6px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => handleEditSave(p.id)} disabled={saving} style={{ ...pbtn('#16a34a'), marginRight: 4 }}>Save</button>
+                    <button onClick={() => setEditId(null)} style={pbtn('#6b7280')}>Cancel</button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '6px 10px', color: '#888', fontSize: 12 }}>{p.code||'\u2014'}</td>
+                  <td style={{ padding: '6px 10px', fontWeight: 500 }}>{p.description}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>${parseFloat(p.price||0).toFixed(2)}</td>
+                  <td style={{ padding: '6px 10px', color: '#555' }}>{p.category||'\u2014'}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => { setEditId(p.id); setEditForm({ code: p.code||'', description: p.description, price: p.price, category: p.category||'' }) }} style={{ ...pbtn('#2563eb'), marginRight: 4 }}>Edit</button>
+                    <button onClick={() => handleDeletePart(p.id, p.description)} style={pbtn('#dc2626')}>Del</button>
+                  </td>
+                </tr>
+              ))}
+              {filteredParts.length === 0 && <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No parts found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
@@ -165,7 +265,7 @@ export default function AdminPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [deleting, setDeleting] = useState(null)
-  const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses'
+  const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses' | 'parts'
 
   const handleStatusChange = async (id, newStatus) => {
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
@@ -284,11 +384,19 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('expenses')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'expenses' ? '#7c3aed' : '#fff', color: activeTab === 'expenses' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             💜 Expense Analytics
           </button>
+          <button onClick={() => setActiveTab('parts')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'parts' ? '#0891b2' : '#fff', color: activeTab === 'parts' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            🔧 Parts Catalog
+          </button>
         </div>
 
         {/* EXPENSE ANALYTICS TAB */}
         {activeTab === 'expenses' && !loading && !error && (
           <ExpenseAnalytics submissions={submissions} />
+        )}
+
+        {/* PARTS CATALOG TAB */}
+        {activeTab === 'parts' && !loading && !error && (
+          <PartsCatalogAdmin />
         )}
 
         {/* SUBMISSIONS TAB */}
