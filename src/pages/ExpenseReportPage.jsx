@@ -5,26 +5,32 @@ import { saveSubmission, uploadPhotos, fetchSettings, DEFAULT_TRUCKS, DEFAULT_TE
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
-function PhotoPicker({ label, value, onChange, capture }) {
+function PhotoPicker({ label, value, onChange }) {
   return (
     <div style={{ marginTop: 4 }}>
-      <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>{label}</div>
       {value ? (
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <img src={URL.createObjectURL(value)} alt="" style={{ width: 110, height: 82, objectFit: 'cover', borderRadius: 5, border: '1px solid #ddd', display: 'block' }} />
           <button type="button" onClick={() => onChange(null)} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>x</button>
         </div>
       ) : (
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '5px 8px', background: '#f2f2f2', border: '1px dashed #bbb', borderRadius: 5, cursor: 'pointer', fontSize: 12, color: '#555' }}>
-          📷 {label}
-          <input type="file" accept="image/*" capture={capture || 'environment'} style={{ display: 'none' }} onChange={e => onChange(e.target.files[0] || null)} />
-        </label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '5px 8px', background: '#1a2332', border: '1px solid #1a2332', borderRadius: 5, cursor: 'pointer', fontSize: 12, color: '#fff', fontWeight: 600 }}>
+            📷 Camera
+            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => onChange(e.target.files[0] || null)} />
+          </label>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '5px 8px', background: '#f2f2f2', border: '1px dashed #bbb', borderRadius: 5, cursor: 'pointer', fontSize: 12, color: '#555' }}>
+            🖼️ Gallery
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onChange(e.target.files[0] || null)} />
+          </label>
+        </div>
       )}
     </div>
   )
 }
 
-export default function ExpenseReportPage() {
+export default function ExpenseReportPageexport default function ExpenseReportPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const [TRUCKS, setTRUCKS] = useState(DEFAULT_TRUCKS)
@@ -230,8 +236,8 @@ export default function ExpenseReportPage() {
               </div>
               {/* DUAL PHOTO PICKERS */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-                <PhotoPicker label="Receipt Photo" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} capture="environment" />
-                <PhotoPicker label="Item / Purchase Photo" value={exp.itemPhoto} onChange={v => updExp(i, 'itemPhoto', v)} capture="environment" />
+                <PhotoPicker label="Receipt Photo" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} />
+                <PhotoPicker label="Item / Purchase Photo" value={exp.itemPhoto} onChange={v => updExp(i, 'itemPhoto', v)} />
               </div>
             </div>
           ))}
