@@ -193,7 +193,7 @@ function PartsCatalogAdmin() {
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 14 }}>Parts Catalog ({parts.length} items)</div>
-      <form onSubmit={handleAddPart} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, background: '#f0f9ff', borderRadius: 8, padding: 12 }}>
+      {!isDemo && (<form onSubmit={handleAddPart} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, background: '#f0f9ff', borderRadius: 8, padding: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#0891b2', width: '100%', marginBottom: 4 }}>Add New Part</div>
         <input style={{ ...pinp, flex: '1 1 80px', minWidth: 80 }} placeholder='Code' value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} />
         <input style={{ ...pinp, flex: '3 1 200px', minWidth: 150 }} placeholder='Description *' required value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
@@ -201,7 +201,7 @@ function PartsCatalogAdmin() {
         <input style={{ ...pinp, flex: '2 1 120px', minWidth: 100 }} placeholder='Category' value={form.category} list='part-cats' onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
         <datalist id='part-cats'>{cats.map(c => <option key={c} value={c} />)}</datalist>
         <button type='submit' disabled={saving} style={pbtn('#0891b2')}>+ Add Part</button>
-      </form>
+      </form>)}
       <input style={{ ...pinp, width: '100%', marginBottom: 10, boxSizing: 'border-box' }} placeholder='Search parts...' value={partsSearch} onChange={e => setPartsSearch(e.target.value)} />
       {loadingParts ? <div style={{ color: '#888', padding: 20, textAlign: 'center' }}>Loading...</div> : (
         <div style={{ overflowX: 'auto' }}>
@@ -232,8 +232,8 @@ function PartsCatalogAdmin() {
                   <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>${parseFloat(p.price||0).toFixed(2)}</td>
                   <td style={{ padding: '6px 10px', color: '#555' }}>{p.category||'\u2014'}</td>
                   <td style={{ padding: '6px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => { setEditId(p.id); setEditForm({ code: p.code||'', description: p.description, price: p.price, category: p.category||'' }) }} style={{ ...pbtn('#2563eb'), marginRight: 4 }}>Edit</button>
-                    <button onClick={() => handleDeletePart(p.id, p.description)} style={pbtn('#dc2626')}>Del</button>
+                    {!isDemo && <button onClick={() => { setEditId(p.id); setEditForm({ code: p.code||'', description: p.description, price: p.price, category: p.category||'' }) }} style={{ ...pbtn('#2563eb'), marginRight: 4 }}>Edit</button>}
+                    {!isDemo && <button onClick={() => handleDeletePart(p.id, p.description)} style={pbtn('#dc2626')}>Del</button>}
                   </td>
                 </tr>
               ))}
@@ -247,7 +247,7 @@ function PartsCatalogAdmin() {
 }
 
 export default function AdminPage() {
-  const { user, isAdmin, loading: authLoading, logout } = useAuth()
+  const { user, isAdmin, isDemo, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const handleLogout = useCallback(async () => {
@@ -372,7 +372,7 @@ export default function AdminPage() {
 
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
-      <NavBar user={user} isAdmin={isAdmin} onLogout={handleLogout} loggingOut={loggingOut} />
+      <NavBar user={user} isAdmin={isAdmin} isDemo={isDemo} onLogout={handleLogout} loggingOut={loggingOut} />
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '12px 12px 80px' }}>
 
@@ -406,9 +406,9 @@ export default function AdminPage() {
             {!loading && !error && (
               <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
                 {statCard('Total Jobs', filtered.length)}
-                {statCard('Revenue (This Month)', fmt(monthRevenue), '#16a34a')}
-                {statCard('Expenses (This Month)', fmt(monthExpenses), '#dc2626')}
-                {statCard('Net Profit (This Month)', fmt(monthNetProfit), monthNetProfit >= 0 ? '#2563eb' : '#dc2626')}
+                {!isDemo && statCard('Revenue (This Month)', fmt(monthRevenue), '#16a34a')}
+                {!isDemo && statCard('Expenses (This Month)', fmt(monthExpenses), '#dc2626')}
+                {!isDemo && statCard('Net Profit (This Month)', fmt(monthNetProfit), monthNetProfit >= 0 ? '#2563eb' : '#dc2626')}
                 {statCard('PMs', pmCount, '#e65c00')}
                 {statCard('Service Calls', scCount, '#2563eb')}
                 {statCard('Exp Reports', expCount, '#7c3aed')}
@@ -428,8 +428,8 @@ export default function AdminPage() {
                         <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555' }}>Tech</th>
                         <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>WOs</th>
                         <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>Hours</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>Revenue</th>
-                        <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>% of Total</th>
+                        {!isDemo && <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>Revenue</th>}
+                        {!isDemo && <th style={{ padding: '6px 10px', fontWeight: 600, color: '#555', textAlign: 'right' }}>% of Total</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -440,10 +440,10 @@ export default function AdminPage() {
                           </td>
                           <td style={{ padding: '6px 10px', textAlign: 'right' }}>{d.woCount}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'right' }}>{d.laborHours.toFixed(1)}h</td>
-                          <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>{fmt(d.total)}</td>
-                          <td style={{ padding: '6px 10px', textAlign: 'right', color: '#888' }}>
+                          {!isDemo && <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>{fmt(d.total)}</td>}
+                          {!isDemo && <td style={{ padding: '6px 10px', textAlign: 'right', color: '#888' }}>
                             {totalRevenue > 0 ? Math.round((d.total / totalRevenue) * 100) + '%' : '—'}
-                          </td>
+                          </td>}
                         </tr>
                       ))}
                     </tbody>
@@ -543,14 +543,14 @@ export default function AdminPage() {
                         </select>
                       </div>
                       <div style={{ fontSize: 12, color: '#555' }}>{submittedBy}</div>
-                      <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: totalColor, cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{displayTotal}</div>
+                      <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: totalColor, cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>{isDemo && lbl !== 'INSP' ? '—' : displayTotal}</div>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
                         {(lbl === 'PM' || lbl === 'SC') && (
                           <button onClick={() => navigate('/edit/' + s.id)} title="Edit submission" style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✏️ Edit</button>
                         )}
-                        <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
+                        {!isDemo && <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
                           {isBeingDeleted ? '...' : '🗑 Del'}
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   )
