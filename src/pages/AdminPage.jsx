@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings } from '../lib/submissions'
 
 function getTypeLabel(s) {
   if (s.template === 'pm_flare_combustor') return 'PM'
@@ -265,6 +265,546 @@ function LivePresence() {
 }
 
 // ── PARTS CATALOG ADMIN ───────────────────────────────────────────────
+// ─── BRANDING ADMIN ──────────────────────────────────────────────────────────
+function BrandingAdmin() {
+  const SUPA_URL = 'https://idddbbvotykfairirmwn.supabase.co'
+  const SUPA_KEY = window.__supa_key__ || (document.cookie.match(/supa_anon=([^;]+)/)||[])[1] || ''
+  const [branding, setBranding] = useState({
+    company_name: 'Reliable Oilfield Services',
+    tagline: 'Field Operations Management',
+    primary_color: '#1a2332',
+    accent_color: '#f97316',
+    logo_url: '',
+    email_footer: 'Thank you for choosing Reliable Oilfield Services.',
+    pdf_header: '',
+    pdf_footer: 'Reliable Oilfield Services | Confidential Work Order'
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchSettings('branding').then(v => {
+      if (v && typeof v === 'object') setBranding(b => ({ ...b, ...v }))
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true); setSaved(false)
+    try {
+      await saveSettings('branding', branding)
+      setSaved(true); setTimeout(() => setSaved(false), 3000)
+    } finally { setSaving(false) }
+  }
+
+  const inp = { border: '1px solid #ddd', borderRadius: 6, padding: '8px 12px', fontSize: 13, width: '100%', boxSizing: 'border-box', background: '#fff' }
+  const label = { fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 4, display: 'block' }
+  const row = { marginBottom: 14 }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading branding settings...</div>
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>🎨 Company Branding</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 20 }}>Customize how your company appears across the app, emails, and PDFs.</div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={row}>
+          <span style={label}>Company Name</span>
+          <input style={inp} value={branding.company_name} onChange={e => setBranding(b => ({ ...b, company_name: e.target.value }))} />
+        </div>
+        <div style={row}>
+          <span style={label}>Tagline / Subtitle</span>
+          <input style={inp} value={branding.tagline} onChange={e => setBranding(b => ({ ...b, tagline: e.target.value }))} />
+        </div>
+        <div style={row}>
+          <span style={label}>Primary Color</span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type='color' value={branding.primary_color} onChange={e => setBranding(b => ({ ...b, primary_color: e.target.value }))} style={{ width: 48, height: 36, border: 'none', cursor: 'pointer', borderRadius: 6 }} />
+            <input style={{ ...inp, flex: 1 }} value={branding.primary_color} onChange={e => setBranding(b => ({ ...b, primary_color: e.target.value }))} />
+          </div>
+        </div>
+        <div style={row}>
+          <span style={label}>Accent Color</span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type='color' value={branding.accent_color} onChange={e => setBranding(b => ({ ...b, accent_color: e.target.value }))} style={{ width: 48, height: 36, border: 'none', cursor: 'pointer', borderRadius: 6 }} />
+            <input style={{ ...inp, flex: 1 }} value={branding.accent_color} onChange={e => setBranding(b => ({ ...b, accent_color: e.target.value }))} />
+          </div>
+        </div>
+        <div style={{ ...row, gridColumn: '1 / -1' }}>
+          <span style={label}>Logo URL (paste a public image URL)</span>
+          <input style={inp} placeholder='https://...' value={branding.logo_url} onChange={e => setBranding(b => ({ ...b, logo_url: e.target.value }))} />
+          {branding.logo_url && <img src={branding.logo_url} alt='logo preview' style={{ marginTop: 8, maxHeight: 60, borderRadius: 6, border: '1px solid #eee' }} />}
+        </div>
+        <div style={{ ...row, gridColumn: '1 / -1' }}>
+          <span style={label}>Email Footer / Signature Text</span>
+          <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} value={branding.email_footer} onChange={e => setBranding(b => ({ ...b, email_footer: e.target.value }))} />
+        </div>
+        <div style={row}>
+          <span style={label}>PDF Header Text</span>
+          <input style={inp} placeholder='Optional header line on PDFs' value={branding.pdf_header} onChange={e => setBranding(b => ({ ...b, pdf_header: e.target.value }))} />
+        </div>
+        <div style={row}>
+          <span style={label}>PDF Footer Text</span>
+          <input style={inp} placeholder='Footer line on PDFs' value={branding.pdf_footer} onChange={e => setBranding(b => ({ ...b, pdf_footer: e.target.value }))} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+        <button onClick={handleSave} disabled={saving} style={{ background: '#1a2332', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          {saving ? 'Saving...' : '💾 Save Branding'}
+        </button>
+        {saved && <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 13 }}>✓ Saved!</span>}
+      </div>
+
+      <div style={{ marginTop: 24, padding: 16, background: '#f8f9fa', borderRadius: 10, border: '1px solid #e5e7eb' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 10 }}>PREVIEW</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 8, background: branding.primary_color }}>
+          {branding.logo_url ? <img src={branding.logo_url} alt='logo' style={{ height: 36, borderRadius: 4 }} /> : <div style={{ width: 36, height: 36, borderRadius: '50%', background: branding.accent_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, color: '#fff' }}>{(branding.company_name||'R')[0]}</div>}
+          <div>
+            <div style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{branding.company_name || 'Company Name'}</div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{branding.tagline || 'Tagline'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── SETTINGS ADMIN ──────────────────────────────────────────────────────────
+function SettingsAdmin() {
+  const [customers, setCustomers] = useState([])
+  const [trucks, setTrucks] = useState([])
+  const [techs, setTechs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(null)
+  const [saved, setSaved] = useState(null)
+  const [newCustomer, setNewCustomer] = useState('')
+  const [newTruck, setNewTruck] = useState('')
+  const [newTech, setNewTech] = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      fetchSettings('customers'),
+      fetchSettings('trucks'),
+      fetchSettings('techs')
+    ]).then(([c, t, te]) => {
+      setCustomers(Array.isArray(c) ? c : [])
+      setTrucks(Array.isArray(t) ? t : [])
+      setTechs(Array.isArray(te) ? te : [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  const saveList = async (key, list, setter) => {
+    setSaving(key); setSaved(null)
+    try {
+      await saveSettings(key, list)
+      setter(list)
+      setSaved(key); setTimeout(() => setSaved(null), 3000)
+    } finally { setSaving(null) }
+  }
+
+  const addItem = (list, setter, value, clearFn, key) => {
+    const v = value.trim()
+    if (!v || list.includes(v)) return
+    const next = [...list, v].sort()
+    clearFn('')
+    saveList(key, next, setter)
+  }
+
+  const removeItem = (list, setter, item, key) => {
+    if (!window.confirm('Remove "' + item + '"?')) return
+    const next = list.filter(x => x !== item)
+    saveList(key, next, setter)
+  }
+
+  const inp = { border: '1px solid #ddd', borderRadius: 6, padding: '8px 12px', fontSize: 13, flex: 1 }
+  const addBtn = { background: '#0891b2', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }
+  const chip = { display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 600 }
+  const removeBtn = { background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 900, fontSize: 15, lineHeight: 1, padding: 0 }
+
+  const ListSection = ({ title, icon, list, setter, newVal, setNew, listKey }) => (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 16 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>{icon} {title}</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <input style={inp} placeholder={'Add ' + title.toLowerCase() + '...'} value={newVal} onChange={e => setNew(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') addItem(list, setter, newVal, setNew, listKey) }} />
+        <button style={addBtn} onClick={() => addItem(list, setter, newVal, setNew, listKey)}>+ Add</button>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {list.length === 0 && <div style={{ color: '#aaa', fontSize: 13 }}>No {title.toLowerCase()} added yet.</div>}
+        {list.map(item => (
+          <span key={item} style={chip}>
+            {item}
+            <button style={removeBtn} onClick={() => removeItem(list, setter, item, listKey)}>×</button>
+          </span>
+        ))}
+      </div>
+      {saving === listKey && <div style={{ marginTop: 8, color: '#0891b2', fontSize: 12, fontWeight: 700 }}>Saving...</div>}
+      {saved === listKey && <div style={{ marginTop: 8, color: '#16a34a', fontSize: 12, fontWeight: 700 }}>✓ Saved!</div>}
+    </div>
+  )
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading settings...</div>
+
+  return (
+    <div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>⚙️ Settings Management</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>Manage the dropdown lists used across the app.</div>
+      <ListSection title='Customers' icon='🏢' list={customers} setter={setCustomers} newVal={newCustomer} setNew={setNewCustomer} listKey='customers' />
+      <ListSection title='Trucks' icon='🚛' list={trucks} setter={setTrucks} newVal={newTruck} setNew={setNewTruck} listKey='trucks' />
+      <ListSection title='Technicians' icon='👷' list={techs} setter={setTechs} newVal={newTech} setNew={setNewTech} listKey='techs' />
+    </div>
+  )
+}
+
+// ─── USERS ADMIN ─────────────────────────────────────────────────────────────
+function UsersAdmin() {
+  const { user } = useAuth()
+  const SUPA_URL = 'https://idddbbvotykfairirmwn.supabase.co'
+  const [profiles, setProfiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(null)
+  const [error, setError] = useState(null)
+
+  const ROLES = ['admin', 'supervisor', 'technician', 'read-only']
+  const ROLE_COLORS = { admin: '#ef4444', supervisor: '#f97316', technician: '#0891b2', 'read-only': '#6b7280' }
+
+  const getToken = () => {
+    try {
+      const raw = localStorage.getItem('sb-idddbbvotykfairirmwn-auth-token')
+      if (raw) return JSON.parse(raw).access_token
+    } catch (e) {}
+    return null
+  }
+
+  const loadProfiles = async () => {
+    setLoading(true); setError(null)
+    try {
+      const token = getToken()
+      const res = await fetch(SUPA_URL + '/rest/v1/profiles?select=*&order=created_at.asc', {
+        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      })
+      if (!res.ok) throw new Error('Failed to load profiles: ' + res.status)
+      const data = await res.json()
+      setProfiles(data || [])
+    } catch (e) {
+      setError(e.message)
+    } finally { setLoading(false) }
+  }
+
+  useEffect(() => { loadProfiles() }, [])
+
+  const updateRole = async (userId, role) => {
+    setSaving(userId)
+    try {
+      const token = getToken()
+      const res = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        body: JSON.stringify({ role })
+      })
+      if (!res.ok) throw new Error('Failed to update role')
+      setProfiles(ps => ps.map(p => p.id === userId ? { ...p, role } : p))
+    } catch (e) {
+      alert('Error updating role: ' + e.message)
+    } finally { setSaving(null) }
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading users...</div>
+  if (error) return <div style={{ padding: 40, textAlign: 'center', color: '#ef4444' }}>Error: {error}</div>
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>👥 User Management</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>View all users and manage their roles. To add a new user, have them sign up at the app login page.</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#f8f9fa' }}>
+              <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e5e7eb' }}>Name</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e5e7eb' }}>Email</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e5e7eb' }}>Role</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#555', borderBottom: '2px solid #e5e7eb' }}>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            {profiles.length === 0 && (
+              <tr><td colSpan={4} style={{ padding: 30, textAlign: 'center', color: '#aaa' }}>No users found.</td></tr>
+            )}
+            {profiles.map((p, i) => (
+              <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{p.full_name || p.name || '—'}</td>
+                <td style={{ padding: '10px 12px', color: '#555' }}>{p.email || '—'}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  {saving === p.id ? (
+                    <span style={{ color: '#0891b2', fontSize: 12 }}>Saving...</span>
+                  ) : (
+                    <select value={p.role || 'technician'} onChange={e => updateRole(p.id, e.target.value)}
+                      style={{ border: '1px solid ' + (ROLE_COLORS[p.role] || '#ddd'), borderRadius: 16, padding: '3px 10px', fontSize: 12, fontWeight: 700, color: ROLE_COLORS[p.role] || '#555', background: '#fff', cursor: 'pointer' }}>
+                      {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
+                    </select>
+                  )}
+                </td>
+                <td style={{ padding: '10px 12px', color: '#888', fontSize: 12 }}>{p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── ANALYTICS ADMIN ─────────────────────────────────────────────────────────
+function AnalyticsAdmin({ submissions }) {
+  const { isDemo } = useAuth()
+  const subs = submissions || []
+
+  const totalJobs = subs.filter(s => s.template === 'pm_flare_combustor' || s.template === 'service_call').length
+  const totalPMs = subs.filter(s => s.template === 'pm_flare_combustor').length
+  const totalSCs = subs.filter(s => s.template === 'service_call').length
+  const totalInsp = subs.filter(s => s.template === 'daily_inspection').length
+  const totalExp = subs.filter(s => s.template === 'expense_report').length
+
+  const passCount = subs.filter(s => s.overall_result === 'pass' || s.status === 'approved').length
+  const failCount = subs.filter(s => s.overall_result === 'fail').length
+  const totalRevenue = isDemo ? null : subs.reduce((sum, s) => sum + (parseFloat(s.total_revenue) || 0), 0)
+
+  const techMap = {}
+  subs.forEach(s => {
+    const t = s.technician || s.tech || 'Unknown'
+    if (!techMap[t]) techMap[t] = 0
+    techMap[t]++
+  })
+  const topTechs = Object.entries(techMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
+
+  const custMap = {}
+  subs.forEach(s => {
+    const c = s.customer || 'Unknown'
+    if (!custMap[c]) custMap[c] = 0
+    custMap[c]++
+  })
+  const topCusts = Object.entries(custMap).sort((a, b) => b[1] - a[1]).slice(0, 5)
+
+  const card = (label, value, color) => (
+    <div style={{ background: '#fff', borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '2px solid ' + color, flex: '1 1 140px', minWidth: 140 }}>
+      <div style={{ fontSize: 24, fontWeight: 900, color }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#888', fontWeight: 600, marginTop: 2 }}>{label}</div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>📊 Analytics Overview</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>Summary based on all loaded submissions.</div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+        {card('Total Jobs', totalJobs, '#1a2332')}
+        {card('PMs', totalPMs, '#0891b2')}
+        {card('Service Calls', totalSCs, '#f97316')}
+        {card('Inspections', totalInsp, '#7c3aed')}
+        {card('Expenses', totalExp, '#6b7280')}
+        {!isDemo && totalRevenue !== null && card('Total Revenue', '$' + totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), '#16a34a')}
+        {card('Pass', passCount, '#16a34a')}
+        {card('Fail', failCount, '#ef4444')}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏆 Most Active Technicians</div>
+          {topTechs.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No data</div> : topTechs.map(([name, count], i) => (
+            <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < topTechs.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+              <span style={{ fontSize: 13, color: '#333' }}>{i + 1}. {name}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0891b2' }}>{count} jobs</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏢 Top Customers by Jobs</div>
+          {topCusts.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No data</div> : topCusts.map(([name, count], i) => (
+            <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < topCusts.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+              <span style={{ fontSize: 13, color: '#333' }}>{i + 1}. {name}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316' }}>{count} jobs</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Branding Admin
+function BrandingAdmin() {
+  const [branding, setBranding] = useState({ companyName: "Reliable Oilfield Services", tagline: "Field Operations Management", primaryColor: "#102558", accentColor: "#ef6600", emailFooter: "", pdfHeader: "", pdfFooter: "" })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState("")
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => { fetchSettings().then(s => { if (s && s.branding) setBranding(b => ({ ...b, ...s.branding })); setLoaded(true); }) }, [])
+  const save = async () => {
+    setSaving(true); setMsg("")
+    try { await saveSettings("branding", branding); setMsg("Saved!") } catch(e) { setMsg("Error: " + e.message) } finally { setSaving(false) }
+  }
+  const inp = { border: "1px solid #ddd", borderRadius: 6, padding: "8px 12px", fontSize: 14, width: "100%", boxSizing: "border-box" }
+  const lbl = { fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 4, display: "block" }
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", maxWidth: 700 }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: "#1a2332", marginBottom: 6 }}>Company Branding</div>
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>White-label ReliableTrack for your company. Changes apply to PDFs, emails, and the app header.</div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Company Name</label><input style={inp} value={branding.companyName} onChange={e=>setBranding(b=>({...b,companyName:e.target.value}))} /></div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Tagline</label><input style={inp} value={branding.tagline} onChange={e=>setBranding(b=>({...b,tagline:e.target.value}))} /></div>
+      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+        <div style={{ flex: 1 }}><label style={lbl}>Primary Color</label><div style={{ display: "flex", gap: 8 }}><input type="color" value={branding.primaryColor} onChange={e=>setBranding(b=>({...b,primaryColor:e.target.value}))} style={{ width: 48, height: 36, borderRadius: 6, border: "1px solid #ddd", cursor: "pointer" }} /><input style={{ ...inp, flex: 1 }} value={branding.primaryColor} onChange={e=>setBranding(b=>({...b,primaryColor:e.target.value}))} /></div></div>
+        <div style={{ flex: 1 }}><label style={lbl}>Accent Color</label><div style={{ display: "flex", gap: 8 }}><input type="color" value={branding.accentColor} onChange={e=>setBranding(b=>({...b,accentColor:e.target.value}))} style={{ width: 48, height: 36, borderRadius: 6, border: "1px solid #ddd", cursor: "pointer" }} /><input style={{ ...inp, flex: 1 }} value={branding.accentColor} onChange={e=>setBranding(b=>({...b,accentColor:e.target.value}))} /></div></div>
+      </div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Preview</label><div style={{ background: branding.primaryColor, borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 12 }}><div style={{ width: 36, height: 36, background: branding.accentColor, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 16 }}>{(branding.companyName||"R").charAt(0)}</div><div><div style={{ color: "#fff", fontWeight: 800 }}>{branding.companyName}</div><div style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{branding.tagline}</div></div></div></div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>Email Footer Text</label><textarea style={{ ...inp, height: 70, resize: "vertical" }} value={branding.emailFooter} onChange={e=>setBranding(b=>({...b,emailFooter:e.target.value}))} placeholder="e.g. Thank you for choosing us. Call (555) 123-4567" /></div>
+      <div style={{ marginBottom: 16 }}><label style={lbl}>PDF Sub-header</label><input style={inp} value={branding.pdfHeader} onChange={e=>setBranding(b=>({...b,pdfHeader:e.target.value}))} placeholder="e.g. Licensed and Insured | 24/7 Emergency Service" /></div>
+      <div style={{ marginBottom: 20 }}><label style={lbl}>PDF Footer</label><input style={inp} value={branding.pdfFooter} onChange={e=>setBranding(b=>({...b,pdfFooter:e.target.value}))} placeholder="e.g. www.company.com | (555) 123-4567" /></div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <button onClick={save} disabled={saving||!loaded} style={{ background: "#102558", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{saving ? "Saving..." : "Save Branding"}</button>
+        {msg && <span style={{ color: msg.startsWith("Error") ? "#dc2626" : "#16a34a", fontSize: 13, fontWeight: 700 }}>{msg}</span>}
+      </div>
+    </div>
+  )
+}
+
+// Settings Admin
+function SettingsAdmin() {
+  const [customers, setCustomers] = useState([])
+  const [trucks, setTrucks] = useState([])
+  const [techs, setTechs] = useState([])
+  const [newCustomer, setNewCustomer] = useState("")
+  const [newTruck, setNewTruck] = useState("")
+  const [newTech, setNewTech] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState("")
+  useEffect(() => {
+    fetchSettings().then(s => {
+      if (s) {
+        if (Array.isArray(s.customers)) setCustomers(s.customers);
+        if (Array.isArray(s.trucks)) setTrucks(s.trucks);
+        if (Array.isArray(s.techs)) setTechs(s.techs);
+      }
+    })
+  }, [])
+  const saveAll = async () => {
+    setSaving(true); setMsg("")
+    try {
+      await saveSettings("customers", customers);
+      await saveSettings("trucks", trucks);
+      await saveSettings("techs", techs);
+      setMsg("Saved!")
+    } catch(e) { setMsg("Error: " + e.message) } finally { setSaving(false) }
+  }
+  const ListEditor = ({ title, items, setItems, newVal, setNewVal, placeholder }) => (
+    <div style={{ background: "#f8fafc", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: "#1a2332", marginBottom: 12 }}>{title} ({items.length})</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+        {items.map((item, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, background: "#e0e7ff", borderRadius: 6, padding: "4px 10px", fontSize: 13 }}>
+            <span>{item}</span>
+            <button type="button" onClick={() => setItems(arr => arr.filter((_,j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#666", fontSize: 14, padding: 0, lineHeight: 1 }}>x</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => { if(e.key==="Enter"&&newVal.trim()){setItems(a=>[...a,newVal.trim()]);setNewVal("");} }} placeholder={placeholder} style={{ flex: 1, border: "1px solid #ddd", borderRadius: 6, padding: "7px 12px", fontSize: 13 }} />
+        <button type="button" onClick={() => { if(newVal.trim()){setItems(a=>[...a,newVal.trim()]);setNewVal("");} }} style={{ background: "#1a2332", color: "#fff", border: "none", borderRadius: 6, padding: "7px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Add</button>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", maxWidth: 700 }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: "#1a2332", marginBottom: 6 }}>App Settings</div>
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>Manage the dropdown lists used in work orders and forms.</div>
+      <ListEditor title="Customers" items={customers} setItems={setCustomers} newVal={newCustomer} setNewVal={setNewCustomer} placeholder="Add customer..." />
+      <ListEditor title="Trucks / Units" items={trucks} setItems={setTrucks} newVal={newTruck} setNewVal={setNewTruck} placeholder="Add truck number..." />
+      <ListEditor title="Technicians" items={techs} setItems={setTechs} newVal={newTech} setNewVal={setNewTech} placeholder="Add technician name..." />
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <button onClick={saveAll} disabled={saving} style={{ background: "#102558", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{saving ? "Saving..." : "Save Settings"}</button>
+        {msg && <span style={{ color: msg.startsWith("Error") ? "#dc2626" : "#16a34a", fontSize: 13, fontWeight: 700 }}>{msg}</span>}
+      </div>
+    </div>
+  )
+}
+
+// Users Admin
+const SUPA_URL_A = import.meta.env.VITE_SUPABASE_URL;
+const SUPA_KEY_A = import.meta.env.VITE_SUPABASE_ANON_KEY;
+function UsersAdmin() {
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [msg, setMsg] = useState("")
+  const [saving, setSaving] = useState(null)
+  const fetchUsers = async () => {
+    setLoading(true)
+    try {
+      const token = Object.keys(localStorage).find(k => k.startsWith("sb-") && k.endsWith("-auth-token"))
+      const jwt = token ? JSON.parse(localStorage.getItem(token))?.access_token : null;
+      const headers = { "apikey": SUPA_KEY_A, "Authorization": "Bearer " + (jwt || SUPA_KEY_A) };
+      const r = await fetch(SUPA_URL_A + "/rest/v1/profiles?select=id,email,role,full_name&order=email.asc", { headers });
+      if (r.ok) { const data = await r.json(); setUsers(data || []); }
+    } catch(e) {} finally { setLoading(false) }
+  }
+  useEffect(() => { fetchUsers() }, [])
+  const updateRole = async (id, newRole) => {
+    setSaving(id); setMsg("")
+    try {
+      const token = Object.keys(localStorage).find(k => k.startsWith("sb-") && k.endsWith("-auth-token"))
+      const jwt = token ? JSON.parse(localStorage.getItem(token))?.access_token : null;
+      const headers = { "apikey": SUPA_KEY_A, "Authorization": "Bearer " + (jwt || SUPA_KEY_A), "Content-Type": "application/json", "Prefer": "return=minimal" };
+      const r = await fetch(SUPA_URL_A + "/rest/v1/profiles?id=eq." + id, { method: "PATCH", headers, body: JSON.stringify({ role: newRole }) });
+      if (r.ok) { setUsers(us => us.map(u => u.id === id ? { ...u, role: newRole } : u)); setMsg("Role updated!"); }
+      else setMsg("Error: " + await r.text());
+    } catch(e) { setMsg("Error: " + e.message) } finally { setSaving(null) }
+  }
+  const ROLES = ["admin", "supervisor", "technician", "readonly"]
+  const roleColor = { admin: "#dc2626", supervisor: "#d97706", technician: "#16a34a", readonly: "#6b7280" }
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#1a2332" }}>User Management</div>
+          <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>View all users and manage their roles. Admins have full access; Technicians see only their own jobs.</div>
+        </div>
+        <button onClick={fetchUsers} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Refresh</button>
+      </div>
+      {msg && <div style={{ padding: "10px 16px", borderRadius: 8, background: msg.startsWith("Error") ? "#fee2e2" : "#dcfce7", color: msg.startsWith("Error") ? "#dc2626" : "#16a34a", marginBottom: 16, fontSize: 13, fontWeight: 700 }}>{msg}</div>}
+      {loading ? <div style={{ textAlign: "center", color: "#888", padding: 40 }}>Loading users...</div> : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
+              <th style={{ padding: "10px 12px", textAlign: "left", color: "#555", fontWeight: 700 }}>Email</th>
+              <th style={{ padding: "10px 12px", textAlign: "left", color: "#555", fontWeight: 700 }}>Name</th>
+              <th style={{ padding: "10px 12px", textAlign: "left", color: "#555", fontWeight: 700 }}>Role</th>
+              <th style={{ padding: "10px 12px", textAlign: "center", color: "#555", fontWeight: 700 }}>Change Role</th>
+            </tr></thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "10px 12px", color: "#1a2332", fontWeight: 600 }}>{u.email}</td>
+                  <td style={{ padding: "10px 12px", color: "#555" }}>{u.full_name || "—"}</td>
+                  <td style={{ padding: "10px 12px" }}><span style={{ background: roleColor[u.role] || "#94a3b8", color: "#fff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{u.role || "—"}</span></td>
+                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                    <select value={u.role || ""} onChange={e => updateRole(u.id, e.target.value)} disabled={saving === u.id} style={{ border: "1px solid #ddd", borderRadius: 6, padding: "5px 8px", fontSize: 12, cursor: "pointer", background: "#fff" }}>
+                      <option value="">— select —</option>
+                      {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {users.length === 0 && <div style={{ textAlign: "center", color: "#888", padding: 30 }}>No users found. Make sure the profiles table exists with id, email, role, full_name columns.</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PartsCatalogAdmin() {
   const { isDemo } = useAuth()
   const [parts, setParts] = useState([])
@@ -512,6 +1052,15 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('live')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'live' ? '#16a34a' : '#fff', color: activeTab === 'live' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeTab === 'live' ? '#fff' : '#16a34a', boxShadow: '0 0 0 2px #16a34a' }}></span> Live
           </button>
+          <button onClick={() => setActiveTab("settings")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "settings" ? "#7c3aed" : "#fff", color: activeTab === "settings" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+            Settings
+          </button>
+          <button onClick={() => setActiveTab("branding")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "branding" ? "#0891b2" : "#fff", color: activeTab === "branding" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+            Branding
+          </button>
+          <button onClick={() => setActiveTab("users")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "users" ? "#dc2626" : "#fff", color: activeTab === "users" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+            Users
+          </button>
         </div>
 
         {/* EXPENSE ANALYTICS TAB */}
@@ -528,6 +1077,15 @@ export default function AdminPage() {
         {activeTab === 'live' && (
           <LivePresence />
         )}
+
+        {/* SETTINGS TAB */}
+        {activeTab === "settings" && <SettingsAdmin />}
+
+        {/* BRANDING TAB */}
+        {activeTab === "branding" && <BrandingAdmin />}
+
+        {/* USERS TAB */}
+        {activeTab === "users" && <UsersAdmin />}
 
         {/* SUBMISSIONS TAB */}
         {activeTab === 'submissions' && (
