@@ -201,7 +201,7 @@ function Section({ icon, title, children, accent=T.navyMid, collapsible=false, d
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function FormPage() {
-  const { user, profile, isAdmin, logout } = useAuth()
+  const { user, profile, isAdmin, isDemo, logout } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const handleLogout = useCallback(async () => {
@@ -383,6 +383,7 @@ export default function FormPage() {
   const toDataUrl = file=>new Promise((res,rej)=>{ const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file) })
 
   const handleSubmit = async () => {
+    if (isDemo) { setSaveError('Demo mode — read only'); return }
     if(!customerName||!locationName){setSaveError('Customer and location are required');return}
     setSaving(true);setSaveError(null)
     try{
