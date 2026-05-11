@@ -334,6 +334,27 @@ export default function FormPage() {
     )
   }
 
+  // ── Presence heartbeat ──────────────────────────────────────────────────
+  useEffect(()=>{
+    if (!user) return
+    const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    const headers = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' }
+    const formLabel = jobType || 'Work Order'
+    const upsertPresence = () => {
+      fetch(SUPA_URL + '/rest/v1/user_presence', {
+        method: 'POST', headers,
+        body: JSON.stringify({ user_id: user.id, user_name: profile?.full_name || user.email, form_type: jobType || 'form', form_label: formLabel, updated_at: new Date().toISOString() })
+      }).catch(()=>{})
+    }
+    upsertPresence()
+    const interval = setInterval(upsertPresence, 30000)
+    return () => {
+      clearInterval(interval)
+      fetch(SUPA_URL + '/rest/v1/user_presence?user_id=eq.' + user.id, { method: 'DELETE', headers }).catch(()=>{})
+    }
+  }, [user, jobType])
+
   useEffect(()=>{
     getNextPmNumber().then(n=>{if(n)setPmNumber(n)}).catch(()=>{})
     getNextWoNumber().then(n=>{if(n)setWoNumber(n)}).catch(()=>{})
