@@ -272,6 +272,7 @@ function PartsCatalogAdmin() {
   const [partsSearch, setPartsSearch] = useState('')
   const [form, setForm] = useState({ code: '', description: '', price: '', category: '' })
   const [saving, setSaving] = useState(false)
+  const [partError, setPartError] = useState('')
   const [editId, setEditId] = useState(null)
   const [editForm, setEditForm] = useState({})
 
@@ -290,8 +291,9 @@ function PartsCatalogAdmin() {
   const handleAddPart = async (e) => {
     e.preventDefault()
     if (!form.description.trim()) return
-    setSaving(true)
+    setSaving(true); setPartError('')
     try { await addPart(form); setForm({ code: '', description: '', price: '', category: '' }); loadParts() }
+    catch(err) { setPartError('Failed: ' + (err.message||'').substring(0,80)) }
     finally { setSaving(false) }
   }
 
@@ -320,6 +322,7 @@ function PartsCatalogAdmin() {
         <input style={{ ...pinp, flex: '2 1 120px', minWidth: 100 }} placeholder='Category' value={form.category} list='part-cats' onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
         <datalist id='part-cats'>{cats.map(c => <option key={c} value={c} />)}</datalist>
         <button type='submit' disabled={saving} style={pbtn('#0891b2')}>+ Add Part</button>
+        {partError && <div style={{ color: '#dc2626', fontSize: 12, width: '100%' }}>{partError}</div>}
       </form>)}
       <input style={{ ...pinp, width: '100%', marginBottom: 10, boxSizing: 'border-box' }} placeholder='Search parts...' value={partsSearch} onChange={e => setPartsSearch(e.target.value)} />
       {loadingParts ? <div style={{ color: '#888', padding: 20, textAlign: 'center' }}>Loading...</div> : (
