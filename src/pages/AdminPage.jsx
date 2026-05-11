@@ -210,7 +210,7 @@ function PartsCatalogAdmin() {
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 600 }}>Code</th>
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 600 }}>Description</th>
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontWeight: 600 }}>Price</th>
+              {!isDemo && <th style={{ padding: '8px 10px', textAlign: 'right', color: '#555', fontWeight: 600 }}>Price</th>}
               <th style={{ padding: '8px 10px', textAlign: 'left', color: '#555', fontWeight: 600 }}>Category</th>
               <th style={{ padding: '8px 10px', textAlign: 'center', color: '#555', fontWeight: 600 }}>Actions</th>
             </tr></thead>
@@ -219,7 +219,7 @@ function PartsCatalogAdmin() {
                 <tr key={p.id} style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
                   <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 70 }} value={editForm.code||''} onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))} /></td>
                   <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: '100%', minWidth: 150 }} value={editForm.description||''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} /></td>
-                  <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 80, textAlign: 'right' }} type='number' step='0.01' value={editForm.price||''} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} /></td>
+                  {!isDemo && <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 80, textAlign: 'right' }} type='number' step='0.01' value={editForm.price||''} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} /></td>}
                   <td style={{ padding: '6px 8px' }}><input style={{ ...pinp, width: 120 }} value={editForm.category||''} list='part-cats' onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} /></td>
                   <td style={{ padding: '6px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     <button onClick={() => handleEditSave(p.id)} disabled={saving} style={{ ...pbtn('#16a34a'), marginRight: 4 }}>Save</button>
@@ -230,7 +230,7 @@ function PartsCatalogAdmin() {
                 <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '6px 10px', color: '#888', fontSize: 12 }}>{p.code||'\u2014'}</td>
                   <td style={{ padding: '6px 10px', fontWeight: 500 }}>{p.description}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>${parseFloat(p.price||0).toFixed(2)}</td>
+                  {!isDemo && <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>${parseFloat(p.price||0).toFixed(2)}</td>}
                   <td style={{ padding: '6px 10px', color: '#555' }}>{p.category||'\u2014'}</td>
                   <td style={{ padding: '6px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {!isDemo && <button onClick={() => { setEditId(p.id); setEditForm({ code: p.code||'', description: p.description, price: p.price, category: p.category||'' }) }} style={{ ...pbtn('#2563eb'), marginRight: 4 }}>Edit</button>}
