@@ -199,6 +199,12 @@ export default function FormPage() {
       setWoNumber(10000)
     })
   }, [])
+  // Pre-fetch PM/SC sequential number so it shows in the form header before submit
+  useEffect(() => {
+    getNextPmNumber().then(n => {
+      setPmNumber(n)
+    }).catch(() => {})
+  }, [])
   // Load dynamic lists from app_settings
   useEffect(() => {
     fetchSettings().then(s => {
@@ -585,6 +591,20 @@ export default function FormPage() {
         <div style={{ margin:'0 16px 6px', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:5, padding:'5px 10px', fontSize:12, color:'#15803d', fontWeight:600 }}>✓ Draft saved (photos not included)</div>
       )}
 
+      {/* FORM NUMBER HEADER */}
+      <div style={{ background: '#1a2332', color: '#fff', borderRadius: 6, padding: '10px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <span style={{ fontSize: 20, fontWeight: 700, color: jobType === 'Service Call' ? '#2563eb' : '#e65c00', letterSpacing: 1 }}>
+            {jobType === 'Service Call' ? 'SC' : 'PM'} #{pmNumber || '…'}
+          </span>
+          <span style={{ fontSize: 12, color: '#aaa', marginLeft: 12 }}>
+            {jobType === 'Service Call' ? 'New Service Call' : 'New Preventive Maintenance'}
+          </span>
+        </div>
+        {jobType === 'Service Call' && woNumber && (
+          <div style={{ fontSize: 11, color: '#aaa' }}>WO #{woNumber}</div>
+        )}
+      </div>
       {/* JOB INFORMATION */}
       <div style={{ margin:'0 0 10px' }}>
         <div style={sHdr}>Job Information</div>
