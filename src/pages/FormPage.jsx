@@ -139,6 +139,28 @@ function PhotoPicker({ label, value, onChange }) {
   )
 }
 
+// --- PhotoLightbox ---
+function PhotoLightbox({ photos, idx, onClose, onPrev, onNext }) {
+  if (idx < 0 || idx >= photos.length) return null;
+  const ph = photos[idx];
+  const src = URL.createObjectURL(ph);
+  const savePhoto = () => { const a = document.createElement('a'); a.href = src; a.download = 'photo-' + (idx+1) + '.jpg'; a.click(); };
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div onClick={e=>e.stopPropagation()} style={{position:'relative',maxWidth:'95vw',maxHeight:'90vh',display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+        <img src={src} alt="" style={{maxWidth:'90vw',maxHeight:'78vh',objectFit:'contain',borderRadius:8}} />
+        <div style={{color:'#ccc',fontSize:12}}>{idx+1} / {photos.length}</div>
+        <div style={{display:'flex',gap:8}}>
+          {idx > 0 && <button type="button" onClick={onPrev} style={{background:'#334',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700}}>Prev</button>}
+          <button type="button" onClick={savePhoto} style={{background:'#0891b2',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700}}>Save to Device</button>
+          {idx < photos.length-1 && <button type="button" onClick={onNext} style={{background:'#334',color:'#fff',border:'none',borderRadius:6,padding:'8px 16px',cursor:'pointer',fontWeight:700}}>Next</button>}
+        </div>
+        <button type="button" onClick={onClose} style={{position:'absolute',top:-36,right:0,background:'transparent',color:'#fff',border:'none',fontSize:22,cursor:'pointer',fontWeight:700}}>Close X</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── SignaturePad ───────────────────────────────────────────────────────────────
 function SignaturePad({ label, required=false, onSave, onClear, isSigned=false }) {
   const canvasRef = useRef(null)
@@ -260,6 +282,7 @@ export default function FormPage() {
   const [photoCaptions,  setPhotoCaptions]  = useState({})
   const [arrivalVideo,   setArrivalVideo]   = useState(null)
   const [departureVideo, setDepartureVideo] = useState(null)
+  const [lightboxIdx, setLightboxIdx]   = useState(-1)
 
   const [techSignatures, setTechSignatures] = useState({})
   const [customerSig,    setCustomerSig]    = useState(null)
@@ -964,25 +987,34 @@ export default function FormPage() {
           </Section>
         )}
 
-        {/* ══ JOB PHOTOS ══ */}
-        <Section icon="📷" title="Job Photos" accent={accent}>
+        {/* == JOB PHOTOS == */}
+        <Section icon="photo" title="Job Photos" accent={accent}>
           {photos.length>0&&(
             <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
               {photos.map((ph,i)=>(
                 <div key={i} style={{position:'relative',display:'flex',flexDirection:'column',gap:4}}>
-                  <img src={URL.createObjectURL(ph)} alt="" style={{width:100,height:75,objectFit:'cover',borderRadius:8,border:`1.5px solid ${T.border}`}} />
+                  <img src={URL.createObjectURL(ph)} alt="" onClick={()=>setLightboxIdx(i)}
+                    style={{width:100,height:75,objectFit:'cover',borderRadius:8,border:'2px solid '+T.border,cursor:'zoom-in'}} />
                   <button type="button" onClick={()=>setPhotos(p=>p.filter((_,pi)=>pi!==i))}
-                    style={{position:'absolute',top:4,right:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✕</button>
-                  <input style={{...inp,width:100,padding:'3px 6px',fontSize:11,borderRadius:5}} placeholder="Caption…"
+                    style={{position:'absolute',top:4,right:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>X</button>
+                  <button type="button" title="Save to gallery" onClick={()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(ph); a.download='photo-'+(i+1)+'.jpg'; a.click(); }}
+                    style={{position:'absolute',top:4,left:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>DL</button>
+                  <input style={{...inp,width:100,padding:'3px 6px',fontSize:11,borderRadius:5}} placeholder="Caption"
                     value={photoCaptions[i]||''} onChange={e=>setPhotoCaptions(c=>({...c,[i]:e.target.value}))} />
                 </div>
               ))}
             </div>
           )}
-          <label style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 18px',background:T.inputBg,border:`1.5px dashed ${T.border}`,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700,transition:'all 0.13s'}}>
-            📷 Add Photos {photos.length>0&&`(${photos.length} added)`}
-            <input type="file" accept="image/*" capture="environment" multiple style={{display:'none'}} onChange={e=>addPhoto(e.target.files)} />
-          </label>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 16px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
+              Take Photo
+              <input type="file" accept="image/*" capture="environment" multiple style={{display:'none'}} onChange={e=>addPhoto(e.target.files)} />
+            </label>
+            <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 16px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
+              From Gallery{photos.length>0&&' ('+photos.length+' added)'}
+              <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>addPhoto(e.target.files)} />
+            </label>
+          </div>
         </Section>
 
         {/* ══ CUSTOMER SIGN-OFF ══ */}
@@ -1055,6 +1087,7 @@ export default function FormPage() {
           </button>
         </div>
 
+      <PhotoLightbox photos={photos} idx={lightboxIdx} onClose={()=>setLightboxIdx(-1)} onPrev={()=>setLightboxIdx(i=>i-1)} onNext={()=>setLightboxIdx(i=>i+1)} />
       </div>
     </div>
   )
