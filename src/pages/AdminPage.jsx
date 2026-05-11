@@ -148,6 +148,7 @@ function ExpenseAnalytics({ submissions }) {
 }
 // ── PARTS CATALOG ADMIN ───────────────────────────────────────────────
 function PartsCatalogAdmin() {
+  const { isDemo } = useAuth()
   const [parts, setParts] = useState([])
   const [loadingParts, setLoadingParts] = useState(true)
   const [partsSearch, setPartsSearch] = useState('')
