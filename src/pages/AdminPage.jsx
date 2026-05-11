@@ -73,7 +73,7 @@ function ExpenseAnalytics({ submissions }) {
     const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
     if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
     const lbl2 = getTypeLabel(s)
-    const rev = lbl2 === 'EXP' ? parseFloat(s.data?.expenseTotal || 0) : parseFloat(s.data?.grandTotal || 0)
+    const rev = (lbl2 === 'EXP' || lbl2 === 'INSP') ? 0 : parseFloat(s.data?.grandTotal || 0)
     byTech[tech].total += rev
     if (lbl2 === 'PM' || lbl2 === 'SC') byTech[tech].woCount += 1
     byTech[tech].laborHours += parseFloat(s.labor_hours || 0)
@@ -219,11 +219,27 @@ export default function AdminPage() {
     return haystack.includes(q)
   })
 
+  // Revenue: PM/SC only (excludes expenses). Filtered list respects user search/filter.
   const totalRevenue = filtered.reduce((sum, s) => {
     const lbl = getTypeLabel(s)
-    if (lbl === 'EXP') return sum + parseFloat(s.data?.expenseTotal || 0)
+    if (lbl === 'EXP' || lbl === 'INSP') return sum
     return sum + parseFloat(s.data?.grandTotal || 0)
   }, 0)
+  // Month-scoped stats (reset each month)
+  const nowD = new Date()
+  const monthStart = new Date(nowD.getFullYear(), nowD.getMonth(), 1).toISOString().split('T')[0]
+  const monthEnd = new Date(nowD.getFullYear(), nowD.getMonth() + 1, 0).toISOString().split('T')[0]
+  const thisMonthSubs = submissions.filter(s => s.date >= monthStart && s.date <= monthEnd)
+  const monthRevenue = thisMonthSubs.reduce((sum, s) => {
+    const lbl = getTypeLabel(s)
+    if (lbl === 'EXP' || lbl === 'INSP') return sum
+    return sum + parseFloat(s.data?.grandTotal || 0)
+  }, 0)
+  const monthExpenses = thisMonthSubs.reduce((sum, s) => {
+    if (getTypeLabel(s) === 'EXP') return sum + parseFloat(s.data?.expenseTotal || 0)
+    return sum
+  }, 0)
+  const monthNetProfit = monthRevenue - monthExpenses
   const warrantyCount = filtered.filter(s => s.data?.warrantyWork).length
   const pmCount = filtered.filter(s => getTypeLabel(s) === 'PM').length
   const scCount = filtered.filter(s => getTypeLabel(s) === 'SC').length
@@ -282,10 +298,12 @@ export default function AdminPage() {
             {!loading && !error && (
               <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
                 {statCard('Total Jobs', filtered.length)}
-                {statCard('Revenue', fmt(totalRevenue), '#16a34a')}
+                {statCard('Revenue (This Month)', fmt(monthRevenue), '#16a34a')}
+                {statCard('Expenses (This Month)', fmt(monthExpenses), '#dc2626')}
+                {statCard('Net Profit (This Month)', fmt(monthNetProfit), monthNetProfit >= 0 ? '#2563eb' : '#dc2626')}
                 {statCard('PMs', pmCount, '#e65c00')}
                 {statCard('Service Calls', scCount, '#2563eb')}
-                {statCard('Expenses', expCount, '#7c3aed')}
+                {statCard('Exp Reports', expCount, '#7c3aed')}
                 {statCard('Inspections', inspCount, '#0891b2')}
                 {statCard('Warranty', warrantyCount, '#888')}
               </div>
