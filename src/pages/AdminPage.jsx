@@ -1061,6 +1061,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab("users")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "users" ? "#dc2626" : "#fff", color: activeTab === "users" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Users
           </button>
+          <button onClick={() => setActiveTab('analytics')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'analytics' ? '#16a34a' : '#fff', color: activeTab === 'analytics' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            📊 Analytics
+          </button>
         </div>
 
         {/* EXPENSE ANALYTICS TAB */}
@@ -1087,6 +1090,9 @@ export default function AdminPage() {
         {/* USERS TAB */}
         {activeTab === "users" && <UsersAdmin />}
 
+
+        {/* ANALYTICS TAB */}
+        {activeTab === 'analytics' && <AnalyticsAdmin submissions={submissions} />}
         {/* SUBMISSIONS TAB */}
         {activeTab === 'submissions' && (
           <>
