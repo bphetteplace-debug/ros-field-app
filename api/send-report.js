@@ -96,204 +96,235 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const mileageTotal = parseFloat(d.mileageTotal || 0);
   const laborTotal = parseFloat(d.laborTotal || 0);
   const grandTotal = partsTotal + mileageTotal + laborTotal;
-  const fmt = (n) => '$' + parseFloat(n || 0).toFixed(2);
-  const BLACK = rgb(0,0,0);
-  const WHITE = rgb(1,1,1);
-  const GRAY = rgb(0.5,0.5,0.5);
-  const LGRAY = rgb(0.94,0.94,0.94);
-  const MGRAY = rgb(0.75,0.75,0.75);
-  const DKGRAY = rgb(0.25,0.25,0.25);
-  const pdfDoc = await PDFDocument.create();
-  const regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  var fmtMoney = function(n) { return '$' + parseFloat(n || 0).toFixed(2); };
 
-  let logoImg = null;
+  var BLACK = rgb(0, 0, 0);
+  var WHITE = rgb(1, 1, 1);
+  var GRAY = rgb(0.5, 0.5, 0.5);
+  var LGRAY = rgb(0.94, 0.94, 0.94);
+  var MGRAY = rgb(0.75, 0.75, 0.75);
+  var DKGRAY = rgb(0.25, 0.25, 0.25);
+  var GREEN = rgb(0.1, 0.6, 0.1);
+
+  var pdfDoc = await PDFDocument.create();
+  var regFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  var boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  var logoImg = null;
   try {
-    const logoResp = await fetch('https://pm.reliable-oilfield-services.com/ros-logo.png');
+    var logoResp = await fetch('https://pm.reliable-oilfield-services.com/ros-logo.png');
     if (logoResp.ok) {
-      const logoBytes = await logoResp.arrayBuffer();
+      var logoBytes = await logoResp.arrayBuffer();
       logoImg = await pdfDoc.embedPng(new Uint8Array(logoBytes));
     }
-  } catch (e) { }
+  } catch (e) { logoImg = null; }
 
-  async function fetchPhotoBytes(storagePath) {
-    if (!storagePath) return null;
-    try {
-      const url = SUPA_URL + '/storage/v1/object/authenticated/photos/' + storagePath;
-      const r = await fetch(url, { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } });
-      if (!r.ok) return null;
-      return new Uint8Array(await r.arrayBuffer());
-    } catch { return null; }
-  }
-
-  async function embedPhoto(bytes) {
-    if (!bytes) return null;
-    try { return await pdfDoc.embedJpg(bytes); } catch {}
-    try { return await pdfDoc.embedPng(bytes); } catch {}
+  async function embedImg(bytes) {
+    if (!bytes || !bytes.length) return null;
+    try { return await pdfDoc.embedJpg(bytes); } catch (e1) {}
+    try { return await pdfDoc.embedPng(bytes); } catch (e2) {}
     return null;
   }
 
-  const PAGE_W = 612;
-  const PAGE_H = 792;
-  const MARGIN = 36;
-  const CONTENT_W = PAGE_W - MARGIN * 2;
-  const HEADER_H = 95;
-  const FOOTER_H = 22;
-  let pageNum = 0;
+  var PAGE_W = 612;
+  var PAGE_H = 792;
+  var MARGIN = 36;
+  var CONTENT_W = PAGE_W - MARGIN * 2;
+  var HEADER_H = 78;
+  var FOOTER_H = 22;
+  var pageNum = 0;
 
   function drawHeader(pg) {
     pageNum++;
     if (logoImg) {
-      const logoDims = logoImg.scale(0.22);
+      var logoDims = logoImg.scale(0.17);
       pg.drawImage(logoImg, { x: MARGIN, y: PAGE_H - MARGIN - logoDims.height, width: logoDims.width, height: logoDims.height });
     } else {
-      pg.drawCircle({ x: MARGIN + 28, y: PAGE_H - MARGIN - 28, size: 28, borderColor: BLACK, borderWidth: 2, color: WHITE });
-      pg.drawText('ROS', { x: MARGIN + 16, y: PAGE_H - MARGIN - 34, size: 10, font: boldFont, color: BLACK });
+      pg.drawCircle({ x: MARGIN + 22, y: PAGE_H - MARGIN - 22, size: 22, borderColor: BLACK, borderWidth: 2, color: WHITE });
+      pg.drawText('ROS', { x: MARGIN + 10, y: PAGE_H - MARGIN - 28, size: 9, font: boldFont, color: BLACK });
     }
-    const titleW = boldFont.widthOfTextAtSize('ROS Service Work Order', 18);
-    pg.drawText('ROS Service Work Order', { x: PAGE_W / 2 - titleW / 2, y: PAGE_H - MARGIN - 22, size: 18, font: boldFont, color: BLACK });
-    const subW = regFont.widthOfTextAtSize('Reliable Oilfield Services', 11);
-    pg.drawText('Reliable Oilfield Services', { x: PAGE_W / 2 - subW / 2, y: PAGE_H - MARGIN - 38, size: 11, font: regFont, color: DKGRAY });
-    pg.drawText('No.', { x: PAGE_W - MARGIN - 72, y: PAGE_H - MARGIN - 16, size: 9, font: boldFont, color: BLACK });
-    const dateStr = sub.date ? sub.date.substring(0,7).replace('-','/') : new Date().toLocaleDateString('en-US',{month:'numeric',year:'numeric'}).replace('/','/');
-    pg.drawText(dateStr + ' ' + woNum, { x: PAGE_W - MARGIN - 72, y: PAGE_H - MARGIN - 28, size: 9, font: regFont, color: BLACK });
+    var titleW = boldFont.widthOfTextAtSize('ROS Service Work Order', 18);
+    pg.drawText('ROS Service Work Order', { x: PAGE_W / 2 - titleW / 2, y: PAGE_H - MARGIN - 20, size: 18, font: boldFont, color: BLACK });
+    var subW = regFont.widthOfTextAtSize('Reliable Oilfield Services', 10);
+    pg.drawText('Reliable Oilfield Services', { x: PAGE_W / 2 - subW / 2, y: PAGE_H - MARGIN - 35, size: 10, font: regFont, color: DKGRAY });
+    var dateStr = sub.date ? sub.date.substring(0, 7).replace('-', '/') : '';
+    pg.drawText('No. ' + dateStr + ' ' + woNum, { x: PAGE_W - MARGIN - 110, y: PAGE_H - MARGIN - 20, size: 9, font: regFont, color: BLACK });
     pg.drawRectangle({ x: MARGIN, y: PAGE_H - HEADER_H + 2, width: CONTENT_W, height: 1, color: MGRAY });
   }
 
   function drawFooter(pg) {
-    pg.drawText(String(sub.id || '').substring(0,50), { x: MARGIN, y: 14, size: 7, font: regFont, color: GRAY });
-    pg.drawText(String(pageNum), { x: PAGE_W - MARGIN - 8, y: 14, size: 8, font: boldFont, color: GRAY });
+    pg.drawText('ID: ' + String(sub.id || '').substring(0, 40), { x: MARGIN, y: 12, size: 7, font: regFont, color: GRAY });
+    pg.drawText('Page ' + String(pageNum), { x: PAGE_W - MARGIN - 40, y: 12, size: 7, font: boldFont, color: GRAY });
   }
 
-  function drawSection(pg, title, yPos) {
-    pg.drawRectangle({ x: MARGIN, y: yPos - 4, width: CONTENT_W, height: 22, color: BLACK });
-    const tw = boldFont.widthOfTextAtSize(title, 11);
-    pg.drawText(title, { x: PAGE_W / 2 - tw / 2, y: yPos + 2, size: 11, font: boldFont, color: WHITE });
-    return yPos - 30;
+  function drawSectionBar(pg, title, yPos) {
+    pg.drawRectangle({ x: MARGIN, y: yPos - 4, width: CONTENT_W, height: 20, color: BLACK });
+    var tw = boldFont.widthOfTextAtSize(title, 10);
+    pg.drawText(title, { x: PAGE_W / 2 - tw / 2, y: yPos, size: 10, font: boldFont, color: WHITE });
+    return yPos - 28;
   }
 
-  function drawField2(pg, label, value, x, yPos) {
-    pg.drawText(label + ':', { x, y: yPos + 14, size: 8, font: boldFont, color: DKGRAY });
-    const val = String(value || 'N/A').substring(0, 30);
-    pg.drawText(val, { x, y: yPos, size: 10, font: regFont, color: BLACK });
+  function drawField(pg, label, value, x, yPos) {
+    pg.drawText(label + ':', { x: x, y: yPos + 12, size: 7, font: boldFont, color: DKGRAY });
+    pg.drawText(String(value || '').substring(0, 30), { x: x, y: yPos, size: 9, font: regFont, color: BLACK });
   }
 
   function newPage() {
-    const pg = pdfDoc.addPage([PAGE_W, PAGE_H]);
+    var pg = pdfDoc.addPage([PAGE_W, PAGE_H]);
     drawHeader(pg);
     return pg;
   }
 
-  let page = newPage();
-  let y = PAGE_H - HEADER_H - 14;
+  var page = newPage();
+  var y = PAGE_H - HEADER_H - 8;
 
   // CUSTOMER INFORMATION
-  y = drawSection(page, 'Customer Information', y);
-  y -= 8;
-  const col1 = MARGIN, col2 = MARGIN + CONTENT_W/3, col3 = MARGIN + CONTENT_W*2/3;
-  drawField2(page, 'Customer Name', d.customer, col1, y);
-  drawField2(page, 'ROS Truck Number', d.truck, col2, y);
-  drawField2(page, 'Start Time', d.startTime || '', col3, y);
-  y -= 32;
-  drawField2(page, 'Location Name', d.location, col1, y);
-  drawField2(page, 'Customer Contact', d.contact, col2, y);
-  drawField2(page, 'Arrival Observations', '', col3, y);
-  y -= 32;
-  drawField2(page, 'GL Code', d.glCode || 'N/A', col1, y);
-  drawField2(page, 'Type of work', jobTypeLabel, col2, y);
-  y -= 32;
-  drawField2(page, 'Equipment Asset Tag', d.assetTag || 'None', col1, y);
-  drawField2(page, 'Work Area', d.workArea || 'None', col2, y);
-  drawField2(page, 'Website', 'Reliable-oilfield-services.com', col3, y);
-  y -= 32;
-  drawField2(page, 'Customer Work Order', d.customerWO || 'N/A', col1, y);
-  drawField2(page, 'Date', sub.date || '', col2, y);
-  y -= 32;
+  y = drawSectionBar(page, 'Customer Information', y);
+  y -= 6;
+  var C1 = MARGIN;
+  var C2 = MARGIN + CONTENT_W / 3;
+  var C3 = MARGIN + (CONTENT_W / 3) * 2;
+  drawField(page, 'Customer Name', sub.customer_name || d.customer, C1, y);
+  drawField(page, 'Truck Number', sub.truck_number || d.truck, C2, y);
+  drawField(page, 'Date', fmtDate(sub.date), C3, y);
+  y -= 28;
+  drawField(page, 'Location', sub.location_name || d.location, C1, y);
+  drawField(page, 'Contact', sub.contact || d.contact, C2, y);
+  drawField(page, 'Type of Work', jobTypeLabel, C3, y);
+  y -= 28;
+  drawField(page, 'GL Code', sub.gl_code || d.glCode, C1, y);
+  drawField(page, 'Asset Tag', sub.asset_tag || d.assetTag, C2, y);
+  drawField(page, 'Work Area', sub.work_area || d.workArea, C3, y);
+  y -= 28;
+  drawField(page, 'Work Order', sub.work_order, C1, y);
+  drawField(page, 'Technician(s)', techs.join(', '), C2, y);
+  if (d.warrantyWork) {
+    page.drawRectangle({ x: C3, y: y - 2, width: 130, height: 16, color: GREEN });
+    page.drawText('WARRANTY - NO CHARGE', { x: C3 + 4, y: y + 1, size: 8, font: boldFont, color: WHITE });
+  }
+  y -= 28;
 
-  // Site sign + GPS side by side
-  const sitePhoto = photos.find(p => p.section === 'site-sign' || p.section === 'arrival-photo');
-  const gpsPhoto = photos.find(p => p.section === 'gps' || p.section === 'map');
-  const HALF_W = CONTENT_W / 2 - 4;
-  const HALF_H = 110;
-  page.drawText('Site Sign:', { x: col1, y: y + 12, size: 8, font: boldFont, color: DKGRAY });
-  page.drawText('GPS:', { x: col2, y: y + 12, size: 8, font: boldFont, color: DKGRAY });
-  page.drawRectangle({ x: col1, y: y - HALF_H, width: HALF_W, height: HALF_H, color: LGRAY });
-  page.drawRectangle({ x: col2, y: y - HALF_H, width: HALF_W, height: HALF_H, color: LGRAY });
+  // Site sign + GPS
+  var sitePhoto = photos.find(function(p) { return p.section === 'site-sign' || p.section === 'arrival-photo' || p.section === 'site_sign'; });
+  var gpsPhoto = photos.find(function(p) { return p.section === 'gps' || p.section === 'map' || p.section === 'gps-map'; });
+  var PH2 = 96;
+  var PW2 = CONTENT_W / 2 - 4;
+  page.drawText('Site Sign:', { x: C1, y: y + 10, size: 7, font: boldFont, color: DKGRAY });
+  page.drawText('GPS Map:', { x: C2, y: y + 10, size: 7, font: boldFont, color: DKGRAY });
+  page.drawRectangle({ x: C1, y: y - PH2, width: PW2, height: PH2, color: LGRAY });
+  page.drawRectangle({ x: C2, y: y - PH2, width: PW2, height: PH2, color: LGRAY });
   if (sitePhoto) {
-    const b = await fetchPhotoBytes(sitePhoto.storage_path);
-    const img = await embedPhoto(b);
-    if (img) { const s = img.scaleToFit(HALF_W, HALF_H); page.drawImage(img, { x: col1+(HALF_W-s.width)/2, y: y-HALF_H+(HALF_H-s.height)/2, width: s.width, height: s.height }); }
+    var sb = await fetchPhotoBytes(sitePhoto.storage_path);
+    var simg = await embedImg(sb);
+    if (simg) {
+      var ss = simg.scaleToFit(PW2 - 4, PH2 - 4);
+      page.drawImage(simg, { x: C1 + (PW2 - ss.width) / 2, y: y - PH2 + (PH2 - ss.height) / 2, width: ss.width, height: ss.height });
+    }
   }
   if (gpsPhoto) {
-    const b = await fetchPhotoBytes(gpsPhoto.storage_path);
-    const img = await embedPhoto(b);
-    if (img) { const s = img.scaleToFit(HALF_W, HALF_H); page.drawImage(img, { x: col2+(HALF_W-s.width)/2, y: y-HALF_H+(HALF_H-s.height)/2, width: s.width, height: s.height }); }
+    var gb = await fetchPhotoBytes(gpsPhoto.storage_path);
+    var gimg = await embedImg(gb);
+    if (gimg) {
+      var gs = gimg.scaleToFit(PW2 - 4, PH2 - 4);
+      page.drawImage(gimg, { x: C2 + (PW2 - gs.width) / 2, y: y - PH2 + (PH2 - gs.height) / 2, width: gs.width, height: gs.height });
+    }
   }
-  y -= HALF_H + 14;
+  y -= PH2 + 10;
 
   // DESCRIPTION OF WORK
-  if (y < 120) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-  y = drawSection(page, 'Description of Work', y);
-  y -= 6;
-  page.drawText('Summary:', { x: MARGIN, y, size: 9, font: boldFont, color: BLACK });
-  y -= 14;
-  const desc = String(d.workDescription || d.description || d.notes || '');
-  const words = desc.split(/\s+/);
-  let line = '';
-  for (const word of words) {
-    const test = line ? line + ' ' + word : word;
-    if (regFont.widthOfTextAtSize(test, 10) > CONTENT_W - 8) {
-      if (y < FOOTER_H + 20) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-      page.drawText(line, { x: MARGIN, y, size: 10, font: regFont, color: BLACK });
-      y -= 14; line = word;
-    } else { line = test; }
+  if (y < 120) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+  y = drawSectionBar(page, 'Description of Work', y);
+  y -= 4;
+  var desc = String(sub.summary || d.workDescription || d.description || d.notes || '');
+  if (desc) {
+    var words = desc.split(/\s+/);
+    var line = '';
+    for (var wi = 0; wi < words.length; wi++) {
+      var word = words[wi];
+      var test = line ? line + ' ' + word : word;
+      if (regFont.widthOfTextAtSize(test, 10) > CONTENT_W - 4) {
+        if (y < FOOTER_H + 18) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+        page.drawText(line, { x: MARGIN, y: y, size: 10, font: regFont, color: BLACK });
+        y -= 14;
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) {
+      if (y < FOOTER_H + 18) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+      page.drawText(line, { x: MARGIN, y: y, size: 10, font: regFont, color: BLACK });
+      y -= 14;
+    }
   }
-  if (line) { page.drawText(line, { x: MARGIN, y, size: 10, font: regFont, color: BLACK }); y -= 14; }
-  y -= 10;
+  y -= 8;
 
   // COMPLETED WORK PHOTOS
-  const generalPhotos = photos.filter(p => !p.section || p.section === 'work' || p.section === 'general');
-  const equipPhotos = photos.filter(p => p.section && p.section !== 'work' && p.section !== 'general' && !p.section.startsWith('arrival') && !p.section.startsWith('departure') && p.section !== 'site-sign' && p.section !== 'gps' && p.section !== 'map' && !p.section.startsWith('part-') && p.section !== 'signature' && !p.section.startsWith('tech-sig'));
-  const allJobPhotos = [...generalPhotos, ...equipPhotos];
-
-  if (allJobPhotos.length > 0) {
-    if (y < 120) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-    y = drawSection(page, 'Completed Work', y);
-    y -= 8;
-    const PW = (CONTENT_W - 8) / 3;
-    const PH = PW * 0.75;
-    let col = 0; let rowY = y;
-    for (const photo of allJobPhotos) {
-      if (col === 0 && rowY - PH < FOOTER_H + 30) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; rowY = y; }
-      const px = MARGIN + col * (PW + 4);
-      page.drawRectangle({ x: px, y: rowY-PH, width: PW, height: PH, color: LGRAY });
-      const b = await fetchPhotoBytes(photo.storage_path);
-      const img = await embedPhoto(b);
-      if (img) { const s = img.scaleToFit(PW, PH); page.drawImage(img, { x: px+(PW-s.width)/2, y: rowY-PH+(PH-s.height)/2, width: s.width, height: s.height }); }
-      if (photo.caption) page.drawText(String(photo.caption).substring(0,38), { x: px, y: rowY-PH-10, size: 7, font: regFont, color: GRAY });
-      col++;
-      if (col >= 3) { col = 0; rowY -= PH + 18; }
+  var skipSecs = ['site-sign','arrival-photo','site_sign','gps','map','gps-map','signature','sig','arrival-video','departure-video'];
+  var jobPhotos = photos.filter(function(p) {
+    var sec = p.section || '';
+    if (skipSecs.indexOf(sec) >= 0) return false;
+    if (sec.indexOf('tech-sig') === 0) return false;
+    if (sec.indexOf('part-') === 0) return false;
+    return true;
+  });
+  if (jobPhotos.length > 0) {
+    if (y < 150) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+    y = drawSectionBar(page, 'Completed Work', y);
+    y -= 6;
+    var PW3 = Math.floor((CONTENT_W - 8) / 3);
+    var PH3 = Math.floor(PW3 * 0.72);
+    var col3 = 0;
+    var rowY = y;
+    for (var pi = 0; pi < jobPhotos.length; pi++) {
+      var photo = jobPhotos[pi];
+      if (col3 === 0 && rowY - PH3 < FOOTER_H + 30) {
+        drawFooter(page);
+        page = newPage();
+        rowY = PAGE_H - HEADER_H - 8;
+      }
+      var px = MARGIN + col3 * (PW3 + 4);
+      page.drawRectangle({ x: px, y: rowY - PH3, width: PW3, height: PH3, color: LGRAY });
+      var pb = await fetchPhotoBytes(photo.storage_path);
+      var pimg = await embedImg(pb);
+      if (pimg) {
+        var ps = pimg.scaleToFit(PW3 - 2, PH3 - 2);
+        page.drawImage(pimg, { x: px + (PW3 - ps.width) / 2, y: rowY - PH3 + (PH3 - ps.height) / 2, width: ps.width, height: ps.height });
+      }
+      if (photo.caption) {
+        page.drawText(String(photo.caption).substring(0, 36), { x: px, y: rowY - PH3 - 9, size: 7, font: regFont, color: GRAY });
+      }
+      col3++;
+      if (col3 >= 3) { col3 = 0; rowY -= PH3 + 16; }
     }
-    y = rowY - (col > 0 ? PH + 18 : 0);
-    y -= 10;
+    if (col3 > 0) { rowY -= PH3 + 16; }
+    y = rowY - 8;
   }
 
   // TECH SIGNATURES
-  const sigPhotos = photos.filter(p => p.section === 'signature' || p.section === 'sig' || (p.section && p.section.startsWith('tech-sig')));
+  var sigPhotos = photos.filter(function(p) {
+    return p.section === 'signature' || p.section === 'sig' || (p.section && p.section.indexOf('tech-sig') === 0);
+  });
   if (sigPhotos.length > 0 || techs.length > 0) {
-    if (y < 120) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-    const nSigs = Math.max(sigPhotos.length, techs.length, 1);
-    for (let i = 0; i < nSigs; i++) {
-      if (y < 90) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-      const techName = techs[i] || '';
-      page.drawText('Tech Signature' + (techName ? ' - ' + techName : ''), { x: MARGIN, y, size: 9, font: boldFont, color: BLACK });
+    var nSigs = Math.max(sigPhotos.length, techs.length, 1);
+    if (y < 100) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+    y = drawSectionBar(page, 'Technician Signatures', y);
+    y -= 6;
+    for (var si = 0; si < nSigs; si++) {
+      if (y < 90) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+      var techN = techs[si] || '';
+      page.drawText('Technician' + (techN ? ': ' + techN : ''), { x: MARGIN, y: y, size: 9, font: boldFont, color: BLACK });
       y -= 6;
-      const SW = 180; const SH = 64;
-      page.drawRectangle({ x: MARGIN, y: y-SH, width: SW, height: SH, color: LGRAY });
-      if (sigPhotos[i]) {
-        const b = await fetchPhotoBytes(sigPhotos[i].storage_path);
-        const img = await embedPhoto(b);
-        if (img) { const s = img.scaleToFit(SW, SH); page.drawImage(img, { x: MARGIN+(SW-s.width)/2, y: y-SH+(SH-s.height)/2, width: s.width, height: s.height }); }
+      var SW = 200;
+      var SH = 60;
+      page.drawRectangle({ x: MARGIN, y: y - SH, width: SW, height: SH, color: LGRAY });
+      if (sigPhotos[si]) {
+        var sigB = await fetchPhotoBytes(sigPhotos[si].storage_path);
+        var sigI = await embedImg(sigB);
+        if (sigI) {
+          var sigS = sigI.scaleToFit(SW - 4, SH - 4);
+          page.drawImage(sigI, { x: MARGIN + (SW - sigS.width) / 2, y: y - SH + (SH - sigS.height) / 2, width: sigS.width, height: sigS.height });
+        }
       }
       y -= SH + 14;
     }
@@ -301,83 +332,102 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 
   // PARTS TABLE
   if (parts.length > 0) {
-    if (y < 100) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-    y = drawSection(page, 'Parts', y);
+    if (y < 120) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+    y = drawSectionBar(page, 'Parts', y);
     y -= 4;
-    const ROW_H = 72;
-    const IMG_W = 62;
-    const CX = { sku: MARGIN, skuW: 55, desc: MARGIN+55, descW: 130, img: MARGIN+190, imgW: IMG_W, notes: MARGIN+258, notesW: 88, price: MARGIN+350, priceW: 56, qty: MARGIN+410, qtyW: 38, total: MARGIN+452, totalW: 84 };
-    // Header
-    page.drawRectangle({ x: MARGIN, y: y-16, width: CONTENT_W, height: 18, color: BLACK });
-    const hdr = [['SKU', CX.sku+2],['Description',CX.desc],['Photo',CX.img+10],['Notes',CX.notes],['Unit $',CX.price],['Qty',CX.qty+5],['Total',CX.total]];
-    for (const [h,hx] of hdr) page.drawText(h, { x:hx, y:y-12, size:8, font:boldFont, color:WHITE });
+    var tCols = [
+      { label: 'SKU', x: MARGIN + 2 },
+      { label: 'Description', x: MARGIN + 62 },
+      { label: 'Notes', x: MARGIN + 225 },
+      { label: 'Unit $', x: MARGIN + 330 },
+      { label: 'Qty', x: MARGIN + 392 },
+      { label: 'Total', x: MARGIN + 428 }
+    ];
+    function drawPartsHeader(pg, yy) {
+      pg.drawRectangle({ x: MARGIN, y: yy - 16, width: CONTENT_W, height: 18, color: BLACK });
+      for (var ci = 0; ci < tCols.length; ci++) {
+        pg.drawText(tCols[ci].label, { x: tCols[ci].x, y: yy - 12, size: 8, font: boldFont, color: WHITE });
+      }
+    }
+    drawPartsHeader(page, y);
     y -= 20;
-
-    for (const part of parts) {
-      if (y - ROW_H < FOOTER_H + 30) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-      const rb = y - ROW_H;
-      page.drawRectangle({ x: MARGIN, y: rb, width: CONTENT_W, height: ROW_H, color: WHITE });
-      page.drawRectangle({ x: MARGIN, y: rb, width: CONTENT_W, height: 1, color: LGRAY });
-      page.drawText(String(part.sku||part.code||''), { x: CX.sku+2, y: y-14, size:8, font:boldFont, color:BLACK });
-      // Wrap description
-      const dw = String(part.description||part.name||'').split(' ');
-      let dl=''; let dy=y-14;
-      for (const w of dw) {
-        const t = dl ? dl+' '+w : w;
-        if (regFont.widthOfTextAtSize(t,8) > CX.descW-4) {
-          page.drawText(dl, { x:CX.desc, y:dy, size:8, font:regFont, color:BLACK });
-          dy -= 11; dl = w; if (dy < rb+4) break;
-        } else dl = t;
+    var ROW_H = 22;
+    for (var rpi = 0; rpi < parts.length; rpi++) {
+      var part = parts[rpi];
+      if (y - ROW_H < FOOTER_H + 30) {
+        drawFooter(page);
+        page = newPage();
+        y = PAGE_H - HEADER_H - 8;
+        drawPartsHeader(page, y);
+        y -= 20;
       }
-      if (dl && dy >= rb+4) page.drawText(dl, { x:CX.desc, y:dy, size:8, font:regFont, color:BLACK });
-      page.drawText(fmt(part.price||part.unitPrice), { x:CX.price, y:y-14, size:8, font:regFont, color:BLACK });
-      const qty = parseInt(part.qty||part.quantity||1);
-      page.drawText(String(qty), { x:CX.qty+5, y:y-14, size:8, font:regFont, color:BLACK });
-      const ptotal = parseFloat(part.price||part.unitPrice||0)*qty;
-      page.drawText(fmt(ptotal), { x:CX.total, y:y-14, size:8, font:boldFont, color:BLACK });
-      // Part photo
-      const pp = photos.find(p => p.section === 'part-'+(part.sku||part.code));
-      if (pp) {
-        const b = await fetchPhotoBytes(pp.storage_path);
-        const img = await embedPhoto(b);
-        if (img) { const s = img.scaleToFit(IMG_W, ROW_H-8); page.drawImage(img, { x:CX.img+(IMG_W-s.width)/2, y:rb+4+(ROW_H-8-s.height)/2, width:s.width, height:s.height }); }
-      }
+      if (rpi % 2 === 1) page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: CONTENT_W, height: ROW_H, color: LGRAY });
+      page.drawText(String(part.sku || part.code || '').substring(0, 10), { x: tCols[0].x, y: y - 14, size: 8, font: boldFont, color: BLACK });
+      page.drawText(String(part.description || part.name || '').substring(0, 26), { x: tCols[1].x, y: y - 14, size: 8, font: regFont, color: BLACK });
+      page.drawText(String(part.notes || '').substring(0, 16), { x: tCols[2].x, y: y - 14, size: 7, font: regFont, color: DKGRAY });
+      page.drawText(fmtMoney(part.price || part.unitPrice), { x: tCols[3].x, y: y - 14, size: 8, font: regFont, color: BLACK });
+      var qty = parseInt(part.qty || part.quantity || 1);
+      page.drawText(String(qty), { x: tCols[4].x, y: y - 14, size: 8, font: regFont, color: BLACK });
+      page.drawText(fmtMoney(parseFloat(part.price || part.unitPrice || 0) * qty), { x: tCols[5].x, y: y - 14, size: 8, font: boldFont, color: BLACK });
       y -= ROW_H;
     }
-
-    // Cost summary
     y -= 8;
-    if (y < 90) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 14; }
-    const tots = [['Parts Total',fmt(partsTotal)],['Mileage/Travel',fmt(mileageTotal)],['Labor',fmt(laborTotal)],['GRAND TOTAL',fmt(grandTotal)]];
-    for (const [lbl,val] of tots) {
-      const bold = lbl === 'GRAND TOTAL';
-      page.drawRectangle({ x: PAGE_W-MARGIN-180, y:y-4, width:180, height:18, color: bold ? BLACK : LGRAY });
-      page.drawText(lbl, { x:PAGE_W-MARGIN-175, y:y, size:9, font: bold ? boldFont : regFont, color: bold ? WHITE : BLACK });
-      page.drawText(val, { x:PAGE_W-MARGIN-58, y:y, size:9, font:boldFont, color: bold ? WHITE : BLACK });
-      y -= 20;
-    }
+  }
+
+  // COST SUMMARY
+  if (y < 110) { drawFooter(page); page = newPage(); y = PAGE_H - HEADER_H - 8; }
+  y = drawSectionBar(page, 'Cost Summary', y);
+  y -= 4;
+  var summRows = [
+    ['Parts Total', fmtMoney(partsTotal)],
+    ['Mileage / Travel (' + parseFloat(sub.miles || 0).toFixed(0) + ' mi)', fmtMoney(mileageTotal)],
+    ['Labor', fmtMoney(laborTotal)],
+    ['GRAND TOTAL', fmtMoney(grandTotal)]
+  ];
+  for (var ri = 0; ri < summRows.length; ri++) {
+    var isGrand = ri === 3;
+    var sRow = summRows[ri];
+    page.drawRectangle({ x: PAGE_W - MARGIN - 210, y: y - 16, width: 210, height: 18, color: isGrand ? BLACK : LGRAY });
+    page.drawText(sRow[0], { x: PAGE_W - MARGIN - 206, y: y - 12, size: 9, font: isGrand ? boldFont : regFont, color: isGrand ? WHITE : BLACK });
+    var valW = boldFont.widthOfTextAtSize(sRow[1], 9);
+    page.drawText(sRow[1], { x: PAGE_W - MARGIN - valW - 4, y: y - 12, size: 9, font: boldFont, color: isGrand ? WHITE : BLACK });
+    y -= 20;
   }
 
   drawFooter(page);
 
-  // Build PDF + send email
-  const pdfBytes = await pdfDoc.save();
-  const pdfB64 = Buffer.from(pdfBytes).toString('base64');
-  const customer = d.customer || sub.customer || 'Customer';
-  const location = d.location || sub.location || '';
-  const tech = techs[0] || sub.technician || '';
-  const subject = 'Work Order #' + woNum + ' - ' + customer + (location ? ' - ' + location : '') + ' - ' + jobTypeLabel + ' - ROS Service Work Order';
-  const htmlBody = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto"><h2 style="color:#1a2332">Work Order #' + woNum + '</h2><p><strong>Customer:</strong> ' + customer + '</p><p><strong>Location:</strong> ' + location + '</p><p><strong>Technician:</strong> ' + tech + '</p><p><strong>Type:</strong> ' + jobTypeLabel + '</p><p><strong>Date:</strong> ' + (sub.date||'') + '</p><p>Please find the attached Work Order PDF.</p><hr/><p style="color:#888;font-size:12px">Reliable Oilfield Services | Reliable-oilfield-services.com</p></div>';
-  const emailResp = await fetch('https://api.resend.com/emails', {
+  var pdfBytes = await pdfDoc.save();
+  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  var custDisp = sub.customer_name || d.customer || 'Customer';
+  var locDisp = sub.location_name || d.location || '';
+  var subject = 'Work Order #' + woNum + ' - ' + custDisp + (locDisp ? ' - ' + locDisp : '') + ' - ' + jobTypeLabel + ' - ROS Service Work Order';
+  var htmlBody = '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto">'
+    + '<div style="background:#1a2332;padding:18px 24px;border-radius:6px 6px 0 0">'
+    + '<img src="https://pm.reliable-oilfield-services.com/ros-logo.png" style="height:44px;width:44px;object-fit:contain;margin-right:12px;vertical-align:middle">'
+    + '<span style="color:#fff;font-size:17px;font-weight:bold;vertical-align:middle">ROS Service Work Order</span>'
+    + '</div>'
+    + '<div style="background:#fff;border:1px solid #ddd;border-top:none;padding:20px">'
+    + '<h2 style="color:#1a2332;margin:0 0 4px">Work Order #' + woNum + '</h2>'
+    + '<p style="color:#666;margin:0 0 16px;font-size:13px">' + jobTypeLabel + ' | ' + fmtDate(sub.date) + '</p>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">'
+    + '<tr><td style="padding:6px;background:#f5f5f5;font-weight:bold;width:120px">Customer</td><td style="padding:6px">' + custDisp + '</td>'
+    + '<td style="padding:6px;background:#f5f5f5;font-weight:bold;width:120px">Location</td><td style="padding:6px">' + locDisp + '</td></tr>'
+    + '<tr><td style="padding:6px;background:#f5f5f5;font-weight:bold">Truck</td><td style="padding:6px">' + (sub.truck_number || '') + '</td>'
+    + '<td style="padding:6px;background:#f5f5f5;font-weight:bold">Tech</td><td style="padding:6px">' + (techs[0] || '') + '</td></tr>'
+    + '</table>'
+    + '<p style="font-size:13px">Please find the ROS Service Work Order PDF attached.</p>'
+    + '<hr style="border:none;border-top:1px solid #eee;margin:16px 0">'
+    + '<p style="color:#999;font-size:11px">Reliable Oilfield Services | reliable-oilfield-services.com</p>'
+    + '</div></div>';
+  var emailResp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM, to: TO, subject, html: htmlBody, attachments: [{ filename: 'Work-Order-' + woNum + '-report.pdf', content: pdfB64 }] }),
+    body: JSON.stringify({ from: FROM, to: TO, subject: subject, html: htmlBody, attachments: [{ filename: 'Work-Order-' + woNum + '-report.pdf', content: pdfB64 }] })
   });
-  const emailData = await emailResp.json();
+  var emailData = await emailResp.json();
   if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
-
 async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const items = Array.isArray(d.expenseItems) ? d.expenseItems : [];
   const total = parseFloat(d.expenseTotal || 0);
