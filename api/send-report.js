@@ -127,37 +127,37 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   }
 
   const page = addPage(pdfDoc);
-  let y = 725;
+  let y = 710;
 
   function drawField(label, value, x, fieldY, w) {
-    page.drawText(label, { x, y: fieldY + 13, size: 7, font: regFont, color: GRAY });
-    page.drawRectangle({ x, y: fieldY, width: w, height: 14, color: LGRAY });
-    page.drawText(String(value || ''), { x: x + 3, y: fieldY + 3, size: 9, font: regFont, color: NAVY });
+    page.drawText(label, { x, y: fieldY + 15, size: 7, font: regFont, color: GRAY });
+    page.drawRectangle({ x, y: fieldY, width: w, height: 16, color: LGRAY });
+    page.drawText(String(value || ''), { x: x + 5, y: fieldY + 4, size: 9, font: regFont, color: NAVY });
   }
 
   // Title
-  page.drawText(label, { x: 50, y, size: 18, font: boldFont, color: NAVY });
-  page.drawText(jobTypeLabel, { x: 50, y: y - 18, size: 10, font: regFont, color: rgb(0.4, 0.4, 0.4) });
+  page.drawText(label, { x: 54, y, size: 18, font: boldFont, color: NAVY });
+  page.drawText(jobTypeLabel, { x: 54, y: y - 20, size: 10, font: regFont, color: rgb(0.4, 0.4, 0.4) });
   y -= 12;
   y -= 12;
-  page.drawRectangle({ x: 50, y, width: 512, height: 2, color: ORANGE });
-  y -= 20;
+  page.drawRectangle({ x: 54, y, width: 504, height: 2, color: ORANGE });
+  y -= 28;
 
   // Job info row 1
-  drawField('Customer', sub.customer_name, 50, y, 180);
-  drawField('Location', sub.location_name, 240, y, 180);
-  drawField('Date', fmtDate(sub.date), 430, y, 130);
-  y -= 32;
-  drawField('Contact', sub.contact, 50, y, 130);
-  drawField('Work Order', sub.work_order, 190, y, 130);
+  drawField('Customer', sub.customer_name, 54, y, 182);
+  drawField('Location', sub.location_name, 244, y, 182);
+  drawField('Date', fmtDate(sub.date), 434, y, 122);
+  y -= 38;
+  drawField('Contact', sub.contact, 54, y, 130);
+  drawField('Work Order', sub.work_order, 192, y, 130);
   drawField('Type of Work', sub.work_type, 330, y, 120);
-  drawField('Truck', sub.truck_number, 460, y, 100);
-  y -= 32;
-  drawField('GL Code', sub.gl_code, 50, y, 120);
-  drawField('Asset Tag', sub.asset_tag, 180, y, 120);
-  drawField('Work Area', sub.work_area, 310, y, 120);
-  drawField('Techs', techs.join(', '), 440, y, 120);
-  y -= 32;
+  drawField('Truck', sub.truck_number, 458, y, 100);
+  y -= 38;
+  drawField('GL Code', sub.gl_code, 54, y, 120);
+  drawField('Asset Tag', sub.asset_tag, 182, y, 120);
+  drawField('Work Area', sub.work_area, 312, y, 120);
+  drawField('Techs', techs.join(', '), 440, y, 118);
+  y -= 38;
 
   // Warranty badge
   if (d.warrantyWork) {
@@ -167,7 +167,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   }
 
   // Description
-  page.drawText('WORK DESCRIPTION', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+  page.drawText('WORK DESCRIPTION', { x: 54, y, size: 9, font: boldFont, color: NAVY });
   y -= 14;
   page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
   y -= 14;
@@ -190,31 +190,31 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 
   // Parts table
   if (parts.length > 0) {
-    page.drawText('PARTS & MATERIALS', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+    page.drawText('PARTS & MATERIALS', { x: 54, y, size: 9, font: boldFont, color: NAVY });
     y -= 14;
     page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
     y -= 4;
     // Table header
-    page.drawRectangle({ x: 50, y: y - 14, width: 512, height: 16, color: NAVY });
-    page.drawText('SKU', { x: 54, y: y - 11, size: 8, font: boldFont, color: WHITE });
-    page.drawText('Description', { x: 130, y: y - 11, size: 8, font: boldFont, color: WHITE });
-    page.drawText('Qty', { x: 430, y: y - 11, size: 8, font: boldFont, color: WHITE });
-    page.drawText('Unit Price', { x: 460, y: y - 11, size: 8, font: boldFont, color: WHITE });
-    page.drawText('Total', { x: 530, y: y - 11, size: 8, font: boldFont, color: WHITE });
+    page.drawRectangle({ x: 54, y: y - 14, width: 504, height: 18, color: NAVY });
+    page.drawText('SKU', { x: 58, y: y - 12, size: 8, font: boldFont, color: WHITE });
+    page.drawText('Description', { x: 130, y: y - 12, size: 8, font: boldFont, color: WHITE });
+    page.drawText('Qty', { x: 432, y: y - 12, size: 8, font: boldFont, color: WHITE });
+    page.drawText('Unit Price', { x: 462, y: y - 12, size: 8, font: boldFont, color: WHITE });
+    page.drawText('Total', { x: 532, y: y - 12, size: 8, font: boldFont, color: WHITE });
     y -= 18;
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
       if (y < 80) break;
-      if (i % 2 === 1) page.drawRectangle({ x: 50, y: y - 12, width: 512, height: 14, color: LGRAY });
-      page.drawText(String(p.sku || ''), { x: 54, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
+      if (i % 2 === 1) page.drawRectangle({ x: 54, y: y - 12, width: 504, height: 16, color: LGRAY });
+      page.drawText(String(p.sku || ''), { x: 58, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       const descStr = String(p.description || p.name || '').substring(0, 50);
       page.drawText(descStr, { x: 130, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(String(p.qty || 1), { x: 430, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(fmt(p.price), { x: 460, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
       page.drawText(fmt((p.price || 0) * (p.qty || 1)), { x: 530, y: y - 9, size: 8, font: regFont, color: rgb(0.2,0.2,0.2) });
-      y -= 14;
+      y -= 18;
     }
-    y -= 6;
+    y -= 12;
   }
 
   // PM Equipment sections
@@ -278,7 +278,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 
   // Cost summary
   if (y < 140) { const pg2 = addPage(pdfDoc); y = 720; }
-  page.drawText('COST SUMMARY', { x: 50, y, size: 9, font: boldFont, color: NAVY });
+  page.drawText('COST SUMMARY', { x: 54, y, size: 9, font: boldFont, color: NAVY });
   y -= 14;
   page.drawRectangle({ x: 50, y: y - 2, width: 512, height: 2, color: ORANGE });
   y -= 18;
