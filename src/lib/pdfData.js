@@ -77,7 +77,7 @@ export function buildPDFData(sub, getUrl) {
     }));
 
   // WO number (pm_number is the job number in this schema)
-  const woNumber = String(sub.pm_number || sub.wo_number || sub.id || '').padStart(5, '0');
+  const woNumber = String(sub.pm_number || sub.work_order || sub.id || '').padStart(5, '0');
 
   return {
     wo_number: woNumber,
