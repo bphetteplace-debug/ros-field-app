@@ -99,9 +99,40 @@ async function generateWorkOrderPDF(sub, allPhotos) {
   var boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   var y = height - 65;
   // HEADER
-  page.drawText('ROS Service Work Order', { x: 50, y: y, size: 24, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+  // Fetch branding logo from Supabase settings
+  var logoImage = null;
+  try {
+    var brandingResp = await fetch(
+      SUPA_URL + '/rest/v1/app_settings?key=eq.branding&select=value',
+      { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } }
+    );
+    if (brandingResp.ok) {
+      var brandingRows = await brandingResp.json();
+      if (brandingRows && brandingRows.length > 0) {
+        var brandingVal = brandingRows[0].value;
+        var logoUrl = typeof brandingVal === 'object' ? brandingVal.logo_url : (typeof brandingVal === 'string' ? JSON.parse(brandingVal).logo_url : null);
+        if (logoUrl && logoUrl.length > 100) {
+          var b64Data = logoUrl.replace(/^data:[^;]+;base64,/, '');
+          var logoBytes = Buffer.from(b64Data, 'base64');
+          if (logoUrl.indexOf('image/png') !== -1 || logoUrl.indexOf('data:image/png') !== -1) {
+            logoImage = await pdfDoc.embedPng(logoBytes);
+          } else {
+            logoImage = await pdfDoc.embedJpg(logoBytes);
+          }
+        }
+      }
+    }
+  } catch (e) { logoImage = null; }
   var woNum = sub.work_order || sub.woNumber || 'N/A';
-  page.drawText('No. ' + woNum, { x: width - 170, y: y + 8, size: 11, font: font, color: rgb(0.4, 0.4, 0.4) });
+  if (logoImage) {
+    var logoDims = logoImage.scaleToFit(120, 50);
+    page.drawImage(logoImage, { x: width - logoDims.width - 48, y: y - logoDims.height + 16, width: logoDims.width, height: logoDims.height });
+    page.drawText('ROS Service Work Order', { x: 50, y: y, size: 20, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    page.drawText('No. ' + woNum, { x: 50, y: y - 20, size: 11, font: font, color: rgb(0.4, 0.4, 0.4) });
+  } else {
+    page.drawText('ROS Service Work Order', { x: 50, y: y, size: 24, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    page.drawText('No. ' + woNum, { x: width - 170, y: y + 8, size: 11, font: font, color: rgb(0.4, 0.4, 0.4) });
+  }
   y -= 55;
   // CUSTOMER INFO BOX
   page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 135, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
