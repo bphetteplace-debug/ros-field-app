@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { fetchSubmission, getPhotoUrl, deleteSubmission } from '../lib/submissions'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { generateSubmissionPdf } from '../lib/submissionPdf'
 
 const COND_COLOR = { Good: '#16a34a', Fair: '#d97706', Poor: '#dc2626', Replaced: '#7c3aed' }
 
@@ -72,29 +71,7 @@ export default function ViewSubmissionPage() {
   const [lightboxPhotos, setLightboxPhotos] = useState([])
   const [lightboxIdx, setLightboxIdx]     = useState(-1)
   const [deleting, setDeleting] = useState(false)
-  const [downloading, setDownloading] = useState(false)
   const [deleteMsg, setDeleteMsg] = useState('')
-  const pdfBtn = { background: '#e65c00', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginRight: 6 }
-  const handleDownloadPdf = async () => {
-    setDownloading(true)
-    try {
-      const bytes = await generateSubmissionPdf(sub)
-      const blob = new Blob([bytes], { type: 'application/pdf' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const pad = String(sub.pm_number || '0').padStart(5, '0')
-      a.download = (sub.template === 'service_call' ? 'SC' : 'PM') + '-' + pad + '.pdf'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      alert('PDF generation failed: ' + e.message)
-    } finally {
-      setDownloading(false)
-    }
-  }
   const { isAdmin, isDemo, user, signOut } = useAuth()
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -190,7 +167,6 @@ export default function ViewSubmissionPage() {
               <div style={{ fontSize: 16, fontWeight: 600, color: '#cbd5e1', marginBottom: 2 }}>{sub.customer_name}{sub.location_name ? ' — ' + sub.location_name : ''}</div>
               <div style={{ fontSize: 13, color: '#94a3b8' }}>{fmtDate(sub.date)}</div>
             </div>
-            <button onClick={handleDownloadPdf} disabled={downloading} style={pdfBtn}>{downloading ? '...' : 'PDF'}</button>
             <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 7, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               ← Back
             </button>
