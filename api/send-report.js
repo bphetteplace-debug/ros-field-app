@@ -276,13 +276,10 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     var px = M; var photoCount = 0;
     for (var phi=0; phi<allPhotos.length && y-photoH > 80 && photoCount<6; phi++) {
       var photo = allPhotos[phi];
+      if (!photo.storage_path) continue;
       try {
-        var pUrl = photo.signedUrl || photo.url || photo.storage_path;
-        if (!pUrl) continue;
-        var pResp = await fetch(pUrl);
-        if (!pResp.ok) continue;
-        var pBuf = await pResp.arrayBuffer();
-        var pBytes = new Uint8Array(pBuf);
+        var pBytes = await fetchPhotoBytes(photo.storage_path);
+        if (!pBytes) continue;
         var pImg;
         try { pImg = await pdfDoc.embedJpg(pBytes); } catch(e2) {
           try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) { continue; }
@@ -292,7 +289,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
         if (photoCount % 3 === 0) { px=M; y-=photoH+6; }
       } catch(e) { /* skip failed photo */ }
     }
-    if (photoCount % 3 !== 0) y -= photoH+6;
+    if (photoCount > 0 && photoCount % 3 !== 0) y -= photoH+6;
     y -= 6;
   }
 
