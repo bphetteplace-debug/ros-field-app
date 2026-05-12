@@ -9,7 +9,7 @@ const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfiel
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { submissionId } = req.body || {};
+  const { submissionId, pdfBase64 } = req.body || {};
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
   if (!RESEND_KEY) return res.status(500).json({ error: 'Missing RESEND_API_KEY' });
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
@@ -288,7 +288,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   // ── Build PDF ────────────────────────────────────────────────────────
   const pdfBytes = await generateWorkOrderPDF(sub, photos);
 
-  const pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  if (pdfBase64) pdfB64 = pdfBase64;
 
   // Build email HTML
   const partsRows = parts.map(function(p) {
