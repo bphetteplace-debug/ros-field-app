@@ -1,5 +1,5 @@
 // src/components/WorkOrderPDFTemplate.jsx
-// ReliableTrack Work Order PDF — completely rebuilt layout
+// ReliableTrack Work Order PDF â completely rebuilt layout
 // Clean, professional field-service report format
 
 export function WorkOrderPDFTemplate({ data }) {
@@ -91,7 +91,7 @@ export function WorkOrderPDFTemplate({ data }) {
     background: LIGHT,
   };
 
-  const tbl  = { width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' };
+  const tbl  = { width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt', tableLayout: 'fixed' };
   const th   = { background: DARK, color: WHITE, padding: '5px 10px', textAlign: 'left', fontSize: '7.5pt', fontWeight: 'bold', textTransform: 'uppercase', border: `1px solid ${DARK}` };
   const thR  = { ...th, textAlign: 'right' };
   const td   = { padding: '6px 10px', border: `1px solid ${BORDER}`, verticalAlign: 'top' };
@@ -140,15 +140,15 @@ export function WorkOrderPDFTemplate({ data }) {
   const F = (label, val, last) => (
     <div style={last ? infoCellLast : infoCell}>
       <div style={infoLabel}>{label}</div>
-      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>—</span>}</div>
+      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>â</span>}</div>
     </div>
   );
 
   const custSig  = photos.find(p => /cust|sig/i.test(p.caption || ''));
   const workPics = photos.filter(p => !custSig || p.url !== custSig.url);
 
-  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs × $${d.labor_rate}/hr × ${techCount} tech${plural}` : '—';
-  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi × $${d.mileage_rate}/mi` : '—';
+  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs Ã $${d.labor_rate}/hr Ã ${techCount} tech${plural}` : 'â';
+  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi Ã $${d.mileage_rate}/mi` : 'â';
 
   const jobTypeFull = d.job_type === 'PM' ? 'Preventive Maintenance'
     : d.job_type === 'SC' ? 'Service Call'
@@ -215,6 +215,7 @@ export function WorkOrderPDFTemplate({ data }) {
         <div style={sectionBar}>Parts Used ({parts.length})</div>
         {parts.length > 0 ? (
           <table style={tbl}>
+              <colgroup><col style={{width:'42%'}}/><col style={{width:'20%'}}/><col style={{width:'8%'}}/><col style={{width:'15%'}}/><col style={{width:'15%'}}/></colgroup>
             <thead>
               <tr>
                 <th style={th}>SKU / Part #</th>
@@ -229,8 +230,8 @@ export function WorkOrderPDFTemplate({ data }) {
                 const alt = i % 2 === 1;
                 return (
                   <tr key={i}>
-                    <td style={alt ? tdA : td}>{p.sku || '—'}</td>
-                    <td style={alt ? tdA : td}>{p.description}</td>
+                    <td style={alt ? tdA : td}>{p.sku || 'â'}</td>
+                    <td style={alt ? { ...tdA, maxWidth:'180px', wordBreak:'break-word' } : { ...td, maxWidth:'180px', wordBreak:'break-word' }}>{p.description}</td>
                     <td style={alt ? tdAR : tdR}>{p.qty}</td>
                     <td style={alt ? tdAR : tdR}>{p.unit_price}</td>
                     <td style={alt ? { ...tdAR, fontWeight: 'bold' } : { ...tdR, fontWeight: 'bold' }}>{p.line_total}</td>
@@ -248,11 +249,11 @@ export function WorkOrderPDFTemplate({ data }) {
         {/* LABOR & MILEAGE */}
         <div style={sectionBar}>Labor &amp; Mileage</div>
         <div style={infoGrid}>
-          {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : '—')}
-          {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : '—')}
+          {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : 'â')}
+          {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : 'â')}
           {F('Labor Total', d.cost_labor, true)}
-          {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : '—')}
-          {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : '—')}
+          {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : 'â')}
+          {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : 'â')}
           {F('Mileage Total', d.cost_mileage, true)}
         </div>
 
@@ -307,7 +308,7 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={{ fontSize: '8pt', color: MID, marginTop: 4, lineHeight: 1.5 }}>
               I certify the work described above was performed professionally and all information is accurate.
             </div>
-            <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || '—'}</strong></div>
+            <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || 'â'}</strong></div>
             <div style={{ ...sigLabel, marginTop: 4 }}>Date: <strong>{d.date_long}</strong></div>
           </div>
         </div>
@@ -316,7 +317,7 @@ export function WorkOrderPDFTemplate({ data }) {
 
       {/* FOOTER */}
       <div style={footer}>
-        <span>Reliable Oilfield Services · reports@reliable-oilfield-services.com</span>
+        <span>Reliable Oilfield Services Â· reports@reliable-oilfield-services.com</span>
         <span>Generated {d.generated_at}</span>
         <span>WO #{d.customer_wo_number}</span>
       </div>
