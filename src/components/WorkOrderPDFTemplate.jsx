@@ -1,425 +1,326 @@
 // src/components/WorkOrderPDFTemplate.jsx
-// Self-contained React component for Work Order PDF rendering
-// Used by DownloadPDFButton (client) and api/send-report.js (server via renderToStaticMarkup)
+// ReliableTrack Work Order PDF — completely rebuilt layout
+// Clean, professional field-service report format
 
 export function WorkOrderPDFTemplate({ data }) {
   const d = data;
-  const techPlural = (d.tech_count || 1) !== 1 ? 's' : '';
+  const parts  = d.parts  || [];
+  const photos = d.photos || [];
+  const techs  = d.technicians || [];
+  const equip  = d.equipment  || [];
+  const techCount = d.tech_count || techs.length || 1;
+  const plural = techCount !== 1 ? 's' : '';
 
-  const styles = {
-    page: {
-      fontFamily: "'Arial', 'Helvetica Neue', Helvetica, sans-serif",
-      fontSize: '10pt',
-      color: '#1a1a1a',
-      background: '#fff',
-      margin: 0,
-      padding: 0,
-      width: '8.5in',
-    },
-    header: {
-      background: '#1a2744',
-      color: '#fff',
-      padding: '18px 28px 14px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-    },
-    headerLeft: {
-      display: 'flex',
-      flexDirection: 'column',
-    },
-    headerCompany: {
-      fontSize: '13pt',
-      fontWeight: 'bold',
-      letterSpacing: '0.04em',
-      marginBottom: '4px',
-    },
-    headerSub: {
-      fontSize: '9pt',
-      opacity: 0.85,
-    },
-    headerRight: {
-      textAlign: 'right',
-    },
-    headerWO: {
-      fontSize: '18pt',
-      fontWeight: 'bold',
-      lineHeight: 1.1,
-    },
-    headerCustomer: {
-      fontSize: '11pt',
-      marginTop: '3px',
-    },
-    headerLocation: {
-      fontSize: '10pt',
-      opacity: 0.85,
-      marginTop: '2px',
-    },
-    headerDate: {
-      fontSize: '9pt',
-      opacity: 0.75,
-      marginTop: '2px',
-    },
-    body: {
-      padding: '18px 28px',
-    },
-    card: {
-      border: '1px solid #dde3ed',
-      borderRadius: '6px',
-      marginBottom: '14px',
-      pageBreakInside: 'avoid',
-      overflow: 'hidden',
-    },
-    cardHeader: {
-      background: '#f0f3f9',
-      borderBottom: '1px solid #dde3ed',
-      padding: '7px 14px',
-      fontWeight: 'bold',
-      fontSize: '9.5pt',
-      textTransform: 'uppercase',
-      letterSpacing: '0.06em',
-      color: '#2c3e6b',
-    },
-    cardBody: {
-      padding: '12px 14px',
-    },
-    grid2: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: '6px 20px',
-    },
-    grid3: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr 1fr',
-      gap: '6px 20px',
-    },
-    field: {
-      marginBottom: '4px',
-    },
-    fieldLabel: {
-      fontSize: '8pt',
-      color: '#6b7a99',
-      fontWeight: 'bold',
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
-      marginBottom: '1px',
-    },
-    fieldValue: {
-      fontSize: '10pt',
-      color: '#1a1a1a',
-      wordBreak: 'break-word',
-    },
-    techBadge: {
-      display: 'inline-block',
-      background: '#e8f0fe',
-      color: '#1a2744',
-      borderRadius: '12px',
-      padding: '2px 10px',
-      fontSize: '9pt',
-      marginRight: '6px',
-      marginBottom: '4px',
-      fontWeight: '600',
-    },
-    equipBadge: {
-      display: 'inline-block',
-      background: '#fff3e0',
-      color: '#7a3a00',
-      borderRadius: '4px',
-      padding: '2px 9px',
-      fontSize: '9pt',
-      marginRight: '6px',
-      marginBottom: '4px',
-      border: '1px solid #ffe0b2',
-    },
-    descBox: {
-      background: '#fafbfd',
-      border: '1px solid #e4e9f2',
-      borderRadius: '4px',
-      padding: '10px 12px',
-      fontSize: '10pt',
-      whiteSpace: 'pre-wrap',
-      lineHeight: 1.55,
-      minHeight: '48px',
-    },
-    table: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      fontSize: '9.5pt',
-    },
-    th: {
-      background: '#f0f3f9',
-      borderBottom: '2px solid #c6d0e6',
-      padding: '6px 10px',
-      textAlign: 'left',
-      fontWeight: 'bold',
-      color: '#2c3e6b',
-      fontSize: '8.5pt',
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
-    },
-    thRight: {
-      background: '#f0f3f9',
-      borderBottom: '2px solid #c6d0e6',
-      padding: '6px 10px',
-      textAlign: 'right',
-      fontWeight: 'bold',
-      color: '#2c3e6b',
-      fontSize: '8.5pt',
-      textTransform: 'uppercase',
-      letterSpacing: '0.04em',
-    },
-    td: {
-      padding: '6px 10px',
-      borderBottom: '1px solid #edf0f7',
-      verticalAlign: 'top',
-    },
-    tdRight: {
-      padding: '6px 10px',
-      borderBottom: '1px solid #edf0f7',
-      verticalAlign: 'top',
-      textAlign: 'right',
-    },
-    tdBold: {
-      padding: '6px 10px',
-      borderBottom: '1px solid #edf0f7',
-      verticalAlign: 'top',
-      fontWeight: '600',
-    },
-    costRow: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      padding: '5px 0',
-      borderBottom: '1px solid #edf0f7',
-      fontSize: '10pt',
-    },
-    costRowTotal: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      padding: '7px 0',
-      borderTop: '2px solid #1a2744',
-      fontWeight: 'bold',
-      fontSize: '11pt',
-      marginTop: '4px',
-    },
-    costLabel: {
-      color: '#555',
-    },
-    costValue: {
-      fontWeight: '600',
-      color: '#1a1a1a',
-    },
-    photoGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3, 1fr)',
-      gap: '10px',
-    },
-    photoCell: {
-      border: '1px solid #dde3ed',
-      borderRadius: '4px',
-      overflow: 'hidden',
-    },
-    photoImg: {
-      width: '100%',
-      aspectRatio: '4/3',
-      objectFit: 'cover',
-      display: 'block',
-    },
-    photoCaption: {
-      padding: '4px 6px',
-      fontSize: '8pt',
-      color: '#6b7a99',
-      background: '#fafbfd',
-      borderTop: '1px solid #edf0f7',
-      textAlign: 'center',
-    },
-    footer: {
-      borderTop: '2px solid #1a2744',
-      padding: '8px 28px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      fontSize: '8pt',
-      color: '#888',
-      background: '#fafbfd',
-    },
-    noPhotos: {
-      color: '#aaa',
-      fontStyle: 'italic',
-      fontSize: '9pt',
-      padding: '8px 0',
-    },
+  const ORANGE = '#E35B04';
+  const DARK   = '#1A1A1A';
+  const MID    = '#444444';
+  const LIGHT  = '#F5F5F5';
+  const BORDER = '#DDDDDD';
+  const WHITE  = '#FFFFFF';
+
+  const page = {
+    fontFamily: "'Arial','Helvetica Neue',Helvetica,sans-serif",
+    fontSize: '9pt',
+    color: DARK,
+    background: WHITE,
+    width: '8.5in',
+    margin: 0,
+    padding: 0,
   };
 
-  const F = (label, value) => (
-    <div style={styles.field}>
-      <div style={styles.fieldLabel}>{label}</div>
-      <div style={styles.fieldValue}>{value || '\u2014'}</div>
+  const header = {
+    background: DARK,
+    color: WHITE,
+    padding: '14px 24px 10px 24px',
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderBottom: `4px solid ${ORANGE}`,
+  };
+  const coName  = { fontSize: '15pt', fontWeight: 'bold', letterSpacing: '0.5px', color: WHITE };
+  const coSub   = { fontSize: '8pt', color: '#AAAAAA', marginTop: 2 };
+  const woBlock = { textAlign: 'right' };
+  const woLabel = { fontSize: '7pt', color: '#AAAAAA', textTransform: 'uppercase', letterSpacing: '1px' };
+  const woNum   = { fontSize: '20pt', fontWeight: 'bold', color: ORANGE, lineHeight: 1 };
+  const dateStr = { fontSize: '8pt', color: '#AAAAAA', marginTop: 3 };
+  const jobTag  = {
+    display: 'inline-block',
+    background: ORANGE,
+    color: WHITE,
+    fontSize: '7pt',
+    fontWeight: 'bold',
+    padding: '2px 8px',
+    borderRadius: 3,
+    marginTop: 4,
+    textTransform: 'uppercase',
+  };
+
+  const sectionBar = {
+    background: ORANGE,
+    color: WHITE,
+    fontWeight: 'bold',
+    fontSize: '8pt',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    padding: '5px 14px',
+    marginTop: 10,
+  };
+
+  const infoGrid = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    background: WHITE,
+    border: `1px solid ${BORDER}`,
+    borderTop: 'none',
+  };
+  const infoCell     = { padding: '7px 14px', borderRight: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` };
+  const infoCellLast = { padding: '7px 14px', borderBottom: `1px solid ${BORDER}` };
+  const infoLabel    = { fontSize: '7pt', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 };
+  const infoVal      = { fontSize: '9pt', fontWeight: 'bold', color: DARK };
+
+  const body = { padding: '0 24px 24px 24px' };
+
+  const descBox = {
+    border: `1px solid ${BORDER}`,
+    borderTop: 'none',
+    padding: '10px 14px',
+    minHeight: '54px',
+    lineHeight: '1.5',
+    color: MID,
+    fontSize: '9pt',
+    background: LIGHT,
+  };
+
+  const tbl  = { width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' };
+  const th   = { background: DARK, color: WHITE, padding: '5px 10px', textAlign: 'left', fontSize: '7.5pt', fontWeight: 'bold', textTransform: 'uppercase', border: `1px solid ${DARK}` };
+  const thR  = { ...th, textAlign: 'right' };
+  const td   = { padding: '6px 10px', border: `1px solid ${BORDER}`, verticalAlign: 'top' };
+  const tdR  = { ...td, textAlign: 'right' };
+  const tdA  = { ...td, background: LIGHT };
+  const tdAR = { ...tdA, textAlign: 'right' };
+
+  const costBlock = { border: `1px solid ${BORDER}`, borderTop: 'none', overflow: 'hidden' };
+  const costRow   = { display: 'flex', justifyContent: 'space-between', padding: '7px 14px', borderBottom: `1px solid ${BORDER}`, fontSize: '9pt' };
+  const costTotal = { ...costRow, background: DARK, color: WHITE, fontWeight: 'bold', fontSize: '11pt', borderBottom: 'none' };
+
+  const badgesWrap = {
+    display: 'flex', flexWrap: 'wrap', gap: '6px',
+    padding: '8px 14px', border: `1px solid ${BORDER}`, borderTop: 'none',
+    background: LIGHT, minHeight: '36px', alignItems: 'center',
+  };
+  const techBadge = { background: DARK, color: WHITE, padding: '3px 10px', borderRadius: 12, fontSize: '8pt', fontWeight: 'bold' };
+  const equipTag  = {
+    display: 'inline-block', background: '#E8F0FE', color: '#1A3A8F',
+    border: '1px solid #B0C4DE', padding: '3px 10px', borderRadius: 3,
+    fontSize: '8.5pt', marginRight: 5, marginBottom: 4,
+  };
+  const emptyNote = { color: '#AAA', fontStyle: 'italic', fontSize: '8.5pt' };
+
+  const photosGrid = {
+    display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px',
+    padding: '10px 14px', border: `1px solid ${BORDER}`, borderTop: 'none', background: LIGHT,
+  };
+  const photoImg = { width: '100%', height: '140px', objectFit: 'cover', display: 'block', borderRadius: 3, border: `1px solid ${BORDER}` };
+  const photoCap = { fontSize: '7pt', color: '#888', marginTop: 3, textAlign: 'center' };
+
+  const sigGrid     = { display: 'grid', gridTemplateColumns: '1fr 1fr', border: `1px solid ${BORDER}`, borderTop: 'none' };
+  const sigCell     = { padding: '10px 14px', borderRight: `1px solid ${BORDER}` };
+  const sigCellLast = { padding: '10px 14px' };
+  const sigLabel    = { fontSize: '7pt', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 };
+  const sigLine     = { borderTop: `1px solid ${BORDER}`, marginTop: '40px', width: '160px' };
+  const sigImg      = { maxHeight: '52px', maxWidth: '180px', objectFit: 'contain' };
+
+  const footer = {
+    borderTop: `3px solid ${ORANGE}`,
+    marginTop: 16, padding: '8px 24px',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    background: DARK, color: '#888', fontSize: '7.5pt',
+  };
+
+  const F = (label, val, last) => (
+    <div style={last ? infoCellLast : infoCell}>
+      <div style={infoLabel}>{label}</div>
+      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>—</span>}</div>
     </div>
   );
 
+  const custSig  = photos.find(p => /cust|sig/i.test(p.caption || ''));
+  const workPics = photos.filter(p => !custSig || p.url !== custSig.url);
+
+  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs × $${d.labor_rate}/hr × ${techCount} tech${plural}` : '—';
+  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi × $${d.mileage_rate}/mi` : '—';
+
+  const jobTypeFull = d.job_type === 'PM' ? 'Preventive Maintenance'
+    : d.job_type === 'SC' ? 'Service Call'
+    : (d.job_type || '');
+
   return (
-    <div style={styles.page}>
+    <div style={page}>
+
       {/* HEADER */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <div style={styles.headerCompany}>RELIABLE OILFIELD SERVICES</div>
-          <div style={styles.headerSub}>Work Order Report</div>
+      <div style={header}>
+        <div>
+          <div style={coName}>RELIABLE OILFIELD SERVICES</div>
+          <div style={coSub}>ReliableTrack Field Report</div>
+          {jobTypeFull && <div style={jobTag}>{jobTypeFull}</div>}
         </div>
-        <div style={styles.headerRight}>
-          <div style={styles.headerWO}>WO #{d.wo_number}</div>
-          <div style={styles.headerCustomer}>{d.customer}</div>
-          <div style={styles.headerLocation}>{d.location}</div>
-          <div style={styles.headerDate}>{d.date_long}</div>
+        <div style={woBlock}>
+          <div style={woLabel}>Work Order</div>
+          <div style={woNum}>#{d.wo_number}</div>
+          <div style={dateStr}>{d.date_long}</div>
         </div>
       </div>
 
-      <div style={styles.body}>
+      <div style={body}>
 
-        {/* JOB DETAILS */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>Job Details</div>
-          <div style={styles.cardBody}>
-            <div style={styles.grid3}>
-              {F('Job Type', d.job_type)}
-              {F('Date', d.date_long)}
-              {F('Truck #', d.truck_number)}
-              {F('Customer', d.customer)}
-              {F('Location', d.location)}
-              {F('Type of Work', d.type_of_work)}
-              {F('Start Time', d.start_time)}
-              {F('Departure Time', d.departure_time)}
-              {F('Asset Tag', d.asset_tag)}
-              {F('Work Area', d.work_area)}
-              {F('Site Contact', d.contact)}
-              {F('Customer WO #', d.customer_wo_number)}
-            </div>
-          </div>
+        {/* JOB INFORMATION */}
+        <div style={sectionBar}>Job Information</div>
+        <div style={infoGrid}>
+          {F('Customer', d.customer)}
+          {F('Location / Site', d.location)}
+          {F('Customer WO #', d.customer_wo_number, true)}
+          {F('Type of Work', d.type_of_work)}
+          {F('Work Area', d.work_area)}
+          {F('Site Contact', d.contact, true)}
+          {F('Start Time', d.start_time)}
+          {F('Departure Time', d.departure_time)}
+          {F('Truck #', d.truck_number, true)}
         </div>
 
         {/* FIELD TECHNICIANS */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>Field Technician{techPlural} ({d.tech_count})</div>
-          <div style={styles.cardBody}>
-            {(d.technicians || []).map((t, i) => (
-              <span key={i} style={styles.techBadge}>{t}</span>
-            ))}
-          </div>
+        <div style={sectionBar}>Field Technicians ({techCount})</div>
+        <div style={badgesWrap}>
+          {techs.length > 0
+            ? techs.map((t, i) => <span key={i} style={techBadge}>{t}</span>)
+            : <span style={emptyNote}>No technicians listed</span>}
         </div>
 
         {/* DESCRIPTION OF WORK */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>Description of Work</div>
-          <div style={styles.cardBody}>
-            <div style={styles.descBox}>{d.description_of_work || '\u2014'}</div>
-          </div>
+        <div style={sectionBar}>Description of Work</div>
+        <div style={descBox}>
+          {d.description_of_work || <span style={emptyNote}>No description provided.</span>}
         </div>
 
-        {/* EQUIPMENT */}
-        {d.equipment && d.equipment.length > 0 && (
-          <div style={styles.card}>
-            <div style={styles.cardHeader}>Equipment / Systems Serviced</div>
-            <div style={styles.cardBody}>
-              {d.equipment.map((eq, i) => (
-                <span key={i} style={styles.equipBadge}>{eq}</span>
-              ))}
+        {/* EQUIPMENT SERVICED */}
+        {equip.length > 0 && (
+          <>
+            <div style={sectionBar}>Equipment Serviced</div>
+            <div style={{ ...badgesWrap, borderTop: 'none' }}>
+              {equip.map((eq, i) => <span key={i} style={equipTag}>{eq}</span>)}
             </div>
+          </>
+        )}
+
+        {/* PARTS USED */}
+        <div style={sectionBar}>Parts Used ({parts.length})</div>
+        {parts.length > 0 ? (
+          <table style={tbl}>
+            <thead>
+              <tr>
+                <th style={th}>SKU / Part #</th>
+                <th style={th}>Description</th>
+                <th style={thR}>Qty</th>
+                <th style={thR}>Unit Price</th>
+                <th style={thR}>Line Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {parts.map((p, i) => {
+                const alt = i % 2 === 1;
+                return (
+                  <tr key={i}>
+                    <td style={alt ? tdA : td}>{p.sku || '—'}</td>
+                    <td style={alt ? tdA : td}>{p.description}</td>
+                    <td style={alt ? tdAR : tdR}>{p.qty}</td>
+                    <td style={alt ? tdAR : tdR}>{p.unit_price}</td>
+                    <td style={alt ? { ...tdAR, fontWeight: 'bold' } : { ...tdR, fontWeight: 'bold' }}>{p.line_total}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div style={{ ...descBox, minHeight: '30px' }}>
+            <span style={emptyNote}>No parts used on this job.</span>
           </div>
         )}
 
-        {/* PARTS */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>Parts Used ({(d.parts || []).length})</div>
-          {(d.parts || []).length > 0 ? (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>SKU</th>
-                  <th style={styles.th}>Description</th>
-                  <th style={{...styles.thRight, width:'60px'}}>Qty</th>
-                  <th style={{...styles.thRight, width:'90px'}}>Unit Price</th>
-                  <th style={{...styles.thRight, width:'90px'}}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.parts.map((p, i) => (
-                  <tr key={i} style={{background: i % 2 === 0 ? '#fff' : '#fafbfd'}}>
-                    <td style={styles.tdBold}>{p.sku}</td>
-                    <td style={styles.td}>{p.description}</td>
-                    <td style={styles.tdRight}>{p.qty}</td>
-                    <td style={styles.tdRight}>{p.unit_price}</td>
-                    <td style={styles.tdRight}>{p.line_total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div style={styles.cardBody}>
-              <span style={styles.noPhotos}>No parts used</span>
-            </div>
-          )}
+        {/* LABOR & MILEAGE */}
+        <div style={sectionBar}>Labor &amp; Mileage</div>
+        <div style={infoGrid}>
+          {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : '—')}
+          {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : '—')}
+          {F('Labor Total', d.cost_labor, true)}
+          {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : '—')}
+          {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : '—')}
+          {F('Mileage Total', d.cost_mileage, true)}
         </div>
 
         {/* COST SUMMARY */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>Cost Summary</div>
-          <div style={styles.cardBody}>
-            <div style={{maxWidth: '340px', marginLeft: 'auto'}}>
-              <div style={styles.costRow}>
-                <span style={styles.costLabel}>Parts</span>
-                <span style={styles.costValue}>{d.cost_parts}</span>
-              </div>
-              <div style={styles.costRow}>
-                <span style={styles.costLabel}>
-                  Mileage ({d.mileage_miles} mi x {d.mileage_rate}/mi)
-                </span>
-                <span style={styles.costValue}>{d.cost_mileage}</span>
-              </div>
-              <div style={styles.costRow}>
-                <span style={styles.costLabel}>
-                  Labor ({d.labor_hours} hrs x {d.labor_rate}/hr x {d.tech_count} tech{techPlural})
-                </span>
-                <span style={styles.costValue}>{d.cost_labor}</span>
-              </div>
-              <div style={styles.costRowTotal}>
-                <span>TOTAL</span>
-                <span>{d.cost_total}</span>
-              </div>
-            </div>
+        <div style={sectionBar}>Cost Summary</div>
+        <div style={costBlock}>
+          <div style={costRow}>
+            <span style={{ color: MID }}>Parts &amp; Materials</span>
+            <span style={{ fontWeight: 'bold' }}>{d.cost_parts}</span>
+          </div>
+          <div style={costRow}>
+            <span style={{ color: MID }}>Labor ({laborLine})</span>
+            <span style={{ fontWeight: 'bold' }}>{d.cost_labor}</span>
+          </div>
+          <div style={costRow}>
+            <span style={{ color: MID }}>Mileage ({mileageLine})</span>
+            <span style={{ fontWeight: 'bold' }}>{d.cost_mileage}</span>
+          </div>
+          <div style={costTotal}>
+            <span>TOTAL DUE</span>
+            <span style={{ color: ORANGE }}>{d.cost_total}</span>
           </div>
         </div>
 
-        {/* PHOTOS */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>Site Photos ({(d.photos || []).length})</div>
-          <div style={styles.cardBody}>
-            {(d.photos || []).length > 0 ? (
-              <div style={styles.photoGrid}>
-                {d.photos.map((ph, i) => (
-                  <div key={i} style={styles.photoCell}>
-                    <img
-                      src={ph.url}
-                      alt={ph.caption || 'photo'}
-                      style={styles.photoImg}
-                      crossOrigin="anonymous"
-                    />
-                    {ph.caption && (
-                      <div style={styles.photoCaption}>{ph.caption}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <span style={styles.noPhotos}>No photos attached</span>
-            )}
+        {/* WORK PHOTOS */}
+        {workPics.length > 0 && (
+          <>
+            <div style={sectionBar}>Work Photos ({workPics.length})</div>
+            <div style={photosGrid}>
+              {workPics.map((ph, i) => (
+                <div key={i}>
+                  <img src={ph.url} alt={ph.caption || 'Photo'} style={photoImg} />
+                  {ph.caption && <div style={photoCap}>{ph.caption}</div>}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* SIGN-OFF */}
+        <div style={sectionBar}>Authorization &amp; Sign-Off</div>
+        <div style={sigGrid}>
+          <div style={sigCell}>
+            <div style={sigLabel}>Customer Signature</div>
+            {custSig
+              ? <img src={custSig.url} alt="Customer signature" style={sigImg} />
+              : <div style={sigLine} />}
+            <div style={{ ...sigLabel, marginTop: 6 }}>Customer / Authorized Representative</div>
+          </div>
+          <div style={sigCellLast}>
+            <div style={sigLabel}>Technician Certification</div>
+            <div style={{ fontSize: '8pt', color: MID, marginTop: 4, lineHeight: 1.5 }}>
+              I certify the work described above was performed professionally and all information is accurate.
+            </div>
+            <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || '—'}</strong></div>
+            <div style={{ ...sigLabel, marginTop: 4 }}>Date: <strong>{d.date_long}</strong></div>
           </div>
         </div>
 
       </div>
 
       {/* FOOTER */}
-      <div style={styles.footer}>
-        <span>Reliable Oilfield Services \u2014 WO #{d.wo_number} \u2014 {d.customer} / {d.location}</span>
+      <div style={footer}>
+        <span>Reliable Oilfield Services · reports@reliable-oilfield-services.com</span>
         <span>Generated {d.generated_at}</span>
+        <span>WO #{d.wo_number}</span>
       </div>
+
     </div>
   );
 }
