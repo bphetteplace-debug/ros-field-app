@@ -9,7 +9,7 @@ const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfiel
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { submissionId } = req.body || {};
+  const { submissionId , pdfBase64 } = req.body || {};
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
   if (!RESEND_KEY) return res.status(500).json({ error: 'Missing RESEND_API_KEY' });
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
@@ -288,7 +288,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   // ── Build PDF ────────────────────────────────────────────────────────
   const pdfBytes = await generateWorkOrderPDF(sub, photos);
 
-  const pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  const pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
   // Build email HTML
   const partsRows = parts.map(function(p) {
@@ -420,7 +420,7 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
   }
 
   const pdfBytes = await pdfDoc.save();
-  const pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  const pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
   // Photo HTML
   const photoHtml = photos.slice(0, 8).map(function(p) {
@@ -540,7 +540,7 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
   }
 
   const pdfBytes = await pdfDoc.save();
-  const pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  const pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
   // Build checklist HTML table by section
   let checklistHtml = '';
@@ -695,7 +695,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
   }
 
   var pdfBytes = await pdfDoc.save();
-  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  var pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
   // Build step rows HTML
   var stepRows = steps.map(function(s, i) {
@@ -857,7 +857,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
     page.drawText('Notes: ' + String(extraNotes).substring(0, 120), { x: 50, y, size: 8, font: regFont, color: rgb(0.4,0.4,0.4) });
   }
   var pdfBytes = await pdfDoc.save();
-  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  var pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
   // Build step rows for HTML
   var stepRows = steps.map(function(s, i) {
