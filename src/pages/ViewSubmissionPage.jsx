@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { fetchSubmission, getPhotoUrl, deleteSubmission } from '../lib/submissions'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { DownloadPDFButton } from '../components/DownloadPDFButton'
+const DownloadPDFButton = lazy(() => import('../components/DownloadPDFButton').then(m => ({ default: m.DownloadPDFButton })))
 
 const COND_COLOR = { Good: '#16a34a', Fair: '#d97706', Poor: '#dc2626', Replaced: '#7c3aed' }
 
@@ -183,7 +183,7 @@ export default function ViewSubmissionPage() {
                 ✏️ Edit
               </button>
             )}
-            <DownloadPDFButton sub={sub} style={{ marginRight: 6 }} />
+            <Suspense fallback={null}><DownloadPDFButton sub={sub} style={{ marginRight: 6 }} /></Suspense>
             {isAdmin && (
               <>
                 <button onClick={handleResend} disabled={resending} style={{ background: resending ? 'rgba(255,255,255,0.05)' : '#e65c00', color: '#fff', border: 'none', borderRadius: 7, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: resending ? 'not-allowed' : 'pointer' }}>
