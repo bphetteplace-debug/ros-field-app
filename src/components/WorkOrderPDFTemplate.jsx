@@ -178,6 +178,7 @@ export function WorkOrderPDFTemplate({ data }) {
         <div style={infoGrid}>
           {F('Customer', d.customer)}
           {F('Location / Site', d.location)}
+          {F('Customer WO #', <span style={{display:'inline-block',borderBottom:'1px solid #999',width:'120px',minHeight:'14px'}}></span>, true)}
           {F('Type of Work', d.type_of_work)}
           {F('Work Area', d.work_area)}
           {F('Site Contact', d.contact, true)}
