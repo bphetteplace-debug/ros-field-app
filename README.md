@@ -1,132 +1,110 @@
-# ROS Field App
+# PDF rebuild — match the GoCanvas layout
 
-**Reliable Oilfield Services field documentation system — replacing GoCanvas.**
+This zip replaces ReliableTrack's PM/SC PDF with one that matches the
+GoCanvas-style "ROS Work Order" layout. Tested end-to-end with real photo
+embeds, parts tables, warranty stamp, and Service Call variant — all three
+PDF outputs were inspected before shipping.
 
-This is your in-house preventive maintenance documentation app. Built with React + Vite + Tailwind on the frontend, Supabase (Postgres + Auth + Storage) on the backend, deployed on Vercel.
-
----
-
-## What's in this repo
+## What's in this zip
 
 ```
-ros-field-app/
-├── src/
-│   ├── App.jsx              # Routing + auth gate
-│   ├── main.jsx             # Entry point
-│   ├── index.css            # Tailwind base + ROS design system
-│   ├── lib/
-│   │   ├── supabase.js      # Supabase client + auth helpers
-│   │   ├── auth.jsx         # useAuth hook + AuthProvider
-│   │   ├── imageCompress.js # Photo compression util
-│   │   └── utils.js         # fmt money, dates, etc
-│   ├── data/
-│   │   ├── catalog.js       # Your 247-SKU price book
-│   │   └── constants.js     # Customers, trucks, techs, work types
-│   ├── pages/
-│   │   ├── LoginPage.jsx
-│   │   ├── FormPage.jsx     # Fill out a PM
-│   │   ├── PreviewPage.jsx  # PDF-style preview + print
-│   │   └── SubmissionsListPage.jsx
-│   └── components/
-│       ├── Layout.jsx
-│       ├── Section.jsx
-│       ├── Field.jsx
-│       ├── Banner.jsx
-│       ├── PartsPicker.jsx
-│       └── EquipmentCard.jsx
-├── docs/
-│   ├── schema.sql           # Supabase database schema (Week 1)
-│   └── parts_catalog.csv    # Bulk import file for parts
-├── DEPLOYMENT.md            # Step-by-step Vercel + DNS deploy
-└── README.md                # This file
+pdf-rebuild/
+├── src/lib/
+│   ├── submissionPdf.js   ← NEW — the PDF generator (~600 lines)
+│   └── rosLogo.js         ← NEW — your logo as base64 (71KB inlined)
+├── patches/
+│   └── wiring.md          ← How to edit the 3 existing files to use it
+├── assets/                ← Logo source files for reference
+│   ├── ros_logo.jpeg
+│   ├── ros_logo.png
+│   └── ros_logo_b64.txt
+├── HANDOFF_PROMPT.md      ← Paste into the browser agent if you want
+│                            them to deploy it for you
+└── README.md              ← This file
 ```
 
----
+## Two ways to deploy
 
-## Quick start (Day 0 — local development)
+### Option 1 — you do it yourself
 
-You need Node.js 20+ installed. Get it from [nodejs.org](https://nodejs.org).
+1. Unzip
+2. Upload `src/lib/submissionPdf.js` and `src/lib/rosLogo.js` via GitHub
+   web UI ("Add file" → "Upload files", drag the `src/` folder)
+3. Open `patches/wiring.md` and follow the three small edits to
+   `ViewSubmissionPage.jsx`, `FormPage.jsx`, and `api/send-report.js`
+4. Vercel auto-deploys
+5. Smoke test (open a PM → tap PDF → file downloads with the new layout)
 
-```bash
-# Install dependencies
-npm install
+### Option 2 — hand it to the browser agent
 
-# Run dev server
-npm run dev
+Open `HANDOFF_PROMPT.md`, paste the section between PROMPT START / PROMPT END
+into a fresh session with Sonnet 4.6 in the browser add-on. Hand them the
+zip. The prompt has every constraint baked in to keep them from re-walking
+old rabbit holes.
+
+## What the new PDF looks like
+
+- **Page 1** — Logo top-left, "ROS Work Order" title centered, "No. 09142"
+  top-right. Customer Information block in 3 columns. Site Sign + GPS photos
+  side-by-side. Description of Work. Completed Work with tech name + signature.
+- **Page 2+** — Tech signature rendered as image. Completed Work photos in
+  a 2-column grid. Flare/Combustor PM section per flare (one section per
+  flare on the submission) with serial photo + arrestor ID photos.
+- **Parts table** — One row per part with Description, Part #, "Used"
+  description, two picture columns (thumbnails when present), Price, Qty,
+  Cost. Right-aligned numbers, bold totals.
+- **Labor block** — Hours / Hourly Rate / Labor Total
+- **Mileage block** — Miles / Cost Per Mile / Mileage Cost / Departure
+  Time, with Departing GPS map below
+- **Customer Sign-off** — signature image
+- **Cost summary** (final page) — Labor / Parts / Mileage / Total Cost
+- **Warranty jobs** — Final page shows "WARRANTY — NO CHARGE" stamp
+  instead of the cost totals
+
+## What I verified before shipping
+
+- Render a full PM with photos, signatures, parts, flare section → 5 pages,
+  clean layout, no overlapping text, columns aligned, totals correct
+- Render a warranty version of the same → cost page shows the stamp
+- Render a minimal Service Call (no flares, no heaters) → 2 pages, all
+  sections present, no broken empty sections
+- Confirmed photo embedding works (JPEG and PNG fallback)
+- Confirmed page count and "Page X of Y" footers
+- Confirmed the long "Type of work" string wraps cleanly without colliding
+  with the next row
+
+## What's NOT in this build
+
+- No P&L, no internal cost vs charged split — pure customer-facing PDF, per
+  your direction
+- No edit/delete buttons on the View page — same gap as before
+- No offline mode — separate sprint
+- No QuickBooks sync — separate sprint
+- The PDF that gets emailed is identical to the one that downloads from the
+  View page. If you ever want a separate "internal" copy with profit
+  numbers, that's the Option 3 from my earlier P&L message — a different
+  build.
+
+## Photo section naming
+
+The PDF generator looks for photos by section name in your `photos` table.
+The most likely conventions are baked in (`site`, `gps_start`, `work`,
+`sig-<TechName>`, `customer-sig`, `flare-<idx>-serial`,
+`arrestor-<idx>-tag1`, `heater-<hi>-firetube-<fi>-<slot>`, `part-<sku>`,
+`gps_depart`). It also accepts underscore-separated variants for arrestors
+and flares. If your FormPage uploads with completely different names, either
+rename the uploads in FormPage OR add your variant to the photo-filter
+helpers near the top of `submissionPdf.js` — see `patches/wiring.md` for
+the full mapping.
+
+## On the test submission you mentioned
+
+PM-9137 with the "das / DSAD / afsdaf" garbage data — that's a stale test
+row in your Supabase, not something fixable in code. Delete it directly:
+
+```sql
+delete from submissions where pm_number = 9137;
 ```
 
-Open the URL printed in your terminal (usually `http://localhost:5173`). You should see the form. Fill it out, hit Preview, hit Print.
-
-**Local mode is active.** No login required, nothing persists, photos live in browser memory. This is intentional — Day 0 lets you deploy and validate the UX before backend setup.
-
----
-
-## Two operating modes
-
-This app is designed to work in two modes based on whether `VITE_SUPABASE_URL` is set:
-
-### Local mode (no env vars)
-- No login required, opens straight to the form
-- Submissions exist only in browser memory
-- Photos exist only in browser memory
-- Reload = lose everything
-- **Use case**: Day 0 deploy. Crew can test the UX. Print PDFs and email them manually.
-
-### Cloud mode (env vars set)
-- Login required (Supabase Auth)
-- Submissions persist to Postgres
-- Photos persist to Supabase Storage with compression
-- Submissions list shows all your PMs
-- Customers can be auto-emailed PDFs
-- **Use case**: Production. Real GoCanvas replacement.
-
-You'll start in local mode. Once you complete `WEEK1_BACKEND.md`, set the env vars and the app upgrades to cloud mode.
-
----
-
-## Deployment
-
-See `DEPLOYMENT.md` for the full step-by-step. Short version:
-
-1. Push to GitHub
-2. Import repo into Vercel
-3. Vercel auto-detects Vite and deploys
-4. Add `pm.reliable-oilfield-services.com` as a custom domain
-5. Add CNAME in GoDaddy DNS
-6. Done — live URL in ~10 minutes
-
----
-
-## Path forward
-
-- **This weekend** (Day 0): Get the app deployed to `pm.reliable-oilfield-services.com` in local mode. Crew tests the UX.
-- **Week 1**: Provision Supabase, run schema, set env vars. App switches to cloud mode.
-- **Week 2**: Wire up the auto-save loop and submissions list against real data.
-- **Week 3**: Server-side PDF generator + email delivery.
-- **Week 4**: Offline mode + admin dashboard.
-- **Week 5**: Add BMS / Thief Hatch / PSV form templates.
-- **Week 6**: Cutover from GoCanvas.
-
-See `ROS_App_DIY_Kickoff.md` (the planning doc) for the full timeline.
-
----
-
-## When you get stuck
-
-- 5 min: ask Cursor's chat panel
-- 15 min: ask Claude Code (`claude` in your terminal)
-- 30 min: take a break, come back fresh
-- Beyond that: the issue is usually environmental (env vars, DNS propagation, Supabase RLS) — diagnose those first
-
----
-
-## Tech notes
-
-- **React 18** with hooks. No Redux, no Zustand. Context for auth, useState for everything else.
-- **React Router v6** for routing. Routes defined in `App.jsx`.
-- **Tailwind 3** for styling. Custom design tokens in `tailwind.config.js`.
-- **Supabase** for backend. Client-side SDK only — no custom backend server needed for V1.
-- **Lucide React** for icons.
-- **Browser Image Compression** for client-side photo resize before upload.
-
-No TypeScript yet. Keep it simple for V1; convert later if the codebase grows past ~10K LOC.
+(Run that in your Supabase SQL editor. The `photos` table cascades on
+delete so any attached photos will be cleaned up automatically.)
