@@ -10,10 +10,11 @@ import {
   DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,
   queueOfflineSubmission,
   fetchPartsCatalog,
+  fetchSubmission,
 } from '../lib/submissions'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
-import { generateSubmissionPdfBase64 } from '../../submissionPdf'
-import { fetchSubmission } from '../lib/submissions'
+import { buildPDFData } from '../lib/pdfData'
+import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -476,7 +477,17 @@ export default function FormPage() {
         let pdfBase64 = null
         try {
           const full = await fetchSubmission(submission.id)
-          pdfBase64 = await generateSubmissionPdfBase64(full)
+          const pdfData = buildPDFData(full, (path) => import('../lib/submissions').then(m => m.getPhotoUrl(path)))
+          const { createRoot } = await import('react-dom/client')
+          const { createElement } = await import('react')
+          const html2pdf = await import('html2pdf.js').then(m => m.default || m)
+          const container = document.createElement('div')
+          document.body.appendChild(container)
+          const root = createRoot(container)
+          root.render(createElement(WorkOrderPDFTemplate, { data: pdfData }))
+          await new Promise(r => setTimeout(r, 300))
+          pdfBase64 = await html2pdf().set({ margin: 0, image: { type: 'jpeg', quality: 0.92 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(container).outputPdf('datauristring').then(uri => uri.split(',')[1])
+          container.remove()
         } catch (e) { console.warn('PDF gen failed:', e) }
         fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id,pdfBase64})})
           .catch(err=>console.warn('Email send failed:',err))
