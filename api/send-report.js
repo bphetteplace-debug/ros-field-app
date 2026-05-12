@@ -140,7 +140,7 @@ async function generateWorkOrderPDF(sub, allPhotos) {
   var right = 320;
   function drawField(label, value, fx, fy) {
     page.drawText(label, { x: fx, y: fy, size: 9, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
-    page.drawText(value || 'N/A', { x: fx, y: fy - 15, size: 11, font: font });
+    page.drawText(String(value != null && value !== '' ? value : 'N/A'), { x: fx, y: fy - 15, size: 11, font: font });
   }
   drawField('Customer Name:', sub.customer_name, left, y + 5);
   drawField('ROS Truck Number:', sub.truck_number, right, y + 5);
