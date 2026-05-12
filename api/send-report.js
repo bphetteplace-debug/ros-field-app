@@ -15,7 +15,7 @@ module.exports = async function handler(req, res) {
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
 
   try {
-    const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+    // pdf-lib lazy-loaded only when pdfBase64 not provided by client
 
     // Fetch submission + photos
     const subRes = await fetch(
@@ -44,7 +44,7 @@ module.exports = async function handler(req, res) {
       return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
     }
     // Default: PM or SC
-    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+    return await sendPmScReport(res, sub, d, photos, pdfBase64);
 
   } catch (err) {
     console.error('send-report error:', err);
@@ -270,7 +270,7 @@ async function generateWorkOrderPDF(sub, allPhotos) {
 
   return await pdfDoc.save();
 }
-async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+async function sendPmScReport(res, sub, d, photos, pdfBase64) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
   const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
@@ -286,10 +286,13 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const grandTotal = parseFloat(d.grandTotal || 0);
 
   // ── Build PDF ────────────────────────────────────────────────────────
-  const pdfBytes = await generateWorkOrderPDF(sub, photos);
-
-  var pdfB64 = Buffer.from(pdfBytes).toString('base64');
-  if (pdfBase64) pdfB64 = pdfBase64;
+  var pdfB64;
+  if (pdfBase64) {
+    pdfB64 = pdfBase64;
+  } else {
+    const pdfBytes = await generateWorkOrderPDF(sub, photos);
+    pdfB64 = Buffer.from(pdfBytes).toString('base64');
+  }
 
   // Build email HTML
   const partsRows = parts.map(function(p) {
