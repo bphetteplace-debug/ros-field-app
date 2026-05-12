@@ -9,13 +9,13 @@ const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfiel
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { submissionId, pdfBase64 } = req.body || {};
+  const { submissionId } = req.body || {};
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
   if (!RESEND_KEY) return res.status(500).json({ error: 'Missing RESEND_API_KEY' });
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
 
   try {
-    // pdf-lib lazy-loaded only when pdfBase64 not provided by client
+    const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 
     // Fetch submission + photos
     const subRes = await fetch(
@@ -44,7 +44,7 @@ module.exports = async function handler(req, res) {
       return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
     }
     // Default: PM or SC
-    return await sendPmScReport(res, sub, d, photos, pdfBase64);
+    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
 
   } catch (err) {
     console.error('send-report error:', err);
@@ -270,7 +270,7 @@ async function generateWorkOrderPDF(sub, allPhotos) {
 
   return await pdfDoc.save();
 }
-async function sendPmScReport(res, sub, d, photos, pdfBase64) {
+async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
   const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
@@ -286,13 +286,9 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64) {
   const grandTotal = parseFloat(d.grandTotal || 0);
 
   // ── Build PDF ────────────────────────────────────────────────────────
-  var pdfB64;
-  if (pdfBase64) {
-    pdfB64 = pdfBase64;
-  } else {
-    const pdfBytes = await generateWorkOrderPDF(sub, photos);
-    pdfB64 = Buffer.from(pdfBytes).toString('base64');
-  }
+  const pdfBytes = await generateWorkOrderPDF(sub, photos);
+
+  const pdfB64 = Buffer.from(pdfBytes).toString('base64');
 
   // Build email HTML
   const partsRows = parts.map(function(p) {
