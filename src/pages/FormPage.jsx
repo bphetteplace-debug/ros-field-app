@@ -10,9 +10,7 @@ import {
   DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,
   queueOfflineSubmission,
   fetchPartsCatalog,
-  fetchSubmission,
 } from '../lib/submissions'
-import { generateSubmissionPdfBase64 } from '../lib/submissionPdf'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
@@ -473,8 +471,7 @@ export default function FormPage() {
       const submission=await saveSubmission(formData,user.id,template)
       if(submission?.id&&Object.keys(photoDataUrls).length>0) await uploadPhotos(submission.id,photoDataUrls)
       if(submission?.id){
-        let pdfBase64=null;try{const full=await fetchSubmission(submission.id);pdfBase64=await generateSubmissionPdfBase64(full)}catch(e){console.warn('PDF gen failed:',e)}
-        fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id,pdfBase64})})
+        fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id})})
           .catch(err=>console.warn('Email send failed:',err))
       }
       try{localStorage.removeItem(draftKey)}catch(e){}
