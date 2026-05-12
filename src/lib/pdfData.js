@@ -93,6 +93,7 @@ export function buildPDFData(sub, getUrl) {
     work_area: sub.work_area || d.workArea || '',
     contact: sub.contact || d.customerContact || '',
     customer_wo_number: sub.work_order || d.customerWorkOrder || '',
+    gl_code: sub.gl_code || d.glCode || '',
     technicians: techNames,
     description_of_work: sub.summary || d.description || '',
     equipment,
