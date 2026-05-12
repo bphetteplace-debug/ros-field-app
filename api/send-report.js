@@ -134,7 +134,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   y -= 55;
 
   // ── CUSTOMER INFORMATION ──────────────────────────────────────────────
-  page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 145, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
+  page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 160, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
 
   var left = 65;
   var right = 325;
@@ -158,7 +158,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   y -= 175;
 
   // ── DESCRIPTION OF WORK ───────────────────────────────────────────────
-  page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 95, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
+  page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 110, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
   page.drawText('Description of Work', { x: 55, y: y + 5, size: 12, font: boldFont });
   var description = String(sub.description || d.description || 'No description provided.');
   page.drawText(description, { x: 55, y: y - 18, size: 10, font: font, maxWidth: width - 110, lineHeight: 13 });
