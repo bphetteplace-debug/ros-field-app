@@ -35,16 +35,16 @@ module.exports = async function handler(req, res) {
 
     // Route to appropriate handler
     if (template === 'expense_report') {
-      return await sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+      return await sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
     }
     if (template === 'daily_inspection') {
-      return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+      return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
     }
     if (template === 'jha' || (d && d.jobType === 'JHA/JSA')) {
-      return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+      return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
     }
     // Default: PM or SC
-    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts);
+    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
 
   } catch (err) {
     console.error('send-report error:', err);
@@ -86,7 +86,7 @@ async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, start
 }
 
 // ── WORK ORDER PDF GENERATOR ───────────────────────────────────────────────
-async function generateWorkOrderPDF(sub, allPhotos) {
+async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var PDFLib = require('pdf-lib');
   var PDFDocument = PDFLib.PDFDocument;
   var rgb = PDFLib.rgb;
@@ -270,7 +270,7 @@ async function generateWorkOrderPDF(sub, allPhotos) {
 
   return await pdfDoc.save();
 }
-async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
   const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
@@ -286,7 +286,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const grandTotal = parseFloat(d.grandTotal || 0);
 
   // ── Build PDF ────────────────────────────────────────────────────────
-  const pdfBytes = await generateWorkOrderPDF(sub, photos);
+  const pdfBytes = await generateWorkOrderPDF(sub, photos, pdfBase64);
 
   const pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
@@ -366,7 +366,7 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 }
 
 // ── EXPENSE REPORT ───────────────────────────────────────────────────────
-async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
   const items = Array.isArray(d.expenseItems) ? d.expenseItems : [];
   const total = parseFloat(d.expenseTotal || 0);
   const techName = d.techs && d.techs.length ? d.techs[0] : (sub.created_by || '');
@@ -470,7 +470,7 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
 }
 
 // ── DAILY INSPECTION REPORT ──────────────────────────────────────────────
-async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
   const checks = Array.isArray(d.checkItems) ? d.checkItems : [];
   const failCount = parseInt(d.failCount || 0);
   const allPass = d.allPass !== false;
@@ -596,7 +596,7 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
 
 
 // -- JHA / JSA REPORT --
-async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
   var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
   var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
   var techName = d.techs && d.techs.length ? d.techs[0] : '';
@@ -769,7 +769,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
 
 
 // -- JHA / JSA REPORT --
-async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
+async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
   var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
   var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
   var techName = d.techs && d.techs.length ? d.techs[0] : (sub.location_name || '');
