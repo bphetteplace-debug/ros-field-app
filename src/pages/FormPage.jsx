@@ -12,6 +12,8 @@ import {
   fetchPartsCatalog,
 } from '../lib/submissions'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
+import { generateSubmissionPdfBase64 } from '../lib/submissionPdf'
+import { fetchSubmission } from '../lib/submissions'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -471,7 +473,12 @@ export default function FormPage() {
       const submission=await saveSubmission(formData,user.id,template)
       if(submission?.id&&Object.keys(photoDataUrls).length>0) await uploadPhotos(submission.id,photoDataUrls)
       if(submission?.id){
-        fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id})})
+        let pdfBase64 = null
+        try {
+          const full = await fetchSubmission(submission.id)
+          pdfBase64 = await generateSubmissionPdfBase64(full)
+        } catch (e) { console.warn('PDF gen failed:', e) }
+        fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id,pdfBase64})})
           .catch(err=>console.warn('Email send failed:',err))
       }
       try{localStorage.removeItem(draftKey)}catch(e){}
