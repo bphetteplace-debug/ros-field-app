@@ -92,269 +92,289 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var rgb = PDFLib.rgb;
   var StandardFonts = PDFLib.StandardFonts;
 
-  var d = (sub.data || sub);
+  // sub has flat DB columns + sub.data (jsonb) for parts/techs/etc
+  var extra = (sub.data && typeof sub.data === 'object') ? sub.data : {};
+
   var safeStr = function(v) {
     if (v == null) return '';
-    return String(v).replace(/[^\x00-\x7E]/g, '?');
+    return String(v).replace(/[^\x20-\x7E]/g, '');
   };
-  var fmt = function(v) { return safeStr(v) || '—'; };
+  var fmt = function(v) { var s = safeStr(v); return s || '--'; };
   var fmtMoney = function(n) {
     var num = parseFloat(n);
     if (isNaN(num)) return '$0.00';
     return '$' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   };
   var fmtDate = function(s) {
-    if (!s) return '—';
+    if (!s) return '--';
     try {
-      return new Date(s).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      var d = new Date(s);
+      return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     } catch(e) { return safeStr(s); }
   };
 
-  // Job data
-  var woNum = safeStr(d.customer_wo_number || d.wo_number || sub.id || '');
-  var jobType = safeStr(d.job_type || '');
-  var customer = fmt(d.customer_name);
-  var location = fmt(d.location_name);
-  var typeOfWork = fmt(d.type_of_work);
-  var workArea = fmt(d.work_area);
-  var siteContact = fmt(d.site_contact);
-  var startTime = fmt(d.start_time);
-  var deptTime = fmt(d.departure_time);
-  var truckNum = fmt(d.truck_number);
-  var dateStr = fmtDate(d.date || sub.created_at);
-  var description = safeStr(d.description || d.description_of_work || '');
+  // ── Pull fields from flat DB columns (primary) with data fallback ──
+  var woNum    = safeStr(sub.work_order || extra.customerWorkOrder || '');
+  var pmNum    = safeStr(sub.pm_number  || '');
+  var customer = fmt(sub.customer_name);
+  var location = fmt(sub.location_name);
+  var contact  = fmt(sub.contact || extra.customerContact);
+  var workType = fmt(sub.work_type || extra.typeOfWork);
+  var workArea = fmt(sub.work_area || extra.workArea);
+  var truckNum = fmt(sub.truck_number);
+  var description = safeStr(sub.summary || extra.description || '');
+  var dateStr  = fmtDate(sub.submitted_at || sub.created_at);
+  var startTime   = fmt(extra.startTime);
+  var deptTime    = fmt(extra.departureTime);
+  var jobType     = safeStr(extra.jobType || sub.template || '');
 
+  // Technicians
   var techNames = [];
-  if (Array.isArray(d.techs)) {
-    techNames = d.techs.map(function(t) {
+  if (Array.isArray(extra.techs)) {
+    techNames = extra.techs.map(function(t) {
       return safeStr(typeof t === 'string' ? t : (t.name || t.label || String(t)));
-    });
-  } else if (typeof d.techs === 'string' && d.techs) {
-    techNames = [safeStr(d.techs)];
+    }).filter(Boolean);
   }
 
-  var parts = Array.isArray(d.parts) ? d.parts : [];
-  var laborHours = parseFloat(d.labor_hours) || 0;
-  var laborRate = parseFloat(d.labor_rate) || 0;
-  var mileage = parseFloat(d.mileage) || 0;
-  var mileageRate = parseFloat(d.mileage_rate) || 0;
-  var partsTotal = parts.reduce(function(sum, p) {
-    return sum + (parseFloat(p.total || p.unit_price * p.qty) || 0);
+  // Parts
+  var parts = Array.isArray(extra.parts) ? extra.parts : [];
+
+  // Cost figures — prefer flat DB columns
+  var laborHours   = parseFloat(sub.labor_hours  || extra.laborHours  || 0) || 0;
+  var laborRate    = parseFloat(sub.labor_rate   || extra.hourlyRate  || 0) || 0;
+  var mileage      = parseFloat(sub.miles        || extra.miles       || 0) || 0;
+  var mileageRate  = parseFloat(sub.cost_per_mile|| extra.costPerMile || 0) || 0;
+  var partsTotal   = parts.reduce(function(s, p) {
+    return s + (parseFloat(p.total || 0) || (parseFloat(p.unit_price||p.price||0) * parseFloat(p.qty||p.quantity||1)));
   }, 0);
-  var laborTotal = laborHours * laborRate;
+  var laborTotal   = laborHours * laborRate;
   var mileageTotal = mileage * mileageRate;
-  var grandTotal = partsTotal + laborTotal + mileageTotal;
+  var grandTotal   = partsTotal + laborTotal + mileageTotal;
 
+  // ── Create PDF ────────────────────────────────────────────────────
   var pdfDoc = await PDFDocument.create();
-  var page = pdfDoc.addPage([612, 792]);
-  var W = 612;
-  var H = 792;
-  var helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  var helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  var page   = pdfDoc.addPage([612, 792]);
+  var W = 612; var H = 792;
+  var hFont  = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  var hBold  = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Colors
-  var navy = rgb(0.059, 0.122, 0.220);    // #0f1f38
-  var orange = rgb(0.902, 0.361, 0.000);  // #e65c00
-  var white = rgb(1, 1, 1);
-  var lightGray = rgb(0.95, 0.95, 0.95);
-  var midGray = rgb(0.6, 0.6, 0.6);
-  var black = rgb(0, 0, 0);
-  var darkGray = rgb(0.2, 0.2, 0.2);
+  var navy     = rgb(0.059, 0.122, 0.220);
+  var orange   = rgb(0.902, 0.361, 0.000);
+  var white    = rgb(1,1,1);
+  var lightGray= rgb(0.93, 0.93, 0.93);
+  var midGray  = rgb(0.55, 0.55, 0.55);
+  var darkGray = rgb(0.18, 0.18, 0.18);
+  var altRow   = rgb(0.97, 0.97, 0.97);
 
-  var margin = 30;
-  var y = H - margin;
+  var M = 30; // margin
+  var y = H - M;
 
-  // ── HEADER BAND ─────────────────────────────────────────────────────
-  page.drawRectangle({ x: 0, y: H - 72, width: W, height: 72, color: navy });
-
-  // Company name
-  page.drawText('RELIABLE OILFIELD SERVICES', {
-    x: margin, y: H - 28, size: 14, font: helveticaBold, color: white
-  });
-  page.drawText('ReliableTrack Field Report', {
-    x: margin, y: H - 46, size: 9, font: helvetica, color: rgb(0.75, 0.75, 0.75)
-  });
+  // ── HEADER ─────────────────────────────────────────────────────────
+  page.drawRectangle({ x:0, y:H-72, width:W, height:72, color:navy });
+  page.drawText('RELIABLE OILFIELD SERVICES', { x:M, y:H-26, size:14, font:hBold, color:white });
+  page.drawText('ReliableTrack Field Report', { x:M, y:H-44, size:9, font:hFont, color:rgb(0.75,0.75,0.75) });
 
   // Job type badge
-  var badgeLabel = jobType.toUpperCase().includes('PM') ? 'PM' : (jobType.toUpperCase().includes('SC') || jobType.toLowerCase().includes('service') ? 'SC' : jobType.substring(0,4).toUpperCase());
-  var badgeColor = jobType.toUpperCase().includes('PM') ? rgb(0.086, 0.627, 0.294) : orange;
-  page.drawRectangle({ x: W - 120, y: H - 55, width: 40, height: 20, color: badgeColor, borderRadius: 3 });
-  page.drawText(badgeLabel, { x: W - 112 + (badgeLabel.length < 3 ? 4 : 0), y: H - 47, size: 9, font: helveticaBold, color: white });
+  var badge = jobType.toLowerCase().includes('pm') ? 'PM' : 'SC';
+  var badgeClr = badge === 'PM' ? rgb(0.086,0.627,0.294) : orange;
+  page.drawRectangle({ x:W-100, y:H-54, width:30, height:18, color:badgeClr });
+  page.drawText(badge, { x:W-94, y:H-46, size:9, font:hBold, color:white });
 
-  // WO Number
-  page.drawText('Work Order No.', { x: W - 72, y: H - 22, size: 7, font: helvetica, color: rgb(0.75, 0.75, 0.75) });
-  page.drawText(woNum || '—', { x: W - 72, y: H - 34, size: 11, font: helveticaBold, color: white });
+  // WO number top-right
+  page.drawText('Work Order No.', { x:W-80, y:H-20, size:7, font:hFont, color:rgb(0.75,0.75,0.75) });
+  page.drawText(woNum || '--', { x:W-80, y:H-34, size:10, font:hBold, color:white });
 
-  y = H - 80;
+  y = H - 78;
 
-  // ── DATE BAR ────────────────────────────────────────────────────────
-  page.drawRectangle({ x: margin, y: y - 14, width: W - margin*2, height: 16, color: lightGray });
-  page.drawText(dateStr, { x: margin + 4, y: y - 10, size: 8, font: helvetica, color: darkGray });
+  // ── DATE BAR ───────────────────────────────────────────────────────
+  page.drawRectangle({ x:M, y:y-15, width:W-M*2, height:15, color:lightGray });
+  page.drawText(dateStr, { x:M+4, y:y-11, size:8, font:hFont, color:darkGray });
   y -= 22;
 
-  // ── INFO GRID (3 columns x 3 rows) ──────────────────────────────────
-  var gridCols = 3;
-  var cellW = (W - margin*2) / gridCols;
-  var cellH = 34;
+  // ── INFO GRID (3 cols x 3 rows) ────────────────────────────────────
   var gridFields = [
     ['CUSTOMER', customer],
     ['LOCATION / SITE', location],
     ['CUSTOMER WO #', ''],
-    ['TYPE OF WORK', typeOfWork],
+    ['TYPE OF WORK', workType],
     ['WORK AREA', workArea],
-    ['SITE CONTACT', siteContact],
+    ['SITE CONTACT', contact],
     ['START TIME', startTime],
     ['DEPARTURE TIME', deptTime],
     ['TRUCK #', truckNum],
   ];
-  for (var gi = 0; gi < gridFields.length; gi++) {
-    var col = gi % gridCols;
-    var row = Math.floor(gi / gridCols);
-    var cellX = margin + col * cellW;
-    var cellY = y - row * cellH;
-    // border
-    page.drawRectangle({ x: cellX, y: cellY - cellH, width: cellW, height: cellH, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.5, color: row % 2 === 0 ? white : rgb(0.98, 0.98, 0.98) });
-    page.drawText(gridFields[gi][0], { x: cellX + 5, y: cellY - 11, size: 6, font: helveticaBold, color: midGray });
+  var cols = 3;
+  var cW = (W-M*2)/cols;
+  var cH = 34;
+  for (var gi=0; gi<gridFields.length; gi++) {
+    var col = gi % cols;
+    var row = Math.floor(gi / cols);
+    var cx  = M + col * cW;
+    var cy  = y - row * cH;
+    page.drawRectangle({ x:cx, y:cy-cH, width:cW, height:cH, color: row%2===0 ? white : altRow, borderColor:rgb(0.82,0.82,0.82), borderWidth:0.5 });
+    page.drawText(gridFields[gi][0], { x:cx+5, y:cy-11, size:6, font:hBold, color:midGray });
     var val = gridFields[gi][1];
     if (val) {
-      page.drawText(val.substring(0, 32), { x: cellX + 5, y: cellY - 23, size: 9, font: helveticaBold, color: darkGray });
+      page.drawText(val.substring(0,35), { x:cx+5, y:cy-23, size:9, font:hBold, color:darkGray });
     } else {
-      // blank write-in line
-      page.drawLine({ start: { x: cellX + 5, y: cellY - 24 }, end: { x: cellX + cellW - 10, y: cellY - 24 }, thickness: 0.5, color: midGray });
+      page.drawLine({ start:{x:cx+5,y:cy-23}, end:{x:cx+cW-8,y:cy-23}, thickness:0.5, color:midGray });
     }
   }
-  y -= gridFields.length / gridCols * cellH + 8;
+  y -= Math.ceil(gridFields.length/cols)*cH + 8;
 
-  // ── FIELD TECHNICIANS ─────────────────────────────────────────────────
-  page.drawRectangle({ x: margin, y: y - 16, width: W - margin*2, height: 16, color: navy });
-  page.drawText('FIELD TECHNICIANS', { x: margin + 6, y: y - 11, size: 8, font: helveticaBold, color: white });
+  // ── FIELD TECHNICIANS ──────────────────────────────────────────────
+  page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+  page.drawText('FIELD TECHNICIANS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
   y -= 22;
   if (techNames.length > 0) {
-    var techX = margin + 4;
-    for (var ti = 0; ti < techNames.length; ti++) {
-      var tname = techNames[ti];
-      var tw = Math.max(helveticaBold.widthOfTextAtSize(tname, 9) + 14, 60);
-      if (techX + tw > W - margin) { techX = margin + 4; y -= 20; }
-      page.drawRectangle({ x: techX, y: y - 14, width: tw, height: 14, color: navy, borderRadius: 3 });
-      page.drawText(tname, { x: techX + 7, y: y - 10, size: 8, font: helveticaBold, color: white });
-      techX += tw + 6;
+    var tx = M+4;
+    for (var ti=0; ti<techNames.length; ti++) {
+      var tn = techNames[ti].substring(0,28);
+      var tw = Math.min(hBold.widthOfTextAtSize(tn, 9)+14, 200);
+      if (tx+tw > W-M) { tx=M+4; y-=20; }
+      page.drawRectangle({ x:tx, y:y-14, width:tw, height:14, color:navy });
+      page.drawText(tn, { x:tx+6, y:y-10, size:8, font:hBold, color:white });
+      tx += tw+6;
     }
+  } else {
+    page.drawText('--', { x:M+4, y:y-10, size:9, font:hFont, color:midGray });
   }
   y -= 22;
 
   // ── DESCRIPTION OF WORK ────────────────────────────────────────────
-  page.drawRectangle({ x: margin, y: y - 16, width: W - margin*2, height: 16, color: navy });
-  page.drawText('DESCRIPTION OF WORK', { x: margin + 6, y: y - 11, size: 8, font: helveticaBold, color: white });
-  y -= 22;
+  page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+  page.drawText('DESCRIPTION OF WORK', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+  y -= 20;
   if (description) {
     var words = description.split(' ');
-    var line = '';
-    var lineH = 13;
-    for (var wi = 0; wi < words.length; wi++) {
-      var testLine = line ? line + ' ' + words[wi] : words[wi];
-      var testW = helvetica.widthOfTextAtSize(testLine, 9);
-      if (testW > W - margin*2 - 10 && line) {
-        if (y < 120) break;
-        page.drawText(line, { x: margin + 5, y: y - 4, size: 9, font: helvetica, color: darkGray });
-        y -= lineH;
-        line = words[wi];
-      } else {
-        line = testLine;
-      }
+    var lineText = '';
+    for (var wi=0; wi<words.length; wi++) {
+      var test = lineText ? lineText+' '+words[wi] : words[wi];
+      if (hFont.widthOfTextAtSize(test,9) > W-M*2-10 && lineText) {
+        if (y < 110) break;
+        page.drawText(lineText, { x:M+5, y:y-4, size:9, font:hFont, color:darkGray });
+        y -= 13; lineText = words[wi];
+      } else { lineText = test; }
     }
-    if (line && y >= 120) {
-      page.drawText(line, { x: margin + 5, y: y - 4, size: 9, font: helvetica, color: darkGray });
-      y -= lineH;
+    if (lineText && y >= 110) {
+      page.drawText(lineText, { x:M+5, y:y-4, size:9, font:hFont, color:darkGray });
+      y -= 13;
     }
   } else {
-    page.drawLine({ start: { x: margin+5, y: y-8 }, end: { x: W-margin-5, y: y-8 }, thickness: 0.5, color: lightGray });
+    page.drawLine({ start:{x:M+5,y:y-8}, end:{x:W-M-5,y:y-8}, thickness:0.5, color:lightGray });
     y -= 14;
   }
   y -= 6;
 
-  // ── PARTS & MATERIALS ─────────────────────────────────────────────
-  if (parts.length > 0 && y > 140) {
-    page.drawRectangle({ x: margin, y: y - 16, width: W - margin*2, height: 16, color: navy });
-    page.drawText('PARTS & MATERIALS', { x: margin + 6, y: y - 11, size: 8, font: helveticaBold, color: white });
+  // ── PHOTOS ─────────────────────────────────────────────────────────
+  if (Array.isArray(allPhotos) && allPhotos.length > 0 && y > 160) {
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('WORK PHOTOS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
     y -= 22;
-    // Header row
-    page.drawRectangle({ x: margin, y: y - 14, width: W - margin*2, height: 14, color: rgb(0.88, 0.88, 0.88) });
-    page.drawText('Description', { x: margin+5, y: y-10, size: 7, font: helveticaBold, color: darkGray });
-    page.drawText('Part #', { x: margin+270, y: y-10, size: 7, font: helveticaBold, color: darkGray });
-    page.drawText('Qty', { x: margin+360, y: y-10, size: 7, font: helveticaBold, color: darkGray });
-    page.drawText('Unit', { x: margin+400, y: y-10, size: 7, font: helveticaBold, color: darkGray });
-    page.drawText('Total', { x: margin+450, y: y-10, size: 7, font: helveticaBold, color: darkGray });
+    var photoW = (W-M*2-12)/3;
+    var photoH = photoW * 0.75;
+    var px = M; var photoCount = 0;
+    for (var phi=0; phi<allPhotos.length && y-photoH > 80 && photoCount<6; phi++) {
+      var photo = allPhotos[phi];
+      try {
+        var pUrl = photo.signedUrl || photo.url || photo.storage_path;
+        if (!pUrl) continue;
+        var pResp = await fetch(pUrl);
+        if (!pResp.ok) continue;
+        var pBuf = await pResp.arrayBuffer();
+        var pBytes = new Uint8Array(pBuf);
+        var pImg;
+        try { pImg = await pdfDoc.embedJpg(pBytes); } catch(e2) {
+          try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) { continue; }
+        }
+        page.drawImage(pImg, { x:px, y:y-photoH, width:photoW, height:photoH });
+        px += photoW+6; photoCount++;
+        if (photoCount % 3 === 0) { px=M; y-=photoH+6; }
+      } catch(e) { /* skip failed photo */ }
+    }
+    if (photoCount % 3 !== 0) y -= photoH+6;
+    y -= 6;
+  }
+
+  // ── PARTS & MATERIALS ──────────────────────────────────────────────
+  if (parts.length > 0 && y > 120) {
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('PARTS & MATERIALS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+    y -= 22;
+    page.drawRectangle({ x:M, y:y-14, width:W-M*2, height:14, color:lightGray });
+    page.drawText('Description',  { x:M+5,   y:y-10, size:7, font:hBold, color:darkGray });
+    page.drawText('Part #',       { x:M+270,  y:y-10, size:7, font:hBold, color:darkGray });
+    page.drawText('Qty',          { x:M+360,  y:y-10, size:7, font:hBold, color:darkGray });
+    page.drawText('Unit $',       { x:M+395,  y:y-10, size:7, font:hBold, color:darkGray });
+    page.drawText('Total',        { x:M+448,  y:y-10, size:7, font:hBold, color:darkGray });
     y -= 14;
-    for (var pi = 0; pi < parts.length && y > 100; pi++) {
+    for (var pi=0; pi<parts.length && y>90; pi++) {
       var p = parts[pi];
-      var pDesc = safeStr(p.description || p.name || p.part_description || '').substring(0, 42);
-      var pNum = safeStr(p.part_number || p.part_no || '').substring(0, 18);
-      var pQty = safeStr(p.qty || p.quantity || '1');
-      var pUnit = fmtMoney(p.unit_price || p.price || 0);
-      var pTotal = fmtMoney(p.total || (parseFloat(p.unit_price||0) * parseFloat(p.qty||1)));
-      var rowBg = pi % 2 === 0 ? white : lightGray;
-      page.drawRectangle({ x: margin, y: y-14, width: W-margin*2, height: 14, color: rowBg });
-      page.drawText(pDesc, { x: margin+5, y: y-10, size: 8, font: helvetica, color: darkGray });
-      page.drawText(pNum, { x: margin+270, y: y-10, size: 8, font: helvetica, color: darkGray });
-      page.drawText(pQty, { x: margin+360, y: y-10, size: 8, font: helvetica, color: darkGray });
-      page.drawText(pUnit, { x: margin+395, y: y-10, size: 8, font: helvetica, color: darkGray });
-      page.drawText(pTotal, { x: margin+445, y: y-10, size: 8, font: helvetica, color: darkGray });
+      var pDesc  = safeStr(p.description||p.name||p.part_description||'').substring(0,42);
+      var pNum   = safeStr(p.part_number||p.part_no||p.partNumber||'').substring(0,18);
+      var pQty   = safeStr(p.qty||p.quantity||'1');
+      var pUnit  = fmtMoney(p.unit_price||p.price||p.unitPrice||0);
+      var pTot   = fmtMoney(p.total||(parseFloat(p.unit_price||0)*parseFloat(p.qty||1)));
+      page.drawRectangle({ x:M, y:y-14, width:W-M*2, height:14, color:pi%2===0?white:altRow });
+      page.drawText(pDesc, { x:M+5,   y:y-10, size:8, font:hFont, color:darkGray });
+      page.drawText(pNum,  { x:M+270,  y:y-10, size:8, font:hFont, color:darkGray });
+      page.drawText(pQty,  { x:M+360,  y:y-10, size:8, font:hFont, color:darkGray });
+      page.drawText(pUnit, { x:M+390,  y:y-10, size:8, font:hFont, color:darkGray });
+      page.drawText(pTot,  { x:M+443,  y:y-10, size:8, font:hFont, color:darkGray });
       y -= 14;
     }
     y -= 6;
   }
 
-  // ── COST SUMMARY ──────────────────────────────────────────────────
-  if (y > 100) {
-    var sumX = W/2;
-    var sumW = W/2 - margin;
-    page.drawRectangle({ x: margin, y: y - 16, width: W - margin*2, height: 16, color: navy });
-    page.drawText('COST SUMMARY', { x: margin + 6, y: y - 11, size: 8, font: helveticaBold, color: white });
+  // ── COST SUMMARY ───────────────────────────────────────────────────
+  if (y > 90) {
+    var sX = W/2; var sW = W/2-M;
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('COST SUMMARY', { x:M+6, y:y-11, size:8, font:hBold, color:white });
     y -= 22;
     var costRows = [
       ['Parts & Materials:', fmtMoney(partsTotal)],
-      ['Labor (' + laborHours.toFixed(1) + ' hrs @ ' + fmtMoney(laborRate) + '/hr):', fmtMoney(laborTotal)],
-      ['Mileage (' + mileage + ' mi @ ' + fmtMoney(mileageRate) + '/mi):', fmtMoney(mileageTotal)],
+      ['Labor ('+laborHours.toFixed(1)+' hrs @ '+fmtMoney(laborRate)+'/hr):', fmtMoney(laborTotal)],
+      ['Mileage ('+mileage+' mi @ '+fmtMoney(mileageRate)+'/mi):', fmtMoney(mileageTotal)],
     ];
-    for (var ci = 0; ci < costRows.length && y > 80; ci++) {
-      page.drawRectangle({ x: sumX, y: y-14, width: sumW, height: 14, color: ci % 2 === 0 ? white : lightGray });
-      page.drawText(costRows[ci][0], { x: sumX+5, y: y-10, size: 8, font: helvetica, color: darkGray });
-      page.drawText(costRows[ci][1], { x: sumX+sumW-55, y: y-10, size: 8, font: helveticaBold, color: darkGray });
+    for (var ci=0; ci<costRows.length && y>70; ci++) {
+      page.drawRectangle({ x:sX, y:y-14, width:sW, height:14, color:ci%2===0?white:altRow });
+      page.drawText(costRows[ci][0], { x:sX+5,    y:y-10, size:8, font:hFont, color:darkGray });
+      page.drawText(costRows[ci][1], { x:sX+sW-60, y:y-10, size:8, font:hBold, color:darkGray });
       y -= 14;
     }
-    // Divider
-    page.drawLine({ start: { x: sumX, y: y-2 }, end: { x: W-margin, y: y-2 }, thickness: 0.5, color: orange });
+    page.drawLine({ start:{x:sX,y:y-2}, end:{x:W-M,y:y-2}, thickness:0.5, color:orange });
     y -= 4;
-    // Grand total
-    page.drawRectangle({ x: sumX, y: y-20, width: sumW, height: 20, color: navy });
-    page.drawText('GRAND TOTAL:', { x: sumX+5, y: y-14, size: 9, font: helveticaBold, color: orange });
-    page.drawText(fmtMoney(grandTotal), { x: sumX+sumW-70, y: y-14, size: 11, font: helveticaBold, color: white });
+    page.drawRectangle({ x:sX, y:y-20, width:sW, height:20, color:navy });
+    page.drawText('GRAND TOTAL:', { x:sX+5, y:y-14, size:9, font:hBold, color:orange });
+    page.drawText(fmtMoney(grandTotal), { x:sX+sW-70, y:y-14, size:11, font:hBold, color:white });
     y -= 28;
   }
 
-  // ── SIGN-OFF ───────────────────────────────────────────────────────
-  if (y > 60) {
+  // ── SIGN-OFF ────────────────────────────────────────────────────────
+  if (y > 55) {
     y -= 10;
-    var colW2 = (W - margin*2) / 2 - 10;
-    page.drawLine({ start: { x: margin, y: y-20 }, end: { x: margin+colW2, y: y-20 }, thickness: 0.5, color: midGray });
-    page.drawText('Technician Signature', { x: margin, y: y-30, size: 7, font: helvetica, color: midGray });
-    page.drawLine({ start: { x: W/2+5, y: y-20 }, end: { x: W-margin, y: y-20 }, thickness: 0.5, color: midGray });
-    page.drawText('Customer Signature / Approval', { x: W/2+5, y: y-30, size: 7, font: helvetica, color: midGray });
+    var sw = (W-M*2)/2-8;
+    page.drawLine({ start:{x:M,y:y-20}, end:{x:M+sw,y:y-20}, thickness:0.5, color:midGray });
+    page.drawText('Technician Signature', { x:M, y:y-30, size:7, font:hFont, color:midGray });
+    page.drawLine({ start:{x:W/2+4,y:y-20}, end:{x:W-M,y:y-20}, thickness:0.5, color:midGray });
+    page.drawText('Customer Signature / Approval', { x:W/2+4, y:y-30, size:7, font:hFont, color:midGray });
     y -= 40;
   }
 
-  // ── FOOTER ────────────────────────────────────────────────────────
-  page.drawRectangle({ x: 0, y: 0, width: W, height: 28, color: navy });
+  // ── FOOTER ──────────────────────────────────────────────────────────
+  page.drawRectangle({ x:0, y:0, width:W, height:28, color:navy });
   page.drawText('Reliable Oilfield Services  |  ReliableTrack  |  reliableoilfieldservices.net', {
-    x: margin, y: 10, size: 7, font: helvetica, color: rgb(0.75,0.75,0.75)
+    x:M, y:10, size:7, font:hFont, color:rgb(0.75,0.75,0.75)
   });
-  page.drawText('WO# ' + woNum + '  |  Generated ' + new Date().toLocaleDateString(), {
-    x: W - 200, y: 10, size: 7, font: helvetica, color: rgb(0.75,0.75,0.75)
+  page.drawText('WO# '+woNum+'  |  '+new Date().toLocaleDateString(), {
+    x:W-170, y:10, size:7, font:hFont, color:rgb(0.75,0.75,0.75)
   });
 
   var pdfBytes = await pdfDoc.save();
   return pdfBytes;
 }
+
 
 async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
   const isPM = sub.template === 'pm_flare_combustor';
