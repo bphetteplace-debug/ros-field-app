@@ -92,99 +92,302 @@ async function generateWorkOrderPDF(sub, allPhotos) {
   var rgb = PDFLib.rgb;
   var StandardFonts = PDFLib.StandardFonts;
   var pdfDoc = await PDFDocument.create();
-  var page = pdfDoc.addPage([595, 842]);
-  var width = page.getSize().width;
-  var height = page.getSize().height;
   var font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   var boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  var y = height - 65;
-  // HEADER
-  // Fetch branding logo from Supabase settings
+
+  // ── Data setup ──────────────────────────────────────────────────────
+  var d = (typeof sub.data === 'object' && sub.data !== null) ? sub.data : {};
+  var W = 595; var H = 842; var M = 40; var CW = W - M * 2;
+  var col1 = M; var col2 = M + CW / 2 + 5;
+  var colW = CW / 2 - 5;
+
+  var parts = Array.isArray(d.parts) ? d.parts : [];
+  var techs = Array.isArray(d.techs) ? d.techs : [];
+  var partsTotal = parseFloat(d.partsTotal || 0);
+  var laborTotal = parseFloat(d.laborTotal || 0);
+  var mileageTotal = parseFloat(d.mileageTotal || 0);
+  var grandTotal = parseFloat(d.grandTotal || 0);
+  var woNum = String(sub.work_order || sub.woNumber || 'N/A');
+  var dateStr = String(sub.date || d.date || '');
+  var custName = String(sub.customer_name || d.customerName || '');
+  var location = String(sub.location_name || d.locationName || '');
+  var truckNum = String(sub.truck_number || d.truckNumber || '');
+  var assetTag = String(sub.asset_tag || d.assetTag || '');
+  var glCode = String(sub.gl_code || d.glCode || '');
+  var contact = String(sub.customer_contact || d.customerContact || '');
+  var typeWork = String(sub.typeOfWork || d.typeOfWork || '');
+  var workArea = String(sub.work_area || d.workArea || '');
+  var coWO = String(sub.customerWorkOrder || d.customerWorkOrder || '');
+  var startTime = String(sub.start_time || d.startTime || '');
+  var endTime = String(sub.end_time || d.endTime || '');
+  var description = String(sub.description || d.description || '');
+  var completedWork = String(d.completedWork || d.work_performed || '');
+
+  function sv(v) { return (v && v !== 'undefined' && v !== 'null') ? v : 'N/A'; }
+
+  // ── Fetch branding logo ──────────────────────────────────────────────
   var logoImage = null;
   try {
-    var brandingResp = await fetch(
-      SUPA_URL + '/rest/v1/app_settings?key=eq.branding&select=value',
-      { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } }
-    );
-    if (brandingResp.ok) {
-      var brandingRows = await brandingResp.json();
-      if (brandingRows && brandingRows.length > 0) {
-        var brandingVal = brandingRows[0].value;
-        var logoUrl = typeof brandingVal === 'object' ? brandingVal.logo_url : (typeof brandingVal === 'string' ? JSON.parse(brandingVal).logo_url : null);
-        if (logoUrl && logoUrl.length > 100) {
-          var b64Data = logoUrl.replace(/^data:[^;]+;base64,/, '');
-          var logoBytes = Buffer.from(b64Data, 'base64');
-          if (logoUrl.indexOf('image/png') !== -1 || logoUrl.indexOf('data:image/png') !== -1) {
-            logoImage = await pdfDoc.embedPng(logoBytes);
-          } else {
-            logoImage = await pdfDoc.embedJpg(logoBytes);
-          }
+    var bResp = await fetch(SUPA_URL + '/rest/v1/app_settings?key=eq.branding&select=value', { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } });
+    if (bResp.ok) {
+      var bRows = await bResp.json();
+      if (bRows && bRows.length > 0) {
+        var bVal = bRows[0].value;
+        var lUrl = typeof bVal === 'object' ? bVal.logo_url : (typeof bVal === 'string' ? JSON.parse(bVal).logo_url : null);
+        if (lUrl && lUrl.length > 100) {
+          var b64 = lUrl.replace(/^data:[^;]+;base64,/, '');
+          var lBytes = Buffer.from(b64, 'base64');
+          logoImage = lUrl.indexOf('image/png') !== -1 ? await pdfDoc.embedPng(lBytes) : await pdfDoc.embedJpg(lBytes);
         }
       }
     }
-  } catch (e) { logoImage = null; }
-  var woNum = sub.work_order || sub.woNumber || 'N/A';
-  if (logoImage) {
-    var logoDims = logoImage.scaleToFit(120, 50);
-    page.drawImage(logoImage, { x: width - logoDims.width - 48, y: y - logoDims.height + 16, width: logoDims.width, height: logoDims.height });
-    page.drawText('ROS Service Work Order', { x: 50, y: y, size: 20, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
-    page.drawText('No. ' + woNum, { x: 50, y: y - 20, size: 11, font: font, color: rgb(0.4, 0.4, 0.4) });
-  } else {
-    page.drawText('ROS Service Work Order', { x: 50, y: y, size: 24, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
-    page.drawText('No. ' + woNum, { x: width - 170, y: y + 8, size: 11, font: font, color: rgb(0.4, 0.4, 0.4) });
+  } catch(e) { logoImage = null; }
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+  function addPage() {
+    var pg = pdfDoc.addPage([W, H]);
+    return { pg: pg, y: H - M };
   }
-  y -= 55;
-  // CUSTOMER INFO BOX
-  page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 135, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
-  var left = 65;
-  var right = 320;
-  function drawField(label, value, fx, fy) {
-    page.drawText(label, { x: fx, y: fy, size: 9, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
-    page.drawText(String(value != null && value !== '' ? value : 'N/A'), { x: fx, y: fy - 15, size: 11, font: font });
+
+  function sectionBar(pg, y, label) {
+    pg.drawRectangle({ x: M, y: y - 2, width: CW, height: 18, color: rgb(0.1, 0.1, 0.1) });
+    pg.drawText(label, { x: M + 6, y: y + 1, size: 10, font: boldFont, color: rgb(1, 1, 1) });
+    return y - 22;
   }
-  drawField('Customer Name:', sub.customer_name, left, y + 5);
-  drawField('ROS Truck Number:', sub.truck_number, right, y + 5);
-  drawField('Location Name:', sub.location_name, left, y - 25);
-  drawField('Customer Contact:', sub.customer_contact, right, y - 25);
-  drawField('GL Code:', sub.gl_code, left, y - 55);
-  var d = sub.data || {};
-  drawField('Type of work:', sub.typeOfWork || d.typeOfWork, right, y - 55);
-  drawField('Equipment Asset Tag:', sub.asset_tag, left, y - 85);
-  drawField('Work Area:', sub.work_area, right, y - 85);
-  drawField('Customer Work Order:', sub.customerWorkOrder || d.customerWorkOrder, left, y - 115);
-  drawField('Date:', sub.date, right, y - 115);
-  y -= 170;
-  // DESCRIPTION OF WORK
-  page.drawRectangle({ x: 48, y: y - 10, width: width - 96, height: 95, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 2 });
-  page.drawText('Description of Work', { x: 55, y: y + 5, size: 12, font: boldFont });
-  var description = sub.description || d.description || 'No description provided.';
-  page.drawText(description, { x: 55, y: y - 18, size: 10, font: font, maxWidth: width - 120, lineHeight: 13 });
-  y -= 125;
-  // PHOTOS GRID
-  var photosToShow = (allPhotos || []).filter(function(p) { return p.bytes; });
-  if (photosToShow.length > 0) {
-    page.drawText('Completed Work', { x: 50, y: y + 5, size: 12, font: boldFont });
-    var photoWidth = 155;
-    var gap = 18;
-    var photoX = 50;
-    var count = 0;
-    for (var pi = 0; pi < photosToShow.length; pi++) {
-      var photo = photosToShow[pi];
-      try {
-        var ext = (photo.storage_path || '').split('.').pop().toLowerCase();
-        var img = ext === 'png' ? await pdfDoc.embedPng(photo.bytes) : await pdfDoc.embedJpg(photo.bytes);
-        page.drawImage(img, { x: photoX, y: y - 115, width: photoWidth, height: 110 });
-        photoX += photoWidth + gap;
-        count++;
-        if (count === 3) { count = 0; photoX = 50; y -= 130; }
-      } catch (e) {}
+
+  function field2col(pg, y, l1, v1, l2, v2) {
+    pg.drawText(l1, { x: col1, y: y, size: 8, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+    pg.drawText(sv(v1), { x: col1, y: y - 13, size: 10, font: font, color: rgb(0, 0, 0) });
+    if (l2) {
+      pg.drawText(l2, { x: col2, y: y, size: 8, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+      pg.drawText(sv(v2), { x: col2, y: y - 13, size: 10, font: font, color: rgb(0, 0, 0) });
     }
-    y -= 140;
+    return y - 30;
   }
+
+  function wrapText(pg, text, x, startY, maxW, size, fnt, lineH) {
+    var words = String(text || '').split(' ');
+    var line = ''; var cy = startY;
+    for (var i = 0; i < words.length; i++) {
+      var test = line ? line + ' ' + words[i] : words[i];
+      var tw = fnt.widthOfTextAtSize(test, size);
+      if (tw > maxW && line) {
+        pg.drawText(line, { x: x, y: cy, size: size, font: fnt, color: rgb(0, 0, 0) });
+        cy -= lineH; line = words[i];
+      } else { line = test; }
+    }
+    if (line) { pg.drawText(line, { x: x, y: cy, size: size, font: fnt, color: rgb(0, 0, 0) }); cy -= lineH; }
+    return cy;
+  }
+
+  function checkY(state, needed) {
+    if (state.y - needed < M + 30) {
+      var ns = addPage();
+      state.pg = ns.pg; state.y = ns.y;
+    }
+  }
+
+  // ── PAGE 1 ───────────────────────────────────────────────────────────
+  var state = addPage();
+  var pg = state.pg;
+  var y = state.y;
+
+  // HEADER BAND
+  pg.drawRectangle({ x: 0, y: H - 75, width: W, height: 75, color: rgb(0.05, 0.05, 0.05) });
+
+  // Logo left
+  if (logoImage) {
+    var ld = logoImage.scaleToFit(130, 52);
+    pg.drawImage(logoImage, { x: M, y: H - 68, width: ld.width, height: ld.height });
+  } else {
+    pg.drawText('RELIABLE OILFIELD SERVICES', { x: M, y: H - 35, size: 13, font: boldFont, color: rgb(1, 1, 1) });
+    pg.drawText('Reliable. Responsive. Results.', { x: M, y: H - 52, size: 8, font: font, color: rgb(0.8, 0.8, 0.8) });
+  }
+
+  // Title right
+  pg.drawText('ROS SERVICE WORK ORDER', { x: W - M - 200, y: H - 33, size: 14, font: boldFont, color: rgb(1, 1, 1) });
+  pg.drawText('Work Order #: ' + woNum, { x: W - M - 160, y: H - 50, size: 9, font: font, color: rgb(0.8, 0.8, 0.8) });
+  pg.drawText('Date: ' + sv(dateStr), { x: W - M - 120, y: H - 63, size: 9, font: font, color: rgb(0.8, 0.8, 0.8) });
+
+  y = H - 90;
+
+  // ── CUSTOMER INFORMATION ─────────────────────────────────────────────
+  y = sectionBar(pg, y, 'CUSTOMER INFORMATION');
+  y -= 4;
+  y = field2col(pg, y, 'Customer Name', custName, 'Location', location);
+  y = field2col(pg, y, 'Truck Number', truckNum, 'Customer Contact', contact);
+  y = field2col(pg, y, 'GL Code', glCode, 'Type of Work', typeWork);
+  y = field2col(pg, y, 'Equipment Asset Tag', assetTag, 'Work Area', workArea);
+  y = field2col(pg, y, 'Customer Work Order', coWO, 'Start / End Time', sv(startTime) + ' - ' + sv(endTime));
+  if (techs.length > 0) {
+    pg.drawText('Technicians', { x: col1, y: y, size: 8, font: boldFont, color: rgb(0.35, 0.35, 0.35) });
+    pg.drawText(techs.map(function(t){ return String(t.name || t); }).join(', '), { x: col1, y: y - 13, size: 10, font: font, color: rgb(0, 0, 0), maxWidth: CW });
+    y -= 30;
+  }
+  y -= 6;
+
+  // ── DESCRIPTION OF WORK ──────────────────────────────────────────────
+  checkY(state, 60);
+  pg = state.pg; y = state.y;
+  y = sectionBar(pg, y, 'DESCRIPTION OF WORK');
+  y -= 6;
+  if (description) {
+    y = wrapText(pg, description, M, y, CW, 10, font, 14);
+    y -= 4;
+  } else {
+    pg.drawText('N/A', { x: M, y: y, size: 10, font: font, color: rgb(0.5, 0.5, 0.5) });
+    y -= 18;
+  }
+  y -= 8;
+
+  // ── COMPLETED WORK ───────────────────────────────────────────────────
+  checkY(state, 40);
+  pg = state.pg; y = state.y;
+  y = sectionBar(pg, y, 'COMPLETED WORK');
+  y -= 6;
+  if (completedWork) {
+    y = wrapText(pg, completedWork, M, y, CW, 10, font, 14);
+    y -= 4;
+  } else {
+    pg.drawText('See attached photos.', { x: M, y: y, size: 10, font: font, color: rgb(0.5, 0.5, 0.5) });
+    y -= 18;
+  }
+  y -= 8;
+
+  // ── PHOTOS ───────────────────────────────────────────────────────────
+  var validPhotos = (allPhotos || []).filter(function(p) { return p && p.bytes && p.bytes.length > 0; });
+  if (validPhotos.length > 0) {
+    checkY(state, 50);
+    pg = state.pg; y = state.y;
+    y = sectionBar(pg, y, 'PHOTOS — COMPLETED WORK (' + validPhotos.length + ' images)');
+    y -= 8;
+
+    var pCols = 3;
+    var pGap = 8;
+    var pW = Math.floor((CW - pGap * (pCols - 1)) / pCols);
+    var pH = Math.floor(pW * 0.75);
+    var pCol = 0;
+    var rowStartY = y;
+
+    for (var pi = 0; pi < validPhotos.length; pi++) {
+      var photo = validPhotos[pi];
+      if (pCol === 0) {
+        checkY(state, pH + 30);
+        if (state.pg !== pg) { pg = state.pg; y = state.y; rowStartY = y; }
+      }
+      try {
+        var ext = String(photo.storage_path || '').split('.').pop().toLowerCase();
+        var img;
+        if (ext === 'png') { img = await pdfDoc.embedPng(photo.bytes); }
+        else { img = await pdfDoc.embedJpg(photo.bytes); }
+        var ix = M + pCol * (pW + pGap);
+        var iy = rowStartY - pH;
+        pg.drawImage(img, { x: ix, y: iy, width: pW, height: pH });
+        pg.drawRectangle({ x: ix, y: iy, width: pW, height: pH, borderColor: rgb(0.8, 0.8, 0.8), borderWidth: 0.5 });
+        if (photo.caption) {
+          var capText = String(photo.caption).substring(0, 40);
+          pg.drawText(capText, { x: ix, y: iy - 11, size: 7, font: font, color: rgb(0.4, 0.4, 0.4), maxWidth: pW });
+        }
+      } catch(e) {}
+      pCol++;
+      if (pCol === pCols) {
+        pCol = 0;
+        y = rowStartY - pH - (photo.caption ? 18 : 10);
+        rowStartY = y;
+      }
+    }
+    if (pCol > 0) {
+      y = rowStartY - pH - 10;
+    }
+    y -= 10;
+  }
+
+  // ── PARTS & MATERIALS ────────────────────────────────────────────────
+  if (parts.length > 0) {
+    checkY(state, 60);
+    pg = state.pg; y = state.y;
+    y = sectionBar(pg, y, 'PARTS & MATERIALS');
+    y -= 4;
+
+    // Table header
+    var c0 = M; var c1p = M + 200; var c2 = M + 290; var c3 = M + 360; var c4 = M + 430; var c5 = M + 480;
+    pg.drawRectangle({ x: M, y: y - 3, width: CW, height: 16, color: rgb(0.88, 0.88, 0.88) });
+    pg.drawText('Part Name / Description', { x: c0 + 2, y: y + 0, size: 8, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    pg.drawText('Part #', { x: c1p, y: y + 0, size: 8, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    pg.drawText('Qty', { x: c2, y: y + 0, size: 8, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    pg.drawText('Unit', { x: c3, y: y + 0, size: 8, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    pg.drawText('Unit Cost', { x: c4, y: y + 0, size: 8, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    pg.drawText('Total', { x: c5, y: y + 0, size: 8, font: boldFont, color: rgb(0.1, 0.1, 0.1) });
+    y -= 18;
+
+    for (var ri = 0; ri < parts.length; ri++) {
+      checkY(state, 18);
+      if (state.pg !== pg) { pg = state.pg; y = state.y; }
+      var p = parts[ri];
+      var pName = String(p.name || p.description || p.partName || '');
+      var pNum = String(p.partNumber || p.part_number || '');
+      var pQty = String(p.quantity || p.qty || '');
+      var pUnit = String(p.unit || '');
+      var pCost = parseFloat(p.unitCost || p.unit_cost || p.cost || 0);
+      var pTot = parseFloat(p.total || p.lineTotal || (pCost * parseFloat(pQty || 0)) || 0);
+      var rowBg = ri % 2 === 0 ? rgb(1, 1, 1) : rgb(0.96, 0.96, 0.96);
+      pg.drawRectangle({ x: M, y: y - 3, width: CW, height: 14, color: rowBg });
+      pg.drawText(pName.substring(0, 32), { x: c0 + 2, y: y, size: 8, font: font, color: rgb(0, 0, 0) });
+      pg.drawText(pNum.substring(0, 14), { x: c1p, y: y, size: 8, font: font, color: rgb(0, 0, 0) });
+      pg.drawText(pQty, { x: c2, y: y, size: 8, font: font, color: rgb(0, 0, 0) });
+      pg.drawText(pUnit, { x: c3, y: y, size: 8, font: font, color: rgb(0, 0, 0) });
+      pg.drawText(pCost > 0 ? '$' + pCost.toFixed(2) : '', { x: c4, y: y, size: 8, font: font, color: rgb(0, 0, 0) });
+      pg.drawText(pTot > 0 ? '$' + pTot.toFixed(2) : '', { x: c5, y: y, size: 8, font: font, color: rgb(0, 0, 0) });
+      y -= 14;
+    }
+    y -= 6;
+  }
+
+  // ── COST SUMMARY ─────────────────────────────────────────────────────
+  if (partsTotal > 0 || laborTotal > 0 || mileageTotal > 0 || grandTotal > 0) {
+    checkY(state, 80);
+    pg = state.pg; y = state.y;
+    y = sectionBar(pg, y, 'COST SUMMARY');
+    y -= 4;
+
+    var sumX = W - M - 160; var valX = W - M - 30;
+    function costRow(label, amount, bold) {
+      var f = bold ? boldFont : font;
+      pg.drawText(label, { x: sumX, y: y, size: 9, font: f, color: rgb(0.1, 0.1, 0.1) });
+      pg.drawText('$' + amount.toFixed(2), { x: valX - (boldFont.widthOfTextAtSize('$' + amount.toFixed(2), 9)), y: y, size: 9, font: f, color: rgb(0.1, 0.1, 0.1) });
+      y -= 16;
+    }
+
+    if (partsTotal > 0) costRow('Parts & Materials:', partsTotal, false);
+    if (laborTotal > 0) costRow('Labor:', laborTotal, false);
+    if (mileageTotal > 0) costRow('Mileage:', mileageTotal, false);
+    if (partsTotal > 0 || laborTotal > 0 || mileageTotal > 0) {
+      pg.drawLine({ start: { x: sumX, y: y + 12 }, end: { x: W - M, y: y + 12 }, thickness: 0.5, color: rgb(0.5, 0.5, 0.5) });
+    }
+    var gt = grandTotal > 0 ? grandTotal : (partsTotal + laborTotal + mileageTotal);
+    costRow('GRAND TOTAL:', gt, true);
+    y -= 10;
+  }
+
+  // ── SIGNATURE LINE ───────────────────────────────────────────────────
+  checkY(state, 60);
+  pg = state.pg; y = state.y;
+  y -= 10;
+  pg.drawLine({ start: { x: M, y: y }, end: { x: M + 180, y: y }, thickness: 0.75, color: rgb(0.3, 0.3, 0.3) });
+  pg.drawLine({ start: { x: W - M - 180, y: y }, end: { x: W - M, y: y }, thickness: 0.75, color: rgb(0.3, 0.3, 0.3) });
+  pg.drawText('Technician Signature', { x: M, y: y - 12, size: 8, font: font, color: rgb(0.5, 0.5, 0.5) });
+  pg.drawText('Customer Signature / Approval', { x: W - M - 180, y: y - 12, size: 8, font: font, color: rgb(0.5, 0.5, 0.5) });
+
+  // ── FOOTER ───────────────────────────────────────────────────────────
+  var pages = pdfDoc.getPages();
+  for (var fi = 0; fi < pages.length; fi++) {
+    pages[fi].drawText('Reliable Oilfield Services  |  reports@reliable-oilfield-services.com', { x: M, y: 22, size: 7, font: font, color: rgb(0.6, 0.6, 0.6) });
+    pages[fi].drawText('Page ' + (fi + 1) + ' of ' + pages.length, { x: W - M - 40, y: 22, size: 7, font: font, color: rgb(0.6, 0.6, 0.6) });
+    pages[fi].drawLine({ start: { x: M, y: 32 }, end: { x: W - M, y: 32 }, thickness: 0.4, color: rgb(0.8, 0.8, 0.8) });
+  }
+
   return await pdfDoc.save();
 }
-
-// ── PM / SC REPORT ───────────────────────────────────────────────────────
 async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
