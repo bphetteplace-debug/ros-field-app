@@ -166,7 +166,7 @@ export function WorkOrderPDFTemplate({ data }) {
         </div>
         <div style={woBlock}>
           <div style={woLabel}>Work Order</div>
-          <div style={woNum}>#{d.wo_number}</div>
+          <div style={woNum}>#{d.customer_wo_number}</div>
           <div style={dateStr}>{d.date_long}</div>
         </div>
       </div>
@@ -178,7 +178,6 @@ export function WorkOrderPDFTemplate({ data }) {
         <div style={infoGrid}>
           {F('Customer', d.customer)}
           {F('Location / Site', d.location)}
-          {F('Customer WO #', d.customer_wo_number, true)}
           {F('Type of Work', d.type_of_work)}
           {F('Work Area', d.work_area)}
           {F('Site Contact', d.contact, true)}
@@ -318,7 +317,7 @@ export function WorkOrderPDFTemplate({ data }) {
       <div style={footer}>
         <span>Reliable Oilfield Services · reports@reliable-oilfield-services.com</span>
         <span>Generated {d.generated_at}</span>
-        <span>WO #{d.wo_number}</span>
+        <span>WO #{d.customer_wo_number}</span>
       </div>
 
     </div>
