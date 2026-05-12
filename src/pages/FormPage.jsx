@@ -12,7 +12,7 @@ import {
   fetchPartsCatalog,
 } from '../lib/submissions'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
-import { generateSubmissionPdfBase64 } from '../lib/submissionPdf'
+import { generateSubmissionPdfBase64 } from '../../submissionPdf'
 import { fetchSubmission } from '../lib/submissions'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
