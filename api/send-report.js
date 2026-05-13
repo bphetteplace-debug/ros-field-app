@@ -109,7 +109,8 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     if (!s) return '--';
     try {
       var d = new Date(s);
-      return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      var r = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      return safeStr(r) || '--';
     } catch(e) { return safeStr(s); }
   };
 
@@ -371,7 +372,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   page.drawText('Reliable Oilfield Services  |  ReliableTrack  |  reliableoilfieldservices.net', {
     x:M, y:10, size:7, font:hFont, color:rgb(0.75,0.75,0.75)
   });
-  page.drawText('WO# '+woNum+'  |  '+new Date().toLocaleDateString(), {
+  page.drawText('WO# '+woNum+'  |  '+safeStr(new Date().toLocaleDateString('en-US')), {
     x:W-170, y:10, size:7, font:hFont, color:rgb(0.75,0.75,0.75)
   });
 
