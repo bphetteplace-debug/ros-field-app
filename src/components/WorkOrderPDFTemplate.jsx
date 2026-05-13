@@ -10,6 +10,14 @@ export function WorkOrderPDFTemplate({ data }) {
   const equip  = d.equipment  || [];
   const techCount = d.tech_count || techs.length || 1;
   const plural = techCount !== 1 ? 's' : '';
+  const arrestors = d.arrestors || [];
+  const flares    = d.flares    || [];
+  const heaters   = d.heaters   || [];
+  const scEquip   = d.sc_equipment || [];
+  const isPM      = d.job_type === 'PM';
+  const isSC      = ['Service Call','Repair','Other'].includes(d.job_type);
+  const showIssue = ['Service Call','Repair'].includes(d.job_type);
+  const permits   = d.permits_required || [];
 
   const ORANGE = '#E35B04';
   const DARK   = '#1A1A1A';
@@ -185,6 +193,9 @@ export function WorkOrderPDFTemplate({ data }) {
           {F('Start Time', d.start_time)}
           {F('Departure Time', d.departure_time)}
           {F('Truck #', d.truck_number, true)}
+          {F('GL Code', d.gl_code)}
+          {F('Asset Tag', d.asset_tag)}
+          {F('Last Service', d.last_service_date, true)}
         </div>
 
         {/* FIELD TECHNICIANS */}
@@ -200,6 +211,24 @@ export function WorkOrderPDFTemplate({ data }) {
         <div style={descBox}>
           {d.description_of_work || <span style={emptyNote}>No description provided.</span>}
         </div>
+        {showIssue && d.reported_issue && (
+          <>
+            <div style={sectionBar}>Reported Issue</div>
+            <div style={descBox}>{d.reported_issue}</div>
+            {d.root_cause && (<>
+              <div style={sectionBar}>Root Cause</div>
+              <div style={descBox}>{d.root_cause}</div>
+            </>)}
+          </>
+        )}
+        {permits.length > 0 && (
+          <>
+            <div style={sectionBar}>Permits Required</div>
+            <div style={{...badgesWrap, borderTop:'none'}}>
+              {permits.map((p,i)=><span key={i} style={equipTag}>{p}</span>)}
+            </div>
+          </>
+        )}
 
         {/* EQUIPMENT SERVICED */}
         {equip.length > 0 && (
@@ -211,6 +240,50 @@ export function WorkOrderPDFTemplate({ data }) {
           </>
         )}
 
+        {isSC && scEquip.length > 0 && (
+          <>
+            <div style={sectionBar}>SC Equipment ({scEquip.length})</div>
+            <div style={{...badgesWrap, borderTop:'none'}}>
+              {scEquip.map((eq,i)=><span key={i} style={equipTag}>{eq.type||String(eq)}</span>)}
+            </div>
+          </>
+        )}
+        {isPM && arrestors.length > 0 && (
+          <>
+            <div style={sectionBar}>Flame Arrestors ({arrestors.length})</div>
+            <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
+              {arrestors.map((a,i)=>(
+                <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
+                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' · Filter Changed':''}{a.notes?' · '+a.notes:''}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {isPM && flares.length > 0 && (
+          <>
+            <div style={sectionBar}>Flares / Combustors ({flares.length})</div>
+            <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
+              {flares.map((f,i)=>(
+                <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
+                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.notes?' · '+f.notes:''}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {isPM && heaters.length > 0 && (
+          <>
+            <div style={sectionBar}>Heater Treaters ({heaters.length})</div>
+            <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
+              {heaters.map((h,i)=>(
+                <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
+                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{h.notes?' · '+h.notes:''}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {/* PARTS USED */}
         <div style={sectionBar}>Parts Used ({parts.length})</div>
         {parts.length > 0 ? (
