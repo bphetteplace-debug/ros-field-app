@@ -109,6 +109,7 @@ export async function saveSubmission(formData, userId, templateOverride) {
     date, startTime, departureTime, description, techs, equipment, parts,
     miles, costPerMile, laborHours, hourlyRate, billableTechs,
     arrestors, flares, heaters, scEquipment,
+            reportedIssue, rootCause, lastServiceDate, permitsRequired,
     // Expense Report fields
     expenseItems, expenseTotal,
     // Daily Inspection fields
@@ -180,7 +181,10 @@ export async function saveSubmission(formData, userId, templateOverride) {
       flares: jobType === 'PM' ? (flares || []) : [],
       heaters: jobType === 'PM' ? (heaters || []) : [],
       scEquipment: jobType === 'Service Call' ? (scEquipment || []) : [],
-      // Expense Report fields
+      reportedIssue: reportedIssue || '',
+                  rootCause: rootCause || '',
+                  lastServiceDate: lastServiceDate || '',
+                  permitsRequired: permitsRequired || [],
       expenseItems: expenseItems || [],
       expenseTotal: expenseTotal || 0,
       // Daily Inspection fields
@@ -365,10 +369,9 @@ export async function updateSubmission(id, formData) {
     customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
     date, startTime, departureTime, lastServiceDate, description, techs, equipment,
     parts, miles, costPerMile, laborHours, hourlyRate, billableTechs,
-    arrestors, flares, heaters, scEquipment,
+            arrestors, flares, heaters, scEquipment,
+            reportedIssue, rootCause, permitsRequired,
   } = formData
-  const partsTotal = (parts||[]).reduce((s,p)=>s+(p.price||0)*(p.qty||0),0)
-  const mileageTotal = parseFloat(miles||0)*parseFloat(costPerMile||1.50)
   const effBill = parseInt(billableTechs)||(techs||[]).length
   const laborTotal = warrantyWork ? 0 : parseFloat(laborHours||0)*parseFloat(hourlyRate||115)*effBill
   const grandTotal = warrantyWork ? 0 : partsTotal+mileageTotal+laborTotal
@@ -400,6 +403,10 @@ export async function updateSubmission(id, formData) {
       flares: jobType==='PM' ? (flares||[]) : [],
       heaters: jobType==='PM' ? (heaters||[]) : [],
       scEquipment: jobType==='Service Call' ? (scEquipment||[]) : [],
+            reportedIssue: reportedIssue || '',
+            rootCause: rootCause || '',
+            lastServiceDate: lastServiceDate || '',
+            permitsRequired: permitsRequired || [],
     },
   })
 }
