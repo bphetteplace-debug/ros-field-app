@@ -15,8 +15,7 @@ module.exports = async function handler(req, res) {
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
 
   try {
-    const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
-
+    
     // Fetch submission + photos
     const subRes = await fetch(
       SUPA_URL + '/rest/v1/submissions?id=eq.' + submissionId + '&select=*,photos(id,storage_path,caption,display_order,section)',
@@ -35,16 +34,16 @@ module.exports = async function handler(req, res) {
 
     // Route to appropriate handler
     if (template === 'expense_report') {
-      return await sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
+              return await sendExpenseReport(res, sub, d, photos, pdfBase64);
     }
     if (template === 'daily_inspection') {
-      return await sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
+              return await sendInspectionReport(res, sub, d, photos, pdfBase64);
     }
     if (template === 'jha' || (d && d.jobType === 'JHA/JSA')) {
-      return await sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
+              return await sendJhaReport(res, sub, d, photos, pdfBase64);
     }
     // Default: PM or SC
-    return await sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64);
+            return await sendPmScReport(res, sub, d, photos, pdfBase64);
 
   } catch (err) {
     console.error('send-report error:', err);
@@ -381,7 +380,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
 }
 
 
-async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
+async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
   const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
@@ -397,9 +396,13 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
   const grandTotal = parseFloat(d.grandTotal || 0);
 
   // ââ Build PDF ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-  const pdfBytes = await generateWorkOrderPDF(sub, photos, pdfBase64);
-
-  const pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
+    var pdfB64;
+      if (pdfBase64) {
+              pdfB64 = pdfBase64;
+      } else {
+              const pdfBytes = await generateWorkOrderPDF(sub, photos, null);
+              pdfB64 = Buffer.from(pdfBytes).toString('base64');
+      }
 
   // Build email HTML
   const partsRows = parts.map(function(p) {
@@ -477,7 +480,8 @@ async function sendPmScReport(res, sub, d, photos, PDFDocument, rgb, StandardFon
 }
 
 // ââ EXPENSE REPORT âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
+async function sendExpenseReport(res, sub, d, photos, pdfBase64 = null) {
+    const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
   const items = Array.isArray(d.expenseItems) ? d.expenseItems : [];
   const total = parseFloat(d.expenseTotal || 0);
   const techName = d.techs && d.techs.length ? d.techs[0] : (sub.created_by || '');
@@ -581,7 +585,8 @@ async function sendExpenseReport(res, sub, d, photos, PDFDocument, rgb, Standard
 }
 
 // ââ DAILY INSPECTION REPORT ââââââââââââââââââââââââââââââââââââââââââââââ
-async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
+async function sendInspectionReport(res, sub, d, photos, pdfBase64 = null) {
+  const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
   const checks = Array.isArray(d.checkItems) ? d.checkItems : [];
   const failCount = parseInt(d.failCount || 0);
   const allPass = d.allPass !== false;
@@ -707,7 +712,8 @@ async function sendInspectionReport(res, sub, d, photos, PDFDocument, rgb, Stand
 
 
 // -- JHA / JSA REPORT --
-async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFonts, pdfBase64 = null) {
+async function sendJhaReport(res, sub, d, photos, pdfBase64 = null) {
+  const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
   var steps = Array.isArray(d.jhaSteps) ? d.jhaSteps : [];
   var ppeList = Array.isArray(d.jhaPPE) ? d.jhaPPE : [];
   var techName = d.techs && d.techs.length ? d.techs[0] : '';
