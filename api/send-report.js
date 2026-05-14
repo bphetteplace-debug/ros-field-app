@@ -7,7 +7,7 @@ const RESEND_KEY = process.env.RESEND_API_KEY;
 const TO = process.env.EMAIL_TO ? process.env.EMAIL_TO.split(',').map(e => e.trim()) : ['bphetteplace@reliableoilfieldservices.net'];
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 
-module.exports = async function handler(req, res) {
+module.exports = async function handler(req, res) {h
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { submissionId , pdfBase64 } = req.body || {};
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
@@ -132,7 +132,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var lastSvcDate = safeStr(extra.lastServiceDate || '');
   var jobType     = safeStr(extra.jobType || sub.template || '');
   var isPM        = jobType === 'PM' || jobType.startsWith('pm');
-  var permits     = Array.isArray(extra.permitsRequired) ? extra.permitsRequired : [];
+  var permits     = Array.isArray(extra.permitsRequired) ? extra.permitsRequired.map(p => safeStr(p)) : [];
   var arrestors   = isPM && Array.isArray(extra.arrestors) ? extra.arrestors : [];
   var flares      = isPM && Array.isArray(extra.flares) ? extra.flares : [];
   var heaters     = isPM && Array.isArray(extra.heaters) ? extra.heaters : [];
