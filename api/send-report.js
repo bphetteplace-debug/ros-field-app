@@ -67,7 +67,7 @@ async function fetchPhotoBytes(storagePath) {
 async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, startY) {
   const sectionPhotos = photos.filter(p => p.section === section || (!p.section && section === 'work'));
   let y = startY;
-  for (const photo of sectionPhotos.slice(0, 6)) {
+  for (const photo of sectionPhotos) {
     if (y < 80) break;
     const bytes = await fetchPhotoBytes(photo.storage_path);
     if (!bytes) continue;
@@ -384,7 +384,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     var photoW = (W-M*2-12)/3;
     var photoH = photoW * 0.75;
     var px = M; var photoCount = 0;
-    for (var phi=0; phi<allPhotos.length && y-photoH > 80 && photoCount<6; phi++) {
+    for (var phi=0; phi<allPhotos.length && y-photoH > 80; phi++) {
       var photo = allPhotos[phi];
       if (!photo.storage_path) continue;
       try {
@@ -491,7 +491,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
 async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
   const isPM = sub.template === 'pm_flare_combustor';
   const pmNum = sub.pm_number || '';
-  const label = isPM ? 'PM #' + pmNum : 'SC #' + pmNum;
+  const label = isPM ? 'PM #' + (sub.work_order || pmNum) : 'SC #' + (sub.work_order || pmNum);
   const techs = Array.isArray(d.techs) ? d.techs : [];
   const parts = Array.isArray(d.parts) ? d.parts : [];
   const arrestors = Array.isArray(d.arrestors) ? d.arrestors : [];
@@ -646,7 +646,7 @@ async function sendExpenseReport(res, sub, d, photos, pdfBase64 = null) {
   const pdfB64 = pdfBase64 || Buffer.from(pdfBytes).toString('base64');
 
   // Photo HTML
-  const photoHtml = photos.slice(0, 8).map(function(p) {
+  const photoHtml = photos.map(function(p) {
     const url = SUPA_URL + '/storage/v1/object/public/submission-photos/' + p.storage_path;
     return '<img src="' + url + '" style="max-width:200px;max-height:150px;margin:6px;border-radius:4px;border:1px solid #ddd" />';
   }).join('');
