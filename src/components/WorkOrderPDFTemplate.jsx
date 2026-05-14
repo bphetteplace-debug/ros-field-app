@@ -14,7 +14,7 @@ export function WorkOrderPDFTemplate({ data }) {
   const flares    = d.flares    || [];
   const heaters   = d.heaters   || [];
   const scEquip   = d.sc_equipment || [];
-  const isPM      = d.job_type === 'PM';
+  const isPM      = d.job_type === 'PM' || (d.job_type && d.job_type.startsWith('pm'));
   const isSC      = ['Service Call','Repair','Other'].includes(d.job_type);
   const showIssue = ['Service Call','Repair'].includes(d.job_type);
   const permits   = d.permits_required || [];
@@ -186,7 +186,7 @@ export function WorkOrderPDFTemplate({ data }) {
         <div style={infoGrid}>
           {F('Customer', d.customer)}
           {F('Location / Site', d.location)}
-          {F('Customer WO #', <span style={{display:'inline-block',borderBottom:'1px solid #999',width:'120px',minHeight:'14px'}}></span>, true)}
+          {F('Customer WO #', d.customer_wo_number, true)}
           {F('Type of Work', d.type_of_work)}
           {F('Work Area', d.work_area)}
           {F('Site Contact', d.contact, true)}
