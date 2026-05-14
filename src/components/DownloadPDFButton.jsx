@@ -27,7 +27,18 @@ export function DownloadPDFButton({ sub, style }) {
       await new Promise((resolve) => {
         const root = createRoot(container);
         root.render(createElement(WorkOrderPDFTemplate, { data }));
-        setTimeout(resolve, 300);
+        // Wait for initial render, then wait for all images to load
+        setTimeout(async () => {
+          const imgs = Array.from(container.querySelectorAll('img'));
+          await Promise.allSettled(
+            imgs.map(img =>
+              img.complete
+                ? Promise.resolve()
+                : new Promise(res => { img.onload = res; img.onerror = res; })
+            )
+          );
+          resolve();
+        }, 300);
       });
 
       const html2pdf = await loadHtml2Pdf();
