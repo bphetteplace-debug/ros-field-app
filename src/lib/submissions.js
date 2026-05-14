@@ -7,7 +7,6 @@ const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const DEFAULT_CUSTOMERS = ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS'];
 export const DEFAULT_TRUCKS = ['0001','0002','0003','0004','0005','0006','0007'];
 export const DEFAULT_TECHS = ['Matthew Reid','Vladimir Rivero','Pedro Perez'];
-
 // Helper: get auth token from localStorage
 function getAuthToken() {
   const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
@@ -259,59 +258,142 @@ export async function removeFromOfflineQueue(id) {
   });
 }
 
-// ── PHOTOS ────────────────────────────────────────────────────────────────────────
+// — PHOTOS ————————————————————————————————————————————————————————————
 export async function uploadPhotos(submissionId, photosOrObj, section) {
-  // photosOrObj can be an array (legacy) or object { sectionName: [{dataUrl, caption, file}] }
-  // Build a flat list of { photo, section } entries
-  const entries = [];
-  if (Array.isArray(photosOrObj)) {
-    const sec = section || 'work';
-    photosOrObj.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
-  } else if (photosOrObj && typeof photosOrObj === 'object') {
-    for (const [sec, arr] of Object.entries(photosOrObj)) {
-      if (!Array.isArray(arr)) continue;
-      arr.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
-    }
-  }
-  const uploaded = [];
-  const token = getAuthToken();
-  for (const entry of entries) {
-    const { photo, section: sec, order } = entry;
-    if (!photo) continue;
-    if (!photo.dataUrl && !photo.file) continue;
-    try {
-      let blob;
-      if (photo.file instanceof Blob) {
-        blob = photo.file;
-      } else if (photo.dataUrl) {
-        blob = await fetch(photo.dataUrl).then(r => r.blob());
-      } else continue;
-      const ext = blob.type === 'image/png' ? 'png'
-        : blob.type === 'video/mp4' ? 'mp4'
-        : blob.type === 'video/webm' ? 'webm'
-        : blob.type === 'video/quicktime' ? 'mov'
-        : blob.type.startsWith('video/') ? 'mp4'
-        : 'jpg';
-      const path = submissionId + '/' + sec + '-' + order + '.' + ext;
-      const storageHeaders = { 'apikey': SUPA_KEY, 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' };
-      if (token) storageHeaders['Authorization'] = 'Bearer ' + token;
-      const upRes = await fetch(SUPA_URL + '/storage/v1/object/submission-photos/' + path, {
-        method: 'POST', headers: storageHeaders, body: blob
-      });
-      if (!upRes.ok) { console.warn('Upload err:', await upRes.text()); continue; }
-      const metaHeaders = { 'apikey': SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
-      if (token) metaHeaders['Authorization'] = 'Bearer ' + token;
-      const metaRes = await fetch(SUPA_URL + '/rest/v1/photos', {
-        method: 'POST', headers: metaHeaders,
-        body: JSON.stringify({ submission_id: submissionId, storage_path: path, caption: photo.caption || '', display_order: order, section: sec })
-      });
-      const metaText = await metaRes.text();
-      if (metaRes.ok) uploaded.push(metaText ? JSON.parse(metaText)[0] : null);
-    } catch (e) { console.warn('Photo upload error:', e); }
-  }
-  return uploaded;
-}
+    if (!submissionId) return [];
 
+    // Normalize input: accept either array (legacy) or { sectionKey: [{dataUrl, caption, file}] }
+    const entries = [];
+    if (Array.isArray(photosOrObj)) {
+          const sec = section || 'work';
+          photosOrObj.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
+    } else if (photosOrObj && typeof photosOrObj === 'object') {
+          for (const [sec, arr] of Object.entries(photosOrObj)) {
+                  if (!Array.isArray(arr)) continue;
+                  arr.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
+          }
+    }
+
+    if (entries.length === 0) return [];
+
+    const token = getAuthToken();
+    const storageBase = SUPA_URL + '/storage/v1/object/submission-photos/';
+    const restBase    = SUPA_URL + '/rest/v1/photos';
+
+    // Convert a single entry to a Blob
+    async function entryToBlob(photo) {
+          if (photo.file instanceof Blob) return photo.file;
+          if (photo.dataUrl && typeof photo.dataUrl === 'string' && photo.dataUrl.startsWith('data:')) {
+                  const res = await fetch(photo.dataUrl);
+                  return res.blob();
+          }
+          return null;
+    }
+
+    // Upload one entry; returns the inserted photo metadata row or null on failure
+    async function uploadOne(entry) {
+          const { photo, section: sec, order } = entry;
+          if (!photo) return null;
+
+          let blob;
+          try {
+                  blob = await entryToBlob(photo);
+          } catch (e) {
+                  console.warn('[uploadPhotos] blob conversion failed for section=' + sec + ' order=' + order + ':', e);
+                  return null;
+          }
+
+          if (!blob || blob.size === 0) {
+                  console.warn('[uploadPhotos] empty blob for section=' + sec + ' order=' + order);
+                  return null;
+          }
+
+          const ext =
+                  blob.type === 'image/png'         ? 'png'  :
+                  blob.type === 'image/webp'        ? 'webp' :
+                  blob.type === 'video/mp4'         ? 'mp4'  :
+                  blob.type === 'video/webm'        ? 'webm' :
+                  blob.type === 'video/quicktime'   ? 'mov'  :
+                  blob.type.startsWith('video/')    ? 'mp4'  :
+                  'jpg';
+
+          const path = submissionId + '/' + sec + '-' + order + '.' + ext;
+
+          const storageHeaders = {
+                  'apikey':       SUPA_KEY,
+                  'Content-Type': blob.type || 'image/jpeg',
+                  'x-upsert':     'true',
+          };
+          if (token) storageHeaders['Authorization'] = 'Bearer ' + token;
+
+          let upRes;
+          try {
+                  upRes = await fetch(storageBase + path, {
+                            method: 'POST', headers: storageHeaders, body: blob,
+                  });
+          } catch (e) {
+                  console.warn('[uploadPhotos] storage fetch error section=' + sec + ' order=' + order + ':', e);
+                  return null;
+          }
+
+          if (!upRes.ok) {
+                  const errText = await upRes.text().catch(function() { return String(upRes.status); });
+                  console.warn('[uploadPhotos] storage upload failed ' + upRes.status + ' section=' + sec + ' order=' + order + ':', errText);
+                  return null;
+          }
+
+          const metaHeaders = {
+                  'apikey':        SUPA_KEY,
+                  'Content-Type':  'application/json',
+                  'Prefer':        'return=representation',
+          };
+          if (token) metaHeaders['Authorization'] = 'Bearer ' + token;
+
+          let metaRes;
+          try {
+                  metaRes = await fetch(restBase, {
+                            method: 'POST',
+                            headers: metaHeaders,
+                            body: JSON.stringify({
+                                        submission_id: submissionId,
+                                        storage_path:  path,
+                                        caption:       photo.caption || '',
+                                        display_order: order,
+                                        section:       sec,
+                            }),
+                  });
+          } catch (e) {
+                  console.warn('[uploadPhotos] metadata insert error section=' + sec + ' order=' + order + ':', e);
+                  // Storage upload succeeded — photo is in bucket but metadata row missing
+                  // Return a partial record so we don't lose the file reference
+                  return { storage_path: path, caption: photo.caption || '', section: sec };
+          }
+
+          const metaText = await metaRes.text().catch(function() { return ''; });
+          if (!metaRes.ok) {
+                  console.warn('[uploadPhotos] metadata insert failed ' + metaRes.status + ':', metaText);
+                  return { storage_path: path, caption: photo.caption || '', section: sec };
+          }
+
+          try {
+                  const parsed = metaText ? JSON.parse(metaText) : null;
+                  return Array.isArray(parsed) ? parsed[0] : parsed;
+          } catch (_e) {
+                  return { storage_path: path, caption: photo.caption || '', section: sec };
+          }
+    }
+
+    // Upload all entries in parallel batches of 5 to avoid overwhelming the connection
+    const BATCH = 5;
+    const results = [];
+    for (let i = 0; i < entries.length; i += BATCH) {
+          const batch = entries.slice(i, i + BATCH);
+          const batchResults = await Promise.all(batch.map(uploadOne));
+          results.push(...batchResults.filter(Boolean));
+    }
+
+    return results;
+}
 export async function fetchSubmissions(userId) {
   try {
     const data = await supaRest('GET', 'submissions?select=*&order=created_at.desc&created_by=eq.' + userId);
