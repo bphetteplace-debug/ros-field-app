@@ -436,8 +436,8 @@ export default function FormPage() {
     setSaving(true);setSaveError(null)
     try{
       const photoDataUrls={}
-      if(siteSignPhoto){const u=await toDataUrl(siteSignPhoto);if(u)photoDataUrls['site-sign']=[{dataUrl:u,caption:'Site Sign'}]}
-    if(photos.length>0) photoDataUrls['general']=await Promise.all(photos.map(async(f,i)=>({dataUrl:await toDataUrl(f),caption:photoCaptions[i]||''})))
+      if(siteSignPhoto){const u=await toDataUrl(siteSignPhoto);if(u)photoDataUrls['site']=[{dataUrl:u,caption:'Site Sign'}]}
+    if(photos.length>0) photoDataUrls['work']=await Promise.all(photos.map(async(f,i)=>({dataUrl:await toDataUrl(f),caption:photoCaptions[i]||''})))
       for(const p of parts){ const pf=partPhotos[p.sku]||[]; if(pf.length) photoDataUrls[`part-${p.sku}`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption}))) }
       if(showVideos){
         if(arrivalVideo){const u=await toDataUrl(arrivalVideo);if(u)photoDataUrls['arrival-video']=[{dataUrl:u,caption:'Arrival Video'}]}
@@ -446,16 +446,16 @@ export default function FormPage() {
       if(showPMEquipment){
         for(let i=0;i<arrestors.length;i++){
           const a=arrestors[i], pf=[a.before1&&{file:a.before1,caption:`Arrestor ${i+1} Before 1`},a.before2&&{file:a.before2,caption:`Arrestor ${i+1} Before 2`},a.after1&&{file:a.after1,caption:`Arrestor ${i+1} After 1`},a.after2&&{file:a.after2,caption:`Arrestor ${i+1} After 2`}].filter(Boolean)
-          if(pf.length) photoDataUrls[`arrestor-${i}`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption})))
+                    if(pf.length) photoDataUrls[`arrestor-${i}-tag1`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption})))
         }
         for(let i=0;i<flares.length;i++){
           const f=flares[i], pf=[f.photo1&&{file:f.photo1,caption:`Flare ${i+1} P1`},f.photo2&&{file:f.photo2,caption:`Flare ${i+1} P2`}].filter(Boolean)
-          if(pf.length) photoDataUrls[`flare-${i}`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption})))
+                    if(pf.length) photoDataUrls[`flare-${i}-serial`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption})))
         }
       }
       if(customerSig) photoDataUrls['customer-sig']=[{dataUrl:customerSig,caption:'Customer Signature'}]
       const tse=Object.entries(techSignatures)
-      if(tse.length) photoDataUrls['tech-sigs']=tse.map(([name,dataUrl])=>({dataUrl,caption:`${name} Signature`}))
+            if(tse.length) tse.forEach(([name,dataUrl])=>{ if(dataUrl) photoDataUrls['sig-'+name]=[{dataUrl,caption:name+' Signature'}] })
 
       const jtObj=JOB_TYPES.find(jt=>jt.value===jobType)
       const template=jtObj?.template||'service_call'
