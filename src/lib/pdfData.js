@@ -44,7 +44,7 @@ export function buildPDFData(sub, getUrl) {
   // Parts
   const parts = (Array.isArray(d.parts) ? d.parts : []).map(p => {
     const qty = Number(p.qty) || 1;
-    const price = Number(p.price) || 0;
+    const price = Number(p.price ?? p.unit_price ?? p.unitPrice) || 0;
     return {
       sku: String(p.sku || ''),
       description: p.description || p.name || '',
