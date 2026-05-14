@@ -486,7 +486,19 @@ export default function FormPage() {
           document.body.appendChild(container)
           const root = createRoot(container)
           flushSync(() => { root.render(createElement(WorkOrderPDFTemplate, { data: pdfData })) })
-          await new Promise(r => setTimeout(r, 600))
+          await new Promise((resolve) => {
+            setTimeout(async () => {
+              const imgs = Array.from(container.querySelectorAll('img'));
+              await Promise.allSettled(
+                imgs.map(img =>
+                  img.complete
+                    ? Promise.resolve()
+                    : new Promise(res => { img.onload = res; img.onerror = res; })
+                )
+              );
+              resolve();
+            }, 600);
+          })
           pdfBase64 = await html2pdf().set({ margin: 0, image: { type: 'jpeg', quality: 0.92 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(container).outputPdf('datauristring').then(uri => uri.split(',')[1])
           container.remove()
         } catch (e) { console.warn('PDF gen failed:', e) }
