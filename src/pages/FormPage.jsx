@@ -473,39 +473,54 @@ export default function FormPage() {
       }
       const submission=await saveSubmission(formData,user.id,template)
       if(submission?.id&&Object.keys(photoDataUrls).length>0) await uploadPhotos(submission.id,photoDataUrls)
-      if(submission?.id){
-        let pdfBase64 = null
-        try {
-          const full = await fetchSubmission(submission.id)
-          const pdfData = buildPDFData(full, (path) => import('../lib/submissions').then(m => m.getPhotoUrl(path)))
-          const { createRoot, flushSync } = await import('react-dom/client')
-          const { createElement } = await import('react')
-          const html2pdf = await import('html2pdf.js').then(m => m.default || m)
-          const container = document.createElement('div')
-          container.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;background:white;z-index:-1;'
-          document.body.appendChild(container)
-          const root = createRoot(container)
-          flushSync(() => { root.render(createElement(WorkOrderPDFTemplate, { data: pdfData })) })
-          await new Promise((resolve) => {
-            setTimeout(async () => {
-              const imgs = Array.from(container.querySelectorAll('img'));
-              await Promise.allSettled(
-                imgs.map(img =>
-                  img.complete
-                    ? Promise.resolve()
-                    : new Promise(res => { img.onload = res; img.onerror = res; })
-                )
-              );
-              resolve();
-            }, 600);
-          })
-          pdfBase64 = await html2pdf().set({ margin: 0, image: { type: 'jpeg', quality: 0.92 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(container).outputPdf('datauristring').then(uri => uri.split(',')[1])
-          container.remove()
-        } catch (e) { console.warn('PDF gen failed:', e) }
-        fetch('/api/send-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({submissionId:submission.id,pdfBase64})})
-          .catch(err=>console.warn('Email send failed:',err))
-      }
-      try{localStorage.removeItem(draftKey)}catch(e){}
+              if (submission?.id) {
+                          let pdfBase64 = null;
+                          try {
+                                        const full = await fetchSubmission(submission.id);
+                                        const { getPhotoUrl } = await import('../lib/submissions');
+                                        const pdfData = await buildPDFData(full, (path) => getPhotoUrl(path));
+                                        const { createRoot, flushSync } = await import('react-dom/client');
+                                        const { createElement }         = await import('react');
+                                        const html2pdf = await import('html2pdf.js').then(m => m.default || m);
+                                        const container = document.createElement('div');
+                                        container.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;background:white;z-index:-1;';
+                                        document.body.appendChild(container);
+                                        const root = createRoot(container);
+                                        flushSync(() => { root.render(createElement(WorkOrderPDFTemplate, { data: pdfData })); });
+                                        // Wait for all images to load before capturing
+                                        await new Promise(resolve => {
+                                                        setTimeout(async () => {
+                                                                          const imgs = Array.from(container.querySelectorAll('img'));
+                                                                          await Promise.allSettled(
+                                                                                              imgs.map(img =>
+                                                                                                                    img.complete
+                                                                                                                      ? Promise.resolve()
+                                                                                                                      : new Promise(r => { img.onload = r; img.onerror = r; })
+                                                                                                                         )
+                                                                                            );
+                                                                          resolve();
+                                                        }, 500);
+                                        });
+                                        pdfBase64 = await html2pdf()
+                                                        .set({
+                                                                          margin: 0,
+                                                                          image:       { type: 'jpeg', quality: 0.92 },
+                                                                          html2canvas: { scale: 2, useCORS: true, allowTaint: false },
+                                                                          jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
+                                                        })
+                                                        .from(container)
+                                                        .outputPdf('datauristring')
+                                                        .then(uri => uri.split(',')[1]);
+                                        container.remove();
+                          } catch (e) {
+                                        console.warn('PDF gen failed:', e);
+                          }
+                          fetch('/api/send-report', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ submissionId: submission.id, pdfBase64 }),
+                          }).catch(err => console.warn('Email send failed:', err));
+              }try{localStorage.removeItem(draftKey)}catch(e){}
       navigate('/submissions')
     }catch(err){
       console.error('Submit error:',err)
