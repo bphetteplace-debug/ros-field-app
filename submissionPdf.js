@@ -363,8 +363,8 @@ async function drawFlareSection(ctx, flare, idx, flarePhotos, arrestorPhotos) {
 
 async function drawHeaterSection(ctx, heater, hi, heaterPhotos) {
   // Heater label + per-firetube rows
-  if (heater.id) {
-    drawLabelAndValue(ctx, 'Heater ID:', heater.id)
+  if (heater.heaterId || heater.id) {
+    drawLabelAndValue(ctx, 'Heater ID:', heater.heaterId || heater.id)
   }
   if (heater.condition) {
     drawLabelAndValue(ctx, 'Overall Condition:', heater.condition)
