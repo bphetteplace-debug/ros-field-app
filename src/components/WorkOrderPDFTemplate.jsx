@@ -16,7 +16,7 @@ export function WorkOrderPDFTemplate({ data }) {
   const scEquip   = d.sc_equipment || [];
   const isPM      = d.job_type === 'PM' || (d.job_type && d.job_type.startsWith('pm'));
   const isSC      = ['Service Call','Repair','Other'].includes(d.job_type);
-  const showIssue = ['Service Call','Repair'].includes(d.job_type);
+  const showIssue = ['Service Call','Repair','service_call','repair'].includes(d.job_type) || d.job_type?.startsWith('service_') || d.job_type?.startsWith('repair');
   const permits   = d.permits_required || [];
 
   const ORANGE = '#E35B04';
@@ -152,8 +152,9 @@ export function WorkOrderPDFTemplate({ data }) {
     </div>
   );
 
-  const custSig  = photos.find(p => /cust|sig/i.test(p.caption || ''));
-  const workPics = photos.filter(p => !custSig || p.url !== custSig.url);
+  const custSig  = photos.find(p => /customer.sig|cust.*sig|^customer signature$/i.test(p.caption || ''));
+  const techSigs = photos.filter(p => /^.+\s+signature$/i.test(p.caption || '') && p !== custSig);
+  const workPics = photos.filter(p => p !== custSig && !techSigs.includes(p) && !/part/i.test(p.caption || ''));
 
   const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs Ã $${d.labor_rate}/hr Ã ${techCount} tech${plural}` : 'â';
   const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi Ã $${d.mileage_rate}/mi` : 'â';
@@ -171,6 +172,9 @@ export function WorkOrderPDFTemplate({ data }) {
           <div style={coName}>RELIABLE OILFIELD SERVICES</div>
           <div style={coSub}>ReliableTrack Field Report</div>
           {jobTypeFull && <div style={jobTag}>{jobTypeFull}</div>}
+          {d.warranty_work && (
+            <div style={{ color: '#FF6B00', fontWeight: 'bold', fontSize: '8pt', marginTop: 4 }}>⚠ WARRANTY WORK</div>
+          )}
         </div>
         <div style={woBlock}>
           <div style={woLabel}>Work Order</div>
@@ -215,10 +219,12 @@ export function WorkOrderPDFTemplate({ data }) {
           <>
             <div style={sectionBar}>Reported Issue</div>
             <div style={descBox}>{d.reported_issue}</div>
-            {d.root_cause && (<>
-              <div style={sectionBar}>Root Cause</div>
-              <div style={descBox}>{d.root_cause}</div>
-            </>)}
+          </>
+        )}
+        {showIssue && d.root_cause && (
+          <>
+            <div style={sectionBar}>Root Cause</div>
+            <div style={descBox}>{d.root_cause}</div>
           </>
         )}
         {permits.length > 0 && (
@@ -266,7 +272,7 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {flares.map((f,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.notes?' · '+f.notes:''}
+                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' · Last Ignition: '+f.last_ignition:''}{f.notes?' · '+f.notes:''}
                 </div>
               ))}
             </div>
@@ -381,7 +387,15 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={{ fontSize: '8pt', color: MID, marginTop: 4, lineHeight: 1.5 }}>
               I certify the work described above was performed professionally and all information is accurate.
             </div>
-            <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || 'â'}</strong></div>
+            {techSigs.length > 0
+              ? techSigs.map((ts, i) => (
+                  <div key={i} style={{ marginTop: 8 }}>
+                    <img src={ts.url} alt={ts.caption} style={sigImg} />
+                    <div style={{ ...sigLabel, marginTop: 4 }}>{ts.caption}</div>
+                  </div>
+                ))
+              : <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || 'â'}</strong></div>
+            }
             <div style={{ ...sigLabel, marginTop: 4 }}>Date: <strong>{d.date_long}</strong></div>
           </div>
         </div>
