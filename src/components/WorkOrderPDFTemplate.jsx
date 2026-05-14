@@ -152,10 +152,33 @@ export function WorkOrderPDFTemplate({ data }) {
     </div>
   );
 
-  const custSig  = photos.find(p => /customer.sig|cust.*sig|^customer signature$/i.test(p.caption || ''));
-  const techSigs = photos.filter(p => /^.+\s+signature$/i.test(p.caption || '') && p !== custSig);
-  const workPics = photos.filter(p => p !== custSig && !techSigs.includes(p) && !/part/i.test(p.caption || ''));
-
+  // Categorize photos by section
+    const custSig  = photos.find(p =>
+          /^customer[\s_-]?sig/i.test(p.caption) ||
+          p.caption === 'Customer Signature' ||
+           p.section       p.section === 'customer-sig'
+        );
+    const techSigs = photos.filter(p =>
+          (/\bSignature\b/i.test(p.caption) && p !== custSig) ||
+          (p.section && p.section.startsWith('sig-'))
+        );
+    const siteSig  = photos.find(p =>
+          /^site[\s_-]?sign/i.test(p.caption) ||
+          p.section === 'site'
+        );
+                                   const videoPics = photos.filter(p =>
+                                         /video/i.test(p.caption) ||
+                                         (p.section && p.section.includes('video'))
+                                       );
+    // Work photos: everything that isn't a signature, site sign, video, or part photo
+    const workPics = photos.filter(p =>
+          p !== custSig &&
+          p !== siteSig &&
+          !techSigs.includes(p) &&
+          !videoPics.includes(p) &&
+          !/^part[-_]/i.test(p.section || '') &&
+          !/^(arrestor|flare|heater)[-_]/i.test(p.section || '')
+        );
   const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs Ã $${d.labor_rate}/hr Ã ${techCount} tech${plural}` : 'â';
   const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi Ã $${d.mileage_rate}/mi` : 'â';
 
@@ -306,18 +329,32 @@ export function WorkOrderPDFTemplate({ data }) {
             </thead>
             <tbody>
               {parts.map((p, i) => {
-                const alt = i % 2 === 1;
-                return (
-                  <tr key={i}>
-                    <td style={alt ? tdA : td}>{p.sku || 'â'}</td>
-                    <td style={alt ? { ...tdA, maxWidth:'180px', wordBreak:'break-word' } : { ...td, maxWidth:'180px', wordBreak:'break-word' }}>{p.description}</td>
-                    <td style={alt ? tdAR : tdR}>{p.qty}</td>
-                    <td style={alt ? tdAR : tdR}>{p.unit_price}</td>
-                    <td style={alt ? { ...tdAR, fontWeight: 'bold' } : { ...tdR, fontWeight: 'bold' }}>{p.line_total}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
+                              const alt = i % 2 === 1;
+                              return (
+                                                    <tr key={i}>
+                                                                          <td style={alt ? tdA : td}>{p.sku || '\u2014'}</td>
+                                                                          <td style={alt ? { ...tdA, maxWidth: '180px', wordBreak: 'break-word' } : { ...td, maxWidth: '180px', wordBreak: 'break-word' }}>
+                                                                            {p.description}
+                                                                            {p.photos && p.photos.length > 0 && (
+                                                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                                                                                  {p.photos.map((ph, pi) => (
+                                                                                                                <img
+                                                                                                                                                  key={pi}
+                                                                                                                                                  src={ph.url}
+                                                                                                                                                  alt={ph.caption || 'Part photo'}
+                                                                                                                                                  style={{ width: 55, height: 55, objectFit: 'cover', borderRadius: 2, border: '1px solid ' + BORDER }}
+                                                                                                                                                  crossOrigin="anonymous"
+                                                                                                                                                />
+                                                                                                              ))}
+                                                                                  </div>
+                                                                                                  )}
+                                                                          </td>
+                                                                          <td style={alt ? tdAR : tdR}>{p.qty}</td>
+                                                                          <td style={alt ? tdAR : tdR}>{p.unit_price}</td>
+                                                                          <td style={alt ? { ...tdAR, fontWeight: 'bold' } : { ...tdR, fontWeight: 'bold' }}>{p.line_total}</td>
+                                                    </tr>
+                                                  );
+          })}</tbody>
           </table>
         ) : (
           <div style={{ ...descBox, minHeight: '30px' }}>
@@ -364,7 +401,7 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={photosGrid}>
               {workPics.map((ph, i) => (
                 <div key={i}>
-                  <img src={ph.url} alt={ph.caption || 'Photo'} style={photoImg} />
+                  <img src={ph.url} alt={ph.caption || 'Photo'} style={photoImg} crossOrigin="anonymous" />
                   {ph.caption && <div style={photoCap}>{ph.caption}</div>}
                 </div>
               ))}
@@ -378,7 +415,7 @@ export function WorkOrderPDFTemplate({ data }) {
           <div style={sigCell}>
             <div style={sigLabel}>Customer Signature</div>
             {custSig
-              ? <img src={custSig.url} alt="Customer signature" style={sigImg} />
+              ? <img src={custSig.url} alt="Customer signature" style={sigImg} crossOrigin="anonymous" />
               : <div style={sigLine} />}
             <div style={{ ...sigLabel, marginTop: 6 }}>Customer / Authorized Representative</div>
           </div>
@@ -390,7 +427,7 @@ export function WorkOrderPDFTemplate({ data }) {
             {techSigs.length > 0
               ? techSigs.map((ts, i) => (
                   <div key={i} style={{ marginTop: 8 }}>
-                    <img src={ts.url} alt={ts.caption} style={sigImg} />
+                    <img src={ts.url} alt={ts.caption} style={sigImg} crossOrigin="anonymous" />
                     <div style={{ ...sigLabel, marginTop: 4 }}>{ts.caption}</div>
                   </div>
                 ))
