@@ -51,7 +51,7 @@ module.exports = async function handler(req, res) {
   }
 };
 
-// ââ HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ HELPERS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function fmt(n) { return '$' + parseFloat(n || 0).toFixed(2); }
 function fmtDate(s) { if (!s) return ''; try { return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return s; } }
 
@@ -84,7 +84,7 @@ async function embedPhotosOnPage(pdfDoc, page, photos, section, rgb, maxW, start
   return y;
 }
 
-// ââ WORK ORDER PDF GENERATOR âââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ WORK ORDER PDF GENERATOR Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var PDFLib = require('pdf-lib');
   var PDFDocument = PDFLib.PDFDocument;
@@ -113,7 +113,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     } catch(e) { return safeStr(s); }
   };
 
-  // ââ Pull fields from flat DB columns (primary) with data fallback ââ
+  // Ã¢ÂÂÃ¢ÂÂ Pull fields from flat DB columns (primary) with data fallback Ã¢ÂÂÃ¢ÂÂ
   var woNum    = safeStr(sub.work_order || extra.customerWorkOrder || '');
   var pmNum    = safeStr(sub.pm_number  || '');
   var customer = fmt(sub.customer_name);
@@ -127,8 +127,15 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var startTime   = fmt(extra.startTime);
   var deptTime    = fmt(extra.departureTime);
   var glCode      = safeStr(sub.gl_code || extra.glCode || '');
-  var customerWO  = safeStr(sub.work_order || extra.customerWorkOrder || '');
+  var customerWO  = safeStr(extra.customerWorkOrder || sub.work_order || '');
+  var assetTag    = safeStr(sub.asset_tag || extra.assetTag || '');
+  var lastSvcDate = safeStr(extra.lastServiceDate || '');
   var jobType     = safeStr(extra.jobType || sub.template || '');
+  var isPM        = jobType === 'PM' || jobType.startsWith('pm');
+  var permits     = Array.isArray(extra.permitsRequired) ? extra.permitsRequired : [];
+  var arrestors   = isPM && Array.isArray(extra.arrestors) ? extra.arrestors : [];
+  var flares      = isPM && Array.isArray(extra.flares) ? extra.flares : [];
+  var heaters     = isPM && Array.isArray(extra.heaters) ? extra.heaters : [];
 
   // Technicians
   var techNames = [];
@@ -141,7 +148,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   // Parts
   var parts = Array.isArray(extra.parts) ? extra.parts : [];
 
-  // Cost figures â prefer flat DB columns
+  // Cost figures Ã¢ÂÂ prefer flat DB columns
   var laborHours   = parseFloat(sub.labor_hours  || extra.laborHours  || 0) || 0;
   var laborRate    = parseFloat(sub.labor_rate   || extra.hourlyRate  || 0) || 0;
   var mileage      = parseFloat(sub.miles        || extra.miles       || 0) || 0;
@@ -153,7 +160,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var mileageTotal = mileage * mileageRate;
   var grandTotal   = partsTotal + laborTotal + mileageTotal;
 
-  // ââ Create PDF ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ Create PDF Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   var pdfDoc = await PDFDocument.create();
   var page   = pdfDoc.addPage([612, 792]);
   var W = 612; var H = 792;
@@ -171,7 +178,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var M = 30; // margin
   var y = H - M;
 
-  // ââ HEADER âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ HEADER Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   page.drawRectangle({ x:0, y:H-72, width:W, height:72, color:navy });
   page.drawText('RELIABLE OILFIELD SERVICES', { x:M, y:H-26, size:14, font:hBold, color:white });
   page.drawText('ReliableTrack Field Report', { x:M, y:H-44, size:9, font:hFont, color:rgb(0.75,0.75,0.75) });
@@ -188,17 +195,19 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
 
   y = H - 78;
 
-  // ââ DATE BAR âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ DATE BAR Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   page.drawRectangle({ x:M, y:y-15, width:W-M*2, height:15, color:lightGray });
   page.drawText(dateStr, { x:M+4, y:y-11, size:8, font:hFont, color:darkGray });
   y -= 22;
 
-  // ââ INFO GRID (3 cols x 3 rows) ââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ INFO GRID (3 cols x 3 rows) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   var gridFields = [
     ['CUSTOMER', customer],
     ['LOCATION / SITE', location],
     ['CUSTOMER WO #', customerWO],
     ['GL CODE', glCode],
+    ['ASSET TAG', assetTag],
+    ['LAST SERVICE DATE', lastSvcDate],
     ['TYPE OF WORK', workType],
     ['WORK AREA', workArea],
     ['SITE CONTACT', contact],
@@ -225,7 +234,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
   y -= Math.ceil(gridFields.length/cols)*cH + 8;
 
-  // ââ FIELD TECHNICIANS ââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ FIELD TECHNICIANS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
   page.drawText('FIELD TECHNICIANS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
   y -= 22;
@@ -244,7 +253,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
   y -= 22;
 
-  // ââ DESCRIPTION OF WORK ââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ DESCRIPTION OF WORK Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
   page.drawText('DESCRIPTION OF WORK', { x:M+6, y:y-11, size:8, font:hBold, color:white });
   y -= 20;
@@ -269,7 +278,65 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
   y -= 6;
 
-  // ââ PHOTOS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ PHOTOS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+  // ── PERMITS REQUIRED ──
+  if (permits.length > 0 && y > 90) {
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('PERMITS REQUIRED', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+    y -= 20;
+    var permStr = permits.join(' | ');
+    page.drawText(permStr.substring(0,80), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
+    y -= 18;
+  }
+
+  // ── FLAME ARRESTORS ──
+  if (arrestors.length > 0 && y > 90) {
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('FLAME ARRESTORS (' + arrestors.length + ')', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+    y -= 20;
+    for (var ai=0; ai<arrestors.length; ai++) {
+      var arr = arrestors[ai];
+      var arrId = safeStr(arr.arrestorId || arr.tagNumber || 'Unlabeled');
+      var arrLine = '#'+(ai+1)+' '+arrId+' | Cond: '+safeStr(arr.condition||'-')+(arr.filterChanged?' | Filter Changed':'')+safeStr(arr.notes?' | '+arr.notes:'');
+      if (y < 60) break;
+      page.drawText(arrLine.substring(0,90), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
+      y -= 13;
+    }
+    y -= 6;
+  }
+
+  // ── FLARES / COMBUSTORS ──
+  if (flares.length > 0 && y > 90) {
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('FLARES / COMBUSTORS (' + flares.length + ')', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+    y -= 20;
+    for (var fi=0; fi<flares.length; fi++) {
+      var flr = flares[fi];
+      var flrId = safeStr(flr.flareId || flr.serialNumber || 'Unlabeled');
+      var flrLine = '#'+(fi+1)+' '+flrId+' | Cond: '+safeStr(flr.condition||'-')+' | Pilot: '+(flr.pilotLit?'Lit':'Not Lit')+safeStr(flr.lastIgnitionDate?' | Last Ign: '+flr.lastIgnitionDate:'')+safeStr(flr.notes?' | '+flr.notes:'');
+      if (y < 60) break;
+      page.drawText(flrLine.substring(0,90), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
+      y -= 13;
+    }
+    y -= 6;
+  }
+
+  // ── HEATER TREATERS ──
+  if (heaters.length > 0 && y > 90) {
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('HEATER TREATERS (' + heaters.length + ')', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+    y -= 20;
+    for (var hi=0; hi<heaters.length; hi++) {
+      var htr = heaters[hi];
+      var htrId = safeStr(htr.heaterId || htr.unitId || 'Unlabeled');
+      var htrLine = '#'+(hi+1)+' '+htrId+' | Cond: '+safeStr(htr.condition||'-')+' | Firetube: '+safeStr(htr.firetubeCondition||'-')+safeStr(htr.lastCleanDate?' | Last Clean: '+htr.lastCleanDate:'')+safeStr(htr.notes?' | '+htr.notes:'');
+      if (y < 60) break;
+      page.drawText(htrLine.substring(0,90), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
+      y -= 13;
+    }
+    y -= 6;
+  }
+
   if (Array.isArray(allPhotos) && allPhotos.length > 0 && y > 160) {
     page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
     page.drawText('WORK PHOTOS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
@@ -296,7 +363,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 6;
   }
 
-  // ââ PARTS & MATERIALS ââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ PARTS & MATERIALS Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   if (parts.length > 0 && y > 120) {
     page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
     page.drawText('PARTS & MATERIALS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
@@ -326,7 +393,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 6;
   }
 
-  // ââ COST SUMMARY âââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ COST SUMMARY Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   if (y > 90) {
     var sX = W/2; var sW = W/2-M;
     page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
@@ -351,7 +418,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 28;
   }
 
-  // ââ SIGN-OFF ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ SIGN-OFF Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   if (y > 55) {
     y -= 10;
     var sw = (W-M*2)/2-8;
@@ -366,7 +433,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 40;
   }
 
-  // ââ FOOTER ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ FOOTER Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   page.drawRectangle({ x:0, y:0, width:W, height:28, color:navy });
   page.drawText('Reliable Oilfield Services  |  ReliableTrack  |  reliableoilfieldservices.net', {
     x:M, y:10, size:7, font:hFont, color:rgb(0.75,0.75,0.75)
@@ -395,7 +462,7 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
   const laborTotal = parseFloat(d.laborTotal || 0);
   const grandTotal = parseFloat(d.grandTotal || 0);
 
-  // ââ Build PDF ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ Build PDF Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     var pdfB64;
       if (pdfBase64) {
               pdfB64 = pdfBase64;
@@ -444,7 +511,7 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
     + '<tr style="background:#102558;color:#fff;font-weight:bold"><td style="padding:8px">TOTAL</td><td style="padding:8px;text-align:right;color:#ef6600">' + fmt(grandTotal) + '</td></tr>'
     + '</table>'
     + '</div>'
-    + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack â¢ Reliable Oilfield Services</div>'
+    + '<div style="text-align:center;padding:12px;color:#999;font-size:11px">ReliableTrack Ã¢ÂÂ¢ Reliable Oilfield Services</div>'
     + '</div>';
 
   // SC video links
@@ -479,7 +546,7 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-// ââ EXPENSE REPORT âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ EXPENSE REPORT Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 async function sendExpenseReport(res, sub, d, photos, pdfBase64 = null) {
     const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
   const items = Array.isArray(d.expenseItems) ? d.expenseItems : [];
@@ -584,7 +651,7 @@ async function sendExpenseReport(res, sub, d, photos, pdfBase64 = null) {
   return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
-// ââ DAILY INSPECTION REPORT ââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ DAILY INSPECTION REPORT Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 async function sendInspectionReport(res, sub, d, photos, pdfBase64 = null) {
   const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
   const checks = Array.isArray(d.checkItems) ? d.checkItems : [];
@@ -995,7 +1062,7 @@ async function sendJhaReport(res, sub, d, photos, PDFDocument, rgb, StandardFont
     + '</div>'
     + '<div style="background:#059669;height:4px"></div>'
     + '<div style="padding:24px;background:#fff;border:1px solid #ddd;border-top:none">'
-    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED â Supervisor approval required before starting work</div>' : '')
+    + (highRisk > 0 ? '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-weight:bold;color:#991b1b">\u26a0\ufe0f ' + highRisk + ' HIGH/CRITICAL RISK STEP(S) IDENTIFIED Ã¢ÂÂ Supervisor approval required before starting work</div>' : '')
     + '<table style="width:100%;font-size:13px;margin-bottom:20px;border-collapse:collapse">'
     + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Lead Tech</td><td style="padding:5px">' + techName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold;width:140px">Date</td><td style="padding:5px">' + fmtDate(sub.date) + '</td></tr>'
     + '<tr><td style="padding:5px;background:#f5f5f5;font-weight:bold">Site / Location</td><td style="padding:5px">' + siteName + '</td><td style="padding:5px;background:#f5f5f5;font-weight:bold">Truck</td><td style="padding:5px">' + (sub.truck_number||'') + '</td></tr>'
