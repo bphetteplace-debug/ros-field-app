@@ -377,15 +377,17 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 6;
   }
 
-  if (Array.isArray(allPhotos) && allPhotos.length > 0 && y > 160) {
+  if (Array.isArray(allPhotos)) {
     page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
     page.drawText('WORK PHOTOS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
     y -= 22;
     var photoW = (W-M*2-12)/3;
     var photoH = photoW * 0.75;
     var px = M; var photoCount = 0;
-    for (var phi=0; phi<allPhotos.length && y-photoH > 80; phi++) {
-      var photo = allPhotos[phi];
+    // Filter out signature photos from work photos (rendered separately in sign-off)
+    var workPhotos = allPhotos.filter(function(p) { return p.section !== 'customer-sig' && !(p.section && p.section.startsWith('sig-')); });
+    for (var phi=0; phi<workPhotos.length && y-photoH > 80; phi++) {
+      var photo = workPhotos[phi];
       if (!photo.storage_path) continue;
       try {
         var pBytes = await fetchPhotoBytes(photo.storage_path);
@@ -459,19 +461,21 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ SIGN-OFF ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
-  if (y > 55) {
+  // Always draw sign-off — add new page if not enough room
+  if (y <= 90) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
+  {
     y -= 10;
     var sw = (W-M*2)/2-8;
-    page.drawLine({ start:{x:M,y:y-20}, end:{x:M+sw,y:y-20}, thickness:0.5, color:midGray });
+    page.drawLine({ start:{x:M,y:y-44}, end:{x:M+sw,y:y-44}, thickness:0.5, color:midGray });
     const tSP = Array.isArray(allPhotos) ? allPhotos.find(p => p.section && p.section.startsWith('sig-')) : null;
-    if (tSP) { try { const sB = await fetchPhotoBytes(tSP.storage_path); if (sB) { let sI; try { sI = await pdfDoc.embedPng(sB); } catch(e){ try { sI = await pdfDoc.embedJpg(sB); } catch(e2){} } if (sI) page.drawImage(sI, { x:M+2, y:y-22, width:90, height:20 }); } } catch(e) {} }
+    if (tSP) { try { const sB = await fetchPhotoBytes(tSP.storage_path); if (sB) { let sI; try { sI = await pdfDoc.embedPng(sB); } catch(e){ try { sI = await pdfDoc.embedJpg(sB); } catch(e2){} } if (sI) page.drawImage(sI, { x:M+2, y:y-46, width:150, height:40 }); } } catch(e) {} }
     const techSigLabel = tSP && tSP.section ? tSP.section.replace('sig-','') + ' Signature' : 'Technician Signature';
-    page.drawText(techSigLabel.substring(0,40), { x:M, y:y-30, size:7, font:hFont, color:midGray });
-    page.drawLine({ start:{x:W/2+4,y:y-20}, end:{x:W-M,y:y-20}, thickness:0.5, color:midGray });
+    page.drawText(techSigLabel.substring(0,40), { x:M, y:y-54, size:7, font:hFont, color:midGray });
+    page.drawLine({ start:{x:W/2+4,y:y-44}, end:{x:W-M,y:y-44}, thickness:0.5, color:midGray });
     const cSP = Array.isArray(allPhotos) ? allPhotos.find(p => p.section === 'customer-sig') : null;
-    if (cSP) { try { const cB = await fetchPhotoBytes(cSP.storage_path); if (cB) { let cI; try { cI = await pdfDoc.embedPng(cB); } catch(e){ try { cI = await pdfDoc.embedJpg(cB); } catch(e2){} } if (cI) page.drawImage(cI, { x:W/2+6, y:y-22, width:90, height:20 }); } } catch(e) {} }
-    page.drawText('Customer Signature / Approval', { x:W/2+4, y:y-30, size:7, font:hFont, color:midGray });
-    y -= 40;
+    if (cSP) { try { const cB = await fetchPhotoBytes(cSP.storage_path); if (cB) { let cI; try { cI = await pdfDoc.embedPng(cB); } catch(e){ try { cI = await pdfDoc.embedJpg(cB); } catch(e2){} } if (cI) page.drawImage(cI, { x:W/2+6, y:y-46, width:150, height:40 }); } } catch(e) {} }
+    page.drawText('Customer Signature / Approval', { x:W/2+4, y:y-54, size:7, font:hFont, color:midGray });
+    y -= 64;
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ FOOTER ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
