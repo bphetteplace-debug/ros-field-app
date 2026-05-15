@@ -32,6 +32,26 @@ function getTypeColor(s) {
   return '#888'
 }
 
+// Friendly relative date: "2h ago" / "Yesterday" / "Mar 14" / "May 14, 2025"
+function relativeDate(raw) {
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return raw
+  const now = new Date()
+  const sameYear = d.getFullYear() === now.getFullYear()
+  const diffMs = now - d
+  const diffHr = diffMs / 36e5
+  if (diffHr < 1 && diffMs > 0) return Math.max(1, Math.floor(diffMs / 6e4)) + 'm ago'
+  if (diffHr < 12 && diffHr >= 0) return Math.floor(diffHr) + 'h ago'
+  // Same day check
+  const sameDay = d.toDateString() === now.toDateString()
+  if (sameDay) return 'Today'
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  if (sameYear) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 export default function SubmissionsListPage() {
   const { user, signOut, isAdmin, isDemo } = useAuth()
   const navigate = useNavigate()
@@ -235,36 +255,50 @@ export default function SubmissionsListPage() {
           const rightColor = lbl === 'INSP'
             ? (s.data?.failCount > 0 ? '#dc2626' : '#16a34a')
             : (isWarranty ? '#e65c00' : '#222')
+          const primaryTitle = lbl === 'EXP' || lbl === 'INSP'
+            ? (techs[0] || s.location_name || 'Unknown')
+            : (s.customer_name || 'Unknown Customer')
+          const subtitle = lbl === 'EXP'
+            ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
+            : lbl === 'INSP'
+              ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
+              : (s.location_name || '')
           return (
-            <div key={s.id} style={{ background: '#fff', borderRadius: 10, marginBottom: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', borderLeft: '4px solid ' + color, overflow: 'hidden' }}>
-              <Link to={'/view/' + s.id} style={{ textDecoration: 'none', display: 'block', padding: '12px 14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: '#1a2332' }}>
-                      {lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || 'Unknown') : (s.customer_name || 'Unknown Customer')}
+            <div key={s.id} style={{ background: '#fff', borderRadius: 14, marginBottom: 12, boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05)', overflow: 'hidden', transition: 'transform 0.18s ease, box-shadow 0.18s ease' }}
+                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 2px 4px rgba(15,23,42,0.06), 0 10px 24px rgba(15,23,42,0.08)'}}
+                 onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05)'}}>
+              <Link to={'/view/' + s.id} style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}>
+                {/* Top color tag — replaces the utilitarian left border with a slim accent */}
+                <div style={{ height: 3, background: color }} />
+                <div style={{ padding: '14px 16px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span className="id-mono" style={{ fontSize: 11, fontWeight: 800, color, letterSpacing: '0.02em' }}>{jobLabel}</span>
+                        {isWarranty && <span className="status-pill" style={{ background: '#fef3c7', color: '#92400e' }}>Warranty</span>}
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: 17, color: '#1a2332', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primaryTitle}</div>
+                      {subtitle && <div style={{ color: '#64748b', fontSize: 13, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
                     </div>
-                    <div style={{ color: '#555', fontSize: 13, marginTop: 2 }}>
-                      {lbl === 'EXP'
-                        ? 'Expense Report' + (s.data?.expenseItems?.length ? ' — ' + s.data.expenseItems.length + ' items' : '')
-                        : lbl === 'INSP'
-                          ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || s.data?.truckNumber || '?')
-                          : (s.location_name || '')}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{relativeDate(s.created_at || s.date)}</div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: rightColor, marginTop: 4 }} className={typeof rightValue === 'string' && rightValue.startsWith('$') ? 'id-mono' : ''}>{isDemo && lbl !== 'INSP' ? '—' : rightValue}</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color }}>{jobLabel}</div>
-                    <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{s.date || ''}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
-                  <div style={{ fontSize: 12, color: '#888' }}>{techs.join(', ') || (s.data?.techName || '')}</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: rightColor }}>{isDemo && lbl !== 'INSP' ? '—' : rightValue}</div>
+                  {(techs.length > 0 || s.data?.techName) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#64748b' }}>
+                      <span style={{ opacity: 0.5 }}>👷</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{techs.join(', ') || s.data?.techName}</span>
+                    </div>
+                  )}
                 </div>
               </Link>
-              <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 14px', display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 12px', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   onClick={e => { e.preventDefault(); navigate('/edit/' + s.id) }}
-                  style={{ background: '#f5f5f5', border: '1px solid #ddd', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 600, color: '#333', cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: 'none', padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer', borderRadius: 6 }}
+                  onMouseEnter={e=>{e.currentTarget.style.color='#1a2332';e.currentTarget.style.background='#f1f5f9'}}
+                  onMouseLeave={e=>{e.currentTarget.style.color='#64748b';e.currentTarget.style.background='transparent'}}
                 >✏️ Edit</button>
               </div>
             </div>

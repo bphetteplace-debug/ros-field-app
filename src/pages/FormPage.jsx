@@ -226,9 +226,11 @@ function Section({ icon, title, children, accent=T.navyMid, collapsible=true, de
         style={{ ...sectionHeaderStyle(accent), cursor:collapsible?'pointer':'default', userSelect:'none' }}>
         <span style={{ fontSize:18, lineHeight:1 }}>{icon}</span>
         <span style={{ flex:1 }}>{title}</span>
-        {collapsible && <span style={{ fontSize:16, opacity:0.85, marginLeft:8, transition:'transform 0.2s', display:'inline-block', transform:open?'rotate(0deg)':'rotate(-90deg)' }}>▾</span>}
+        {collapsible && <span style={{ fontSize:16, opacity:0.85, marginLeft:8, transition:'transform 0.25s cubic-bezier(0.22,1,0.36,1)', display:'inline-block', transform:open?'rotate(0deg)':'rotate(-90deg)' }}>▾</span>}
       </div>
-      {open && <div style={sectionBodyStyle}>{children}</div>}
+      <div className={open ? 'section-body-open' : 'section-body-closed'}>
+        <div style={sectionBodyStyle}>{children}</div>
+      </div>
     </div>
   )
 }
@@ -654,7 +656,7 @@ export default function FormPage() {
         <div style={{background:`linear-gradient(135deg, ${T.navy} 0%, ${accent} 100%)`,borderRadius:14,padding:'20px 22px',marginBottom:20,boxShadow:'0 4px 20px rgba(0,0,0,0.22)',color:'#fff',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
           <div>
             <div style={{fontSize:10,fontWeight:800,letterSpacing:2,opacity:0.65,textTransform:'uppercase',marginBottom:4}}>Job Ticket</div>
-            <div style={{fontSize:30,fontWeight:900,lineHeight:1.1,marginBottom:4,letterSpacing:'-0.5px'}}>WO #{woNumber||'…'}</div>
+            <div className="id-mono" style={{fontSize:32,fontWeight:900,lineHeight:1.05,marginBottom:4}}>WO·{woNumber||'…'}</div>
             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
               <span style={{background:'rgba(255,255,255,0.18)',backdropFilter:'blur(4px)',padding:'3px 12px',borderRadius:20,fontSize:13,fontWeight:700}}>{jtConfig.icon} {jobType}</span>
             </div>
@@ -1048,11 +1050,11 @@ export default function FormPage() {
                     </div>
                   </div>
                   <div style={{marginTop:8}}>
-                    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:partPhotos[p.sku]?.length?6:0}}>
+                    <div style={{display:'grid',gridTemplateColumns:partPhotos[p.sku]?.length?'repeat(auto-fill, minmax(72px, 1fr))':'none',gap:6,marginBottom:partPhotos[p.sku]?.length?8:0}}>
                       {(partPhotos[p.sku]||[]).map((ph,idx)=>(
-                        <div key={idx} style={{position:'relative'}}>
-                          <img src={URL.createObjectURL(ph.file)} alt="" style={{width:72,height:54,objectFit:'cover',borderRadius:6,border:`1.5px solid ${T.border}`}} />
-                          <button type="button" onClick={()=>removePartPhoto(p.sku,idx)} style={{position:'absolute',top:2,right:2,background:'rgba(15,31,56,0.7)',color:'#fff',border:'none',borderRadius:'50%',width:17,height:17,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✕</button>
+                        <div key={idx} style={{position:'relative',aspectRatio:'1 / 1',borderRadius:8,overflow:'hidden',border:`1px solid ${T.border}`,boxShadow:'0 1px 3px rgba(15,23,42,0.06)'}}>
+                          <img src={URL.createObjectURL(ph.file)} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+                          <button type="button" onClick={()=>removePartPhoto(p.sku,idx)} style={{position:'absolute',top:3,right:3,background:'rgba(15,31,56,0.78)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,fontWeight:700}}>×</button>
                         </div>
                       ))}
                     </div>
@@ -1135,16 +1137,18 @@ export default function FormPage() {
         {/* == JOB PHOTOS == */}
         <Section icon="photo" title="Job Photos" accent={accent}>
           {photos.length>0&&(
-            <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))',gap:10,marginBottom:14}}>
               {photos.map((ph,i)=>(
-                <div key={i} style={{position:'relative',display:'flex',flexDirection:'column',gap:4}}>
-                  <img src={URL.createObjectURL(ph)} alt="" onClick={()=>setLightboxIdx(i)}
-                    style={{width:100,height:75,objectFit:'cover',borderRadius:8,border:'2px solid '+T.border,cursor:'zoom-in'}} />
-                  <button type="button" onClick={()=>setPhotos(p=>p.filter((_,pi)=>pi!==i))}
-                    style={{position:'absolute',top:4,right:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>X</button>
-                  <button type="button" title="Save to gallery" onClick={()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(ph); a.download='photo-'+(i+1)+'.jpg'; a.click(); }}
-                    style={{position:'absolute',top:4,left:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>DL</button>
-                  <input style={{...inp,width:100,padding:'3px 6px',fontSize:11,borderRadius:5}} placeholder="Caption"
+                <div key={i} style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <div style={{position:'relative',aspectRatio:'1 / 1',borderRadius:10,overflow:'hidden',border:'1px solid '+T.border,boxShadow:'0 2px 6px rgba(15,23,42,0.06)'}}>
+                    <img src={URL.createObjectURL(ph)} alt="" onClick={()=>setLightboxIdx(i)}
+                      style={{width:'100%',height:'100%',objectFit:'cover',display:'block',cursor:'zoom-in'}} />
+                    <button type="button" onClick={()=>setPhotos(p=>p.filter((_,pi)=>pi!==i))}
+                      style={{position:'absolute',top:6,right:6,background:'rgba(15,31,56,0.78)',color:'#fff',border:'none',borderRadius:'50%',width:24,height:24,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,fontWeight:700}}>×</button>
+                    <button type="button" title="Save to gallery" onClick={()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(ph); a.download='photo-'+(i+1)+'.jpg'; a.click(); }}
+                      style={{position:'absolute',top:6,left:6,background:'rgba(15,31,56,0.78)',color:'#fff',border:'none',borderRadius:'50%',width:24,height:24,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,fontWeight:700}}>DL</button>
+                  </div>
+                  <input style={{...inp,width:'100%',padding:'4px 8px',fontSize:11,borderRadius:6}} placeholder="Caption"
                     value={photoCaptions[i]||''} onChange={e=>setPhotoCaptions(c=>({...c,[i]:e.target.value}))} />
                 </div>
               ))}
@@ -1235,7 +1239,7 @@ export default function FormPage() {
              job they're on without scrolling back to the WO Hero banner. */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:saveError?8:6,fontSize:11,color:T.muted,fontWeight:600,letterSpacing:0.3,textTransform:'uppercase',minHeight:14}}>
             <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {jtConfig.icon} WO #{woNumber||'…'}
+              {jtConfig.icon} <span className="id-mono" style={{letterSpacing:'-0.02em',fontWeight:800}}>WO·{woNumber||'…'}</span>
               {customerName && <span style={{color:T.text,marginLeft:8,textTransform:'none',letterSpacing:0,fontWeight:700}}>· {customerName}</span>}
             </span>
             {locationName && <span style={{color:T.muted,fontWeight:500,textTransform:'none',letterSpacing:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'40%',textAlign:'right'}}>{locationName}</span>}
