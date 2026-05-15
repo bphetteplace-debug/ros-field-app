@@ -16,6 +16,7 @@ import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
 import { compressImage } from '../lib/imageCompress'
+import MicButton from '../components/MicButton'
 
 // Photos straight off a phone camera are 3-5MB. compressImage shrinks them
 // to ~500KB, which is the difference between uploads succeeding and silently
@@ -871,21 +872,33 @@ export default function FormPage() {
             <>
               <div style={{marginBottom:14}}>
                 <label style={lbl}>Reported Issue *</label>
-                <textarea style={{...inp,minHeight:72,resize:'vertical'}} value={reportedIssue} onChange={e=>setReportedIssue(e.target.value)} placeholder="What was the customer-reported problem?" />
+                <div style={{position:'relative'}}>
+                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:46}} value={reportedIssue} onChange={e=>setReportedIssue(e.target.value)} placeholder="What was the customer-reported problem?" />
+                  <MicButton value={reportedIssue} onChange={setReportedIssue} />
+                </div>
               </div>
               <div style={{marginBottom:14}}>
                 <label style={lbl}>Root Cause</label>
-                <textarea style={{...inp,minHeight:72,resize:'vertical'}} value={rootCause} onChange={e=>setRootCause(e.target.value)} placeholder="Identified root cause..." />
+                <div style={{position:'relative'}}>
+                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:46}} value={rootCause} onChange={e=>setRootCause(e.target.value)} placeholder="Identified root cause..." />
+                  <MicButton value={rootCause} onChange={setRootCause} />
+                </div>
               </div>
             </>
           )}
           <div style={{marginBottom:14}}>
             <label style={lbl}>{showIssueFields?'Work Performed':'Description'}</label>
-            <textarea style={{...inp,minHeight:88,resize:'vertical'}} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe all work performed..." />
+            <div style={{position:'relative'}}>
+              <textarea style={{...inp,minHeight:88,resize:'vertical',paddingRight:46}} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe all work performed..." />
+              <MicButton value={description} onChange={setDescription} />
+            </div>
           </div>
           <div>
             <label style={lbl}>Equipment / Serial Numbers</label>
-            <input style={inp} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Compressor SN, Tank ID, etc." />
+            <div style={{position:'relative'}}>
+              <input style={{...inp,paddingRight:42}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Compressor SN, Tank ID, etc." />
+              <MicButton value={equipment} onChange={setEquipment} size={28} top={6} right={6} />
+            </div>
           </div>
         </Section>
 
@@ -936,7 +949,13 @@ export default function FormPage() {
                     <input type="checkbox" checked={a.filterChanged} onChange={e=>updArr(i,'filterChanged',e.target.checked)} style={{width:15,height:15}} />
                     Filter / Element Changed
                   </label>
-                  <div style={{marginBottom:10}}><label style={lbl}>Notes</label><input style={inp} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder="Notes…" /></div>
+                  <div style={{marginBottom:10}}>
+                    <label style={lbl}>Notes</label>
+                    <div style={{position:'relative'}}>
+                      <input style={{...inp,paddingRight:42}} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <MicButton value={a.notes} onChange={v=>updArr(i,'notes',v)} size={28} top={6} right={6} />
+                    </div>
+                  </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                     <PhotoPicker label="Before — Photo 1" value={a.before1} onChange={v=>updArr(i,'before1',v)} />
                     <PhotoPicker label="Before — Photo 2" value={a.before2} onChange={v=>updArr(i,'before2',v)} />
@@ -972,7 +991,13 @@ export default function FormPage() {
                     </label>
                     <div style={fld}><label style={lbl}>Last Ignition</label><input type="date" style={inp} value={f.lastIgnition} onChange={e=>updFlare(i,'lastIgnition',e.target.value)} /></div>
                   </div>
-                  <div style={{marginBottom:10}}><label style={lbl}>Notes</label><input style={inp} value={f.notes} onChange={e=>updFlare(i,'notes',e.target.value)} placeholder="Notes…" /></div>
+                  <div style={{marginBottom:10}}>
+                    <label style={lbl}>Notes</label>
+                    <div style={{position:'relative'}}>
+                      <input style={{...inp,paddingRight:42}} value={f.notes} onChange={e=>updFlare(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <MicButton value={f.notes} onChange={v=>updFlare(i,'notes',v)} size={28} top={6} right={6} />
+                    </div>
+                  </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                     <PhotoPicker label="Photo 1" value={f.photo1} onChange={v=>updFlare(i,'photo1',v)} />
                     <PhotoPicker label="Photo 2" value={f.photo2} onChange={v=>updFlare(i,'photo2',v)} />
@@ -999,7 +1024,13 @@ export default function FormPage() {
                     <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={h.condition} onChange={e=>updHT(hi,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
                   <div style={{marginBottom:10}}><label style={lbl}>Last Tube Clean Date</label><input type="date" style={inp} value={h.lastCleanDate} onChange={e=>updHT(hi,'lastCleanDate',e.target.value)} /></div>
-                  <div style={{marginBottom:10}}><label style={lbl}>Notes</label><input style={inp} value={h.notes} onChange={e=>updHT(hi,'notes',e.target.value)} placeholder="Notes…" /></div>
+                  <div style={{marginBottom:10}}>
+                    <label style={lbl}>Notes</label>
+                    <div style={{position:'relative'}}>
+                      <input style={{...inp,paddingRight:42}} value={h.notes} onChange={e=>updHT(hi,'notes',e.target.value)} placeholder="Notes…" />
+                      <MicButton value={h.notes} onChange={v=>updHT(hi,'notes',v)} size={28} top={6} right={6} />
+                    </div>
+                  </div>
                   <div>
                     <div style={{fontWeight:700,fontSize:12,color:T.navyMid,marginBottom:8,textTransform:'uppercase',letterSpacing:0.5}}>Firetubes ({h.firetubes.length}/10)</div>
                     {h.firetubes.map((ft,fi)=>(

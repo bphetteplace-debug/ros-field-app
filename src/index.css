@@ -127,6 +127,13 @@ button:not(:disabled):active {
 .status-pill.failed     { background: #fee2e2; color: #991b1b; }
 .status-pill.draft      { background: #e0e7ff; color: #3730a3; }
 
+/* Mic pulse — radiating red ring while voice dictation is listening */
+@keyframes micPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  70%  { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
 /* Subtle shimmer for loading states */
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .shimmer {
