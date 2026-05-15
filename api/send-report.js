@@ -379,7 +379,6 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
 
   // Work Photos. Filter out signatures (rendered in sign-off) and part photos
   // (rendered inline next to each part below).
-  globalThis.__workPhotoTrace = [];
   if (Array.isArray(allPhotos)) {
     var workPhotos = allPhotos.filter(function(p) {
       if (!p) return false;
@@ -388,7 +387,6 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       if (p.section && p.section.startsWith('part-')) return false;
       return true;
     });
-    globalThis.__workPhotoTrace.push({ stage: 'filtered', count: workPhotos.length });
     if (workPhotos.length > 0) {
       // Section header
       if (y - 30 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
@@ -400,44 +398,29 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       var px = M; var photoCount = 0;
       for (var phi=0; phi<workPhotos.length; phi++) {
         var photo = workPhotos[phi];
-        if (!photo.storage_path) {
-          globalThis.__workPhotoTrace.push({ phi: phi, status: 'no_path', section: photo.section });
-          continue;
-        }
+        if (!photo.storage_path) continue;
         // New page if next row won't fit
         if (photoCount % 3 === 0 && y - photoH < 30) {
           page = pdfDoc.addPage([612, 792]); y = H - 40;
-          globalThis.__workPhotoTrace.push({ phi: phi, status: 'new_page' });
         }
         try {
           var pBytes = await fetchPhotoBytes(photo.storage_path);
-          if (!pBytes) {
-            globalThis.__workPhotoTrace.push({ phi: phi, status: 'fetch_null', path: photo.storage_path });
-            continue;
-          }
+          if (!pBytes) continue;
           var pImg;
           try { pImg = await pdfDoc.embedJpg(pBytes); } catch(e2) {
-            try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) {
-              globalThis.__workPhotoTrace.push({ phi: phi, status: 'embed_failed', path: photo.storage_path, err: String(e3.message||e3).slice(0,80) });
-              continue;
-            }
+            try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) { continue; }
           }
           page.drawImage(pImg, { x:px, y:y-photoH, width:photoW, height:photoH });
-          globalThis.__workPhotoTrace.push({ phi: phi, status: 'drawn', y: Math.round(y), px: Math.round(px), photoCount: photoCount });
           px += photoW+6; photoCount++;
           if (photoCount % 3 === 0) { px=M; y-=photoH+6; }
-        } catch(e) {
-          globalThis.__workPhotoTrace.push({ phi: phi, status: 'caught', err: String(e.message||e).slice(0,80) });
-        }
+        } catch(e) { /* skip failed photo */ }
       }
       if (photoCount > 0 && photoCount % 3 !== 0) y -= photoH+6;
       y -= 6;
-      globalThis.__workPhotoTrace.push({ stage: 'done', renderedCount: photoCount });
     }
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ PARTS & MATERIALS ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
-  globalThis.__partsTrace = [];
   if (parts.length > 0) {
     // Section header (and column header) — break to new page if not enough room
     if (y - 36 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
@@ -458,7 +441,6 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       var partPhotosForRow = (Array.isArray(allPhotos) && partSku)
         ? allPhotos.filter(function(ph) { return ph && ph.section === 'part-' + partSku; })
         : [];
-      globalThis.__partsTrace.push({ pi: pi, sku: partSku, partKeys: Object.keys(p), photoCount: partPhotosForRow.length });
       var rowH = 14 + (partPhotosForRow.length > 0 ? 56 : 0);
       // New page if this row + photos won't fit
       if (y - rowH < 30) {
@@ -491,30 +473,18 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
         var rendered = 0;
         for (var ppi = 0; ppi < partPhotosForRow.length && rendered < 8; ppi++) {
           var pp = partPhotosForRow[ppi];
-          if (!pp.storage_path) {
-            globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'no_path' });
-            continue;
-          }
+          if (!pp.storage_path) continue;
           try {
             var ppB = await fetchPhotoBytes(pp.storage_path);
-            if (!ppB) {
-              globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'fetch_null', path: pp.storage_path });
-              continue;
-            }
+            if (!ppB) continue;
             var ppI;
             try { ppI = await pdfDoc.embedJpg(ppB); } catch(e1) {
-              try { ppI = await pdfDoc.embedPng(ppB); } catch(e2) {
-                globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'embed_failed', err: String(e2.message||e2).slice(0,60) });
-                continue;
-              }
+              try { ppI = await pdfDoc.embedPng(ppB); } catch(e2) { continue; }
             }
             page.drawImage(ppI, { x: ppx, y: y - ppSize - 2, width: ppSize, height: ppSize });
-            globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'drawn', y: Math.round(y), ppx: Math.round(ppx) });
             ppx += ppSize + 4;
             rendered++;
-          } catch(e) {
-            globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'caught', err: String(e.message||e).slice(0,60) });
-          }
+          } catch(e) { /* skip */ }
         }
         if (rendered > 0) y -= ppSize + 6;
       }
@@ -553,21 +523,60 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ SIGN-OFF ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
-  // Always draw sign-off — add new page if not enough room
-  if (y <= 90) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
+  // Sign-off section: stack ALL tech signatures vertically in the left column,
+  // customer signature on the right. Was rendering only the first tech sig
+  // because it used `.find` instead of looping all sig-* photos.
   {
+    var techSigs = Array.isArray(allPhotos)
+      ? allPhotos.filter(function(p) { return p && p.section && p.section.startsWith('sig-'); })
+      : [];
+    var sigBoxH = 44;       // line + signature image + label per tech
+    var techBlockH = Math.max(sigBoxH, techSigs.length * sigBoxH);
+    var neededH = Math.max(techBlockH, 64) + 12;
+    if (y - neededH < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
     y -= 10;
     var sw = (W-M*2)/2-8;
-    page.drawLine({ start:{x:M,y:y-44}, end:{x:M+sw,y:y-44}, thickness:0.5, color:midGray });
-    const tSP = Array.isArray(allPhotos) ? allPhotos.find(p => p.section && p.section.startsWith('sig-')) : null;
-    if (tSP) { try { const sB = await fetchPhotoBytes(tSP.storage_path); if (sB) { let sI; try { sI = await pdfDoc.embedPng(sB); } catch(e){ try { sI = await pdfDoc.embedJpg(sB); } catch(e2){} } if (sI) page.drawImage(sI, { x:M+2, y:y-46, width:150, height:40 }); } } catch(e) {} }
-    const techSigLabel = tSP && tSP.section ? tSP.section.replace('sig-','') + ' Signature' : 'Technician Signature';
-    page.drawText(techSigLabel.substring(0,40), { x:M, y:y-54, size:7, font:hFont, color:midGray });
-    page.drawLine({ start:{x:W/2+4,y:y-44}, end:{x:W-M,y:y-44}, thickness:0.5, color:midGray });
-    const cSP = Array.isArray(allPhotos) ? allPhotos.find(p => p.section === 'customer-sig') : null;
-    if (cSP) { try { const cB = await fetchPhotoBytes(cSP.storage_path); if (cB) { let cI; try { cI = await pdfDoc.embedPng(cB); } catch(e){ try { cI = await pdfDoc.embedJpg(cB); } catch(e2){} } if (cI) page.drawImage(cI, { x:W/2+6, y:y-46, width:150, height:40 }); } } catch(e) {} }
-    page.drawText('Customer Signature / Approval', { x:W/2+4, y:y-54, size:7, font:hFont, color:midGray });
-    y -= 64;
+    var techStartY = y;
+    // Tech sigs (left column)
+    if (techSigs.length === 0) {
+      page.drawLine({ start:{x:M,y:y-34}, end:{x:M+sw,y:y-34}, thickness:0.5, color:midGray });
+      page.drawText('Technician Signature', { x:M, y:y-44, size:7, font:hFont, color:midGray });
+      y -= sigBoxH;
+    } else {
+      for (var ti = 0; ti < techSigs.length; ti++) {
+        var tSP = techSigs[ti];
+        page.drawLine({ start:{x:M,y:y-34}, end:{x:M+sw,y:y-34}, thickness:0.5, color:midGray });
+        try {
+          var sB = await fetchPhotoBytes(tSP.storage_path);
+          if (sB) {
+            var sI;
+            try { sI = await pdfDoc.embedPng(sB); } catch(e1) { try { sI = await pdfDoc.embedJpg(sB); } catch(e2){} }
+            if (sI) page.drawImage(sI, { x:M+2, y:y-36, width:120, height:32 });
+          }
+        } catch(e) {}
+        var label = (tSP.section || '').replace('sig-','') + ' Signature';
+        page.drawText(label.substring(0,40), { x:M, y:y-44, size:7, font:hFont, color:midGray });
+        y -= sigBoxH;
+      }
+    }
+    // Customer sig (right column, top-aligned with first tech sig)
+    var cy = techStartY;
+    page.drawLine({ start:{x:W/2+4,y:cy-34}, end:{x:W-M,y:cy-34}, thickness:0.5, color:midGray });
+    var cSP = Array.isArray(allPhotos) ? allPhotos.find(function(p) { return p && p.section === 'customer-sig'; }) : null;
+    if (cSP) {
+      try {
+        var cB = await fetchPhotoBytes(cSP.storage_path);
+        if (cB) {
+          var cI;
+          try { cI = await pdfDoc.embedPng(cB); } catch(e3) { try { cI = await pdfDoc.embedJpg(cB); } catch(e4){} }
+          if (cI) page.drawImage(cI, { x:W/2+6, y:cy-36, width:150, height:32 });
+        }
+      } catch(e) {}
+    }
+    page.drawText('Customer Signature / Approval', { x:W/2+4, y:cy-44, size:7, font:hFont, color:midGray });
+    // Make sure y advances past whichever column is taller
+    if (cy - sigBoxH < y) y = cy - sigBoxH;
+    y -= 12;
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ FOOTER ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
@@ -680,24 +689,7 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
 
   const emailData = await emailResp.json();
   if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
-  // Temporary debug — tells us whether photos are missing at the
-  // metadata-fetch level vs the rendering level. Remove once verified.
-  const sectionCounts = {};
-  for (const ph of (photos || [])) {
-    const sec = (ph && ph.section) || '(none)';
-    sectionCounts[sec] = (sectionCounts[sec] || 0) + 1;
-  }
-  return res.status(200).json({
-    ok: true,
-    emailId: emailData.id,
-    debug: {
-      photoCount: (photos || []).length,
-      sectionCounts,
-      partsCount: (parts || []).length,
-      workPhotoTrace: globalThis.__workPhotoTrace || [],
-      partsTrace: globalThis.__partsTrace || [],
-    }
-  });
+  return res.status(200).json({ ok: true, emailId: emailData.id });
 }
 
 // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ EXPENSE REPORT ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
