@@ -225,6 +225,9 @@ export default function InventoryPage() {
   }
 
   function removePart(i) {
+    var p = parts[i]
+    var label = (p && (p.code || p.description)) ? '"' + (p.code || p.description) + '"' : 'this part'
+    if (!window.confirm('Remove ' + label + ' from the inventory list?\n\nThis only stages the change — your inventory is not updated until you click Save Inventory.')) return
     setParts(parts.filter(function(_, idx) { return idx !== i }))
   }
 

@@ -605,37 +605,49 @@ function AnalyticsAdmin({ submissions }) {
       <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>📊 Analytics Overview</div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>Summary based on all loaded submissions.</div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-        {card('Total Jobs', totalJobs, '#1a2332')}
-        {card('PMs', totalPMs, '#0891b2')}
-        {card('Service Calls', totalSCs, '#f97316')}
-        {card('Inspections', totalInsp, '#7c3aed')}
-        {card('Expenses', totalExp, '#6b7280')}
-        {!isDemo && totalRevenue !== null && card('Total Revenue', '$' + totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), '#16a34a')}
-        {card('Pass', passCount, '#16a34a')}
-        {card('Fail', failCount, '#ef4444')}
-      </div>
+      {subs.length === 0 ? (
+        <div style={{ background: '#fff', borderRadius: 12, padding: '32px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>📊</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#1a2332', marginBottom: 6 }}>No submissions to analyze yet</div>
+          <div style={{ fontSize: 13, color: '#666', maxWidth: 420, margin: '0 auto', lineHeight: 1.5 }}>
+            Once your field techs start logging PMs, service calls, expenses, and inspections, totals, top performers, and customer breakdowns will show up here.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+            {card('Total Jobs', totalJobs, '#1a2332')}
+            {card('PMs', totalPMs, '#0891b2')}
+            {card('Service Calls', totalSCs, '#f97316')}
+            {card('Inspections', totalInsp, '#7c3aed')}
+            {card('Expenses', totalExp, '#6b7280')}
+            {!isDemo && totalRevenue !== null && card('Total Revenue', '$' + totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }), '#16a34a')}
+            {card('Pass', passCount, '#16a34a')}
+            {card('Fail', failCount, '#ef4444')}
+          </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏆 Most Active Technicians</div>
-          {topTechs.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No data</div> : topTechs.map(([name, count], i) => (
-            <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < topTechs.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-              <span style={{ fontSize: 13, color: '#333' }}>{i + 1}. {name}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0891b2' }}>{count} jobs</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏆 Most Active Technicians</div>
+              {topTechs.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No technician data on these submissions.</div> : topTechs.map(([name, count], i) => (
+                <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < topTechs.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                  <span style={{ fontSize: 13, color: '#333' }}>{i + 1}. {name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0891b2' }}>{count} jobs</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏢 Top Customers by Jobs</div>
-          {topCusts.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No data</div> : topCusts.map(([name, count], i) => (
-            <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < topCusts.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-              <span style={{ fontSize: 13, color: '#333' }}>{i + 1}. {name}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316' }}>{count} jobs</span>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏢 Top Customers by Jobs</div>
+              {topCusts.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No customer data on these submissions.</div> : topCusts.map(([name, count], i) => (
+                <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < topCusts.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                  <span style={{ fontSize: 13, color: '#333' }}>{i + 1}. {name}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316' }}>{count} jobs</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -905,8 +917,19 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses' | 'parts'
 
   const handleStatusChange = async (id, newStatus) => {
+    const sub = submissions.find(s => s.id === id)
+    if (!sub) return
+    const prevStatus = sub.status || 'submitted'
+    if (prevStatus === newStatus) return
+    if (!window.confirm('Change status to "' + newStatus.toUpperCase() + '"?')) return
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
-    try { await updateSubmissionStatus(id, newStatus) } catch(e) { console.error('Status update failed:', e) }
+    try {
+      await updateSubmissionStatus(id, newStatus)
+    } catch(e) {
+      console.error('Status update failed:', e)
+      alert('Status update failed: ' + (e.message || e) + '\nReverting to "' + prevStatus.toUpperCase() + '".')
+      setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: prevStatus } : s))
+    }
   }
 
   const handleDelete = async (s) => {

@@ -227,11 +227,22 @@ export default function SubmissionsListPage() {
         {loading && <p style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Loading...</p>}
         {error && <p style={{ textAlign: 'center', color: '#e65c00', marginTop: 40 }}>Error: {error}</p>}
         {!loading && !error && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', marginTop: 60, color: '#aaa' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-            <p style={{ fontSize: 15 }}>{search || filterType !== 'ALL' ? 'No results found.' : 'No submissions yet.'}</p>
-            {(search || filterType !== 'ALL') && (
-              <button onClick={() => { setSearch(''); setFilterType('ALL') }} style={{ marginTop: 8, color: '#e65c00', background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button>
+          <div style={{ textAlign: 'center', marginTop: 60, color: '#888' }}>
+            {(search || filterType !== 'ALL') ? (
+              <>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                <p style={{ fontSize: 15, marginBottom: 4 }}>No results found.</p>
+                <p style={{ fontSize: 13, color: '#aaa', marginBottom: 10 }}>Try a different search or clear the active filters.</p>
+                <button onClick={() => { setSearch(''); setFilterType('ALL') }} style={{ color: '#e65c00', background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}>Clear filters</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#1a2332', marginBottom: 6 }}>No submissions yet</p>
+                <p style={{ fontSize: 13, color: '#666', maxWidth: 360, margin: '0 auto', lineHeight: 1.5 }}>
+                  Start a new job using the buttons in the top bar — <strong>+ Work Order</strong>, <strong>+ Expense</strong>, <strong>+ Insp</strong>, <strong>+ JHA</strong>, or <strong>+ Quote</strong>. Submissions will appear here as soon as they're logged.
+                </p>
+              </>
             )}
           </div>
         )}
