@@ -218,7 +218,7 @@ function SignaturePad({ label, required=false, onSave, onClear, isSigned=false }
 }
 
 // ─── Section card ───────────────────────────────────────────────────────────────
-function Section({ icon, title, children, accent=T.navyMid, collapsible=false, defaultOpen=true }) {
+function Section({ icon, title, children, accent=T.navyMid, collapsible=true, defaultOpen=true }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={cardStyle}>
@@ -226,7 +226,7 @@ function Section({ icon, title, children, accent=T.navyMid, collapsible=false, d
         style={{ ...sectionHeaderStyle(accent), cursor:collapsible?'pointer':'default', userSelect:'none' }}>
         <span style={{ fontSize:18, lineHeight:1 }}>{icon}</span>
         <span style={{ flex:1 }}>{title}</span>
-        {collapsible && <span style={{ fontSize:13, opacity:0.8 }}>{open?'▲':'▼'}</span>}
+        {collapsible && <span style={{ fontSize:16, opacity:0.85, marginLeft:8, transition:'transform 0.2s', display:'inline-block', transform:open?'rotate(0deg)':'rotate(-90deg)' }}>▾</span>}
       </div>
       {open && <div style={sectionBodyStyle}>{children}</div>}
     </div>
