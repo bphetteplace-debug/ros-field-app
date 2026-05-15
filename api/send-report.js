@@ -7,7 +7,7 @@ const RESEND_KEY = process.env.RESEND_API_KEY;
 const TO = process.env.EMAIL_TO ? process.env.EMAIL_TO.split(',').map(e => e.trim()) : ['bphetteplace@reliableoilfieldservices.net'];
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 
-module.exports = async function handler(req, res) {h
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { submissionId , pdfBase64 } = req.body || {};
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
