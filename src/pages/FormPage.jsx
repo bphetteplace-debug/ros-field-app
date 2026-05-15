@@ -641,6 +641,7 @@ export default function FormPage() {
     const missing = [];
     if (!customerName)  missing.push('Customer');
     if (!locationName)  missing.push('Location / Well Name');
+    if (!customerWorkOrder || !customerWorkOrder.trim()) missing.push('Customer Work Order / PO #');
     if (missing.length) { setSaveError('Missing required field' + (missing.length>1?'s':'') + ': ' + missing.join(', ')); return; }
     setSaving(true);setSaveError(null);setSaveStatus('Preparing photos…')
     try{
@@ -896,7 +897,7 @@ export default function FormPage() {
           </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Contact</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} placeholder="Name / phone" /></div>
-            <div style={fld}><label style={lbl}>Customer Work Order / PO #</label><input style={inp} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder="Optional" /></div>
+            <div style={fld}><label style={lbl}>Customer Work Order / PO # <span style={{color:'#dc2626'}}>*</span></label><input style={{...inp, borderColor: customerWorkOrder ? inp.borderColor : '#dc2626'}} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder="Required — enter the customer's WO/PO #" required /></div>
           </div>
           <div style={row}>
             <div style={fld}><label style={lbl}>Type of Work</label>

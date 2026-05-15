@@ -170,7 +170,7 @@ export async function saveSubmission(formData, userId, templateOverride) {
       jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
       laborHours, hourlyRate, billableTechs: effectiveBillable, description,
       glCode, assetTag, workArea, startTime, departureTime, typeOfWork,
-      customerWorkOrder: customerWorkOrder || effectiveWoNumber, customerContact,
+      customerWorkOrder: customerWorkOrder || '', customerContact,
       partsTotal, mileageTotal, laborTotal,
       grandTotal: warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal,
       arrestors: jobType === 'PM' ? (arrestors || []) : [],
