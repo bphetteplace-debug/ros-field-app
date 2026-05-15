@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchPartsCatalog } from '../lib/submissions'
+import { fetchPartsCatalog, getAuthToken } from '../lib/submissions'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 async function supaRest(path, opts) {
   opts = opts || {}
-  var tokenKey = Object.keys(localStorage).find(function(k) { return k.startsWith('sb-') && k.endsWith('-auth-token') })
-  var token = null
-  try { token = tokenKey ? JSON.parse(localStorage.getItem(tokenKey))?.access_token : null } catch { token = null }
+  var token = getAuthToken()
   var headers = Object.assign({
     'apikey': SUPABASE_ANON_KEY,
     'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),

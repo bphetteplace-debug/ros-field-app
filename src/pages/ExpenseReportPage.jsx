@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { saveSubmission, uploadPhotos, fetchSettings, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
+import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
@@ -142,7 +142,7 @@ export default function ExpenseReportPage() {
 
       // Fire email
       try {
-        const token = Object.keys(localStorage).map(k => k.startsWith('sb-') && k.endsWith('-auth-token') ? JSON.parse(localStorage.getItem(k))?.access_token : null).find(Boolean)
+        const token = getAuthToken()
         fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: submission.id, userToken: token }) }).then(async r => { if (!r.ok) { const t = await r.text().catch(() => r.statusText || ''); throw new Error('HTTP ' + r.status + ' — ' + (t || '').slice(0, 240)); } }).catch(err => { console.error('Email send failed:', err); alert('Email failed for expense report #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe report was saved. Open it from the list and use "Send Report" to retry.'); })
       } catch (_) {}
       clearDraft()
