@@ -90,6 +90,8 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var PDFDocument = PDFLib.PDFDocument;
   var rgb = PDFLib.rgb;
   var StandardFonts = PDFLib.StandardFonts;
+  var PDFName = PDFLib.PDFName;
+  var PDFString = PDFLib.PDFString;
 
   // sub has flat DB columns + sub.data (jsonb) for parts/techs/etc
   var extra = (sub.data && typeof sub.data === 'object') ? sub.data : {};
@@ -255,7 +257,52 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
   y -= 22;
 
-  // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ DESCRIPTION OF WORK ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
+  // -- SITE LOCATION / GPS --
+  // Mirrors the client-side WorkOrderPDFTemplate "Site Sign & GPS" section
+  // for the lambda fallback path. Only renders if a fix was captured.
+  // Adds a clickable Google Maps link annotation over the URL line.
+  var gpsLat = typeof extra.gpsLat === 'number' ? extra.gpsLat : (extra.gpsLat ? parseFloat(extra.gpsLat) : null);
+  var gpsLng = typeof extra.gpsLng === 'number' ? extra.gpsLng : (extra.gpsLng ? parseFloat(extra.gpsLng) : null);
+  var gpsAccuracy = typeof extra.gpsAccuracy === 'number' ? extra.gpsAccuracy : (extra.gpsAccuracy ? parseFloat(extra.gpsAccuracy) : null);
+  if (gpsLat != null && gpsLng != null && !isNaN(gpsLat) && !isNaN(gpsLng) && y > 90) {
+    var gpsBlockH = 50;
+    if (y - gpsBlockH < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
+    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+    page.drawText('SITE LOCATION (GPS)', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+    y -= 20;
+    var coordStr = gpsLat.toFixed(6) + ', ' + gpsLng.toFixed(6);
+    page.drawText('Pin:  ' + coordStr, { x:M+5, y:y-2, size:9, font:hBold, color:darkGray });
+    if (gpsAccuracy != null && !isNaN(gpsAccuracy)) {
+      page.drawText('+/- ' + Math.round(gpsAccuracy) + ' m', { x:M+330, y:y-2, size:8, font:hFont, color:midGray });
+    }
+    y -= 13;
+    var mapsUrl = 'https://maps.google.com/?q=' + gpsLat + ',' + gpsLng;
+    var linkText = 'View on Google Maps';
+    var linkWidth = hFont.widthOfTextAtSize(linkText, 9);
+    var linkY = y - 2;
+    page.drawText(linkText, { x:M+5, y:linkY, size:9, font:hBold, color:rgb(0.0, 0.4, 0.85) });
+    page.drawLine({ start:{x:M+5, y:linkY-1.5}, end:{x:M+5+linkWidth, y:linkY-1.5}, thickness:0.5, color:rgb(0.0, 0.4, 0.85) });
+    try {
+      var linkAnnot = pdfDoc.context.register(
+        pdfDoc.context.obj({
+          Type: 'Annot',
+          Subtype: 'Link',
+          Rect: [M+5, linkY-2, M+5+linkWidth, linkY+9],
+          Border: [0, 0, 0],
+          A: { Type: 'Action', S: 'URI', URI: PDFString.of(mapsUrl) },
+        })
+      );
+      var existingAnnots = page.node.get(PDFName.of('Annots'));
+      if (existingAnnots && typeof existingAnnots.push === 'function') {
+        existingAnnots.push(linkAnnot);
+      } else {
+        page.node.set(PDFName.of('Annots'), pdfDoc.context.obj([linkAnnot]));
+      }
+    } catch (e) { /* non-clickable fallback — text + URL still legible */ }
+    y -= 18;
+  }
+
+  //ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ DESCRIPTION OF WORK ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
   page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
   page.drawText('DESCRIPTION OF WORK', { x:M+6, y:y-11, size:8, font:hBold, color:white });
   y -= 20;

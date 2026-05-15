@@ -287,10 +287,20 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
           {hasGps && (
             <div style={{ fontSize: '8.5pt', lineHeight: 1.6 }}>
               <div style={infoLabel}>GPS Coordinates</div>
-              <div style={{ fontWeight: 'bold', color: DARK }}>{Number(d.gps_lat).toFixed(6)}, {Number(d.gps_lng).toFixed(6)}</div>
+              <div style={{ fontWeight: 'bold', color: DARK }}>📍 {Number(d.gps_lat).toFixed(6)}, {Number(d.gps_lng).toFixed(6)}</div>
               {d.gps_accuracy != null && (
-                <div style={{ color: MID, marginTop: 2 }}>Accuracy: Â±{Math.round(d.gps_accuracy)} m</div>
+                <div style={{ color: MID, marginTop: 2 }}>Accuracy: ±{Math.round(d.gps_accuracy)} m</div>
               )}
+              <div style={{ marginTop: 4 }}>
+                <a
+                  href={'https://maps.google.com/?q=' + Number(d.gps_lat) + ',' + Number(d.gps_lng)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#1565c0', textDecoration: 'underline', fontWeight: 'bold' }}
+                >
+                  View on Google Maps
+                </a>
+              </div>
             </div>
           )}
         </div>
