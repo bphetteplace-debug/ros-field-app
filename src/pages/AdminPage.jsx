@@ -1214,9 +1214,27 @@ function PartsCatalogAdmin() {
   const [editId, setEditId] = useState(null)
   const [editForm, setEditForm] = useState({})
 
+  // Suggests the next part code by finding the highest existing pure-numeric
+  // code and adding 1. Non-numeric codes (e.g. "ABC-001", "42123-A") are
+  // ignored. Returns '' if no numeric codes exist.
+  const nextPartCode = (rows) => {
+    const nums = (rows || [])
+      .map(p => String(p.code || '').trim())
+      .filter(c => /^\d+$/.test(c))
+      .map(c => parseInt(c, 10))
+    if (nums.length === 0) return ''
+    return String(Math.max(...nums) + 1)
+  }
+
   const loadParts = () => {
     setLoadingParts(true)
-    fetchPartsCatalog().then(p => { setParts(p); setLoadingParts(false) })
+    fetchPartsCatalog().then(p => {
+      setParts(p)
+      setLoadingParts(false)
+      // Pre-fill code with the next sequential value, but only if the user
+      // hasn't started typing their own — never overwrite in-progress input.
+      setForm(f => f.code ? f : { ...f, code: nextPartCode(p) })
+    })
   }
   useEffect(loadParts, [])
 
