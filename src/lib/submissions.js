@@ -96,6 +96,35 @@ export async function saveSettings(key, value) {
   return text ? JSON.parse(text) : null;
 }
 
+// ── AUDIT LOG ────────────────────────────────────────────────────────────────────
+// Records sensitive admin actions (status changes, deletes, etc.) to a
+// dedicated audit_log table. Failure is swallowed silently — we never want
+// audit logging to block the real admin action.
+export async function logAudit({ userId, userName, action, targetType, targetId, details }) {
+  try {
+    await supaRest('POST', 'audit_log', {
+      user_id: userId,
+      user_name: userName,
+      action,
+      target_type: targetType,
+      target_id: targetId ? String(targetId) : null,
+      details: details || null,
+    });
+  } catch (e) {
+    console.warn('audit log write failed:', e.message || e);
+  }
+}
+
+export async function fetchAuditLog(limit = 200) {
+  try {
+    const data = await supaRest('GET', 'audit_log?select=*&order=created_at.desc&limit=' + limit);
+    return data || [];
+  } catch (e) {
+    console.warn('fetchAuditLog failed:', e.message || e);
+    return [];
+  }
+}
+
 // ── SUBMISSIONS ────────────────────────────────────────────────────────────────────
 // templateOverride: pass 'expense_report' or 'daily_inspection' to override automatic template detection
 export async function saveSubmission(formData, userId, templateOverride) {

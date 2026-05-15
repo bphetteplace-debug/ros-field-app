@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog } from '../lib/submissions'
 import { supabase } from '../lib/supabase'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -701,6 +701,102 @@ function AnalyticsAdmin({ submissions }) {
 }
 
 
+// ─── AUDIT LOG ADMIN ─────────────────────────────────────────────────────────
+function describeAudit(entry) {
+  const d = entry.details || {}
+  const id = entry.target_id
+  switch (entry.action) {
+    case 'submission_status_changed': {
+      const who = d.pm_number ? '#' + d.pm_number : (id || '')
+      const cust = d.customer_name ? ' (' + d.customer_name + ')' : ''
+      const from = (d.from || '').toUpperCase()
+      const to = (d.to || '').toUpperCase()
+      return 'Changed status of ' + who + cust + ' from ' + from + ' to ' + to
+    }
+    case 'submission_deleted': {
+      const who = d.pm_number ? '#' + d.pm_number : (id || '')
+      const cust = d.customer_name ? ' (' + d.customer_name + ')' : ''
+      return 'Deleted ' + (d.type || 'submission') + ' ' + who + cust
+    }
+    default:
+      return entry.action + (entry.target_type ? ' on ' + entry.target_type : '') + (id ? ' ' + id : '')
+  }
+}
+
+function fmtAuditTime(ts) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  const now = new Date()
+  const diffMs = now - d
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return diffMin + 'm ago'
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const yest = new Date(now); yest.setDate(yest.getDate() - 1)
+  if (d.toDateString() === yest.toDateString()) return 'Yesterday ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function AuditLogAdmin() {
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const load = () => {
+    setLoading(true); setError(null)
+    fetchAuditLog(200)
+      .then(rows => setEntries(rows))
+      .catch(e => setError(e.message || String(e)))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading audit log…</div>
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+      <div style={{ background: '#0f1f38', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>📜 Audit Log</div>
+        <button onClick={load} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Refresh</button>
+      </div>
+      {error && <div style={{ padding: 16, color: '#dc2626', fontSize: 13 }}>Error: {error}</div>}
+      {!error && entries.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📜</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>No audit entries yet</div>
+          <div style={{ fontSize: 12, color: '#aaa' }}>Status changes and deletions will be recorded here once you start making them.</div>
+        </div>
+      )}
+      {!error && entries.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8f9fa' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase', borderBottom: '2px solid #e5e7eb' }}>When</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase', borderBottom: '2px solid #e5e7eb' }}>Who</th>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#555', fontSize: 11, textTransform: 'uppercase', borderBottom: '2px solid #e5e7eb' }}>What</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e, i) => (
+                <tr key={e.id} style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                  <td style={{ padding: '10px 14px', color: '#666', whiteSpace: 'nowrap' }} title={new Date(e.created_at).toLocaleString()}>{fmtAuditTime(e.created_at)}</td>
+                  <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1a2332' }}>{e.user_name || '—'}</td>
+                  <td style={{ padding: '10px 14px', color: '#333' }}>{describeAudit(e)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ padding: '8px 16px', fontSize: 11, color: '#aaa', borderTop: '1px solid #f0f0f0' }}>
+        Showing up to 200 most recent entries.
+      </div>
+    </div>
+  )
+}
+
 // ─── PDF LAYOUT ADMIN ────────────────────────────────────────────────────────
 function PdfLayoutAdmin() {
   const [sections, setSections] = useState(DEFAULT_PDF_LAYOUT)
@@ -944,7 +1040,7 @@ function PartsCatalogAdmin() {
 }
 
 export default function AdminPage() {
-  const { user, isAdmin, isDemo, loading: authLoading, signOut } = useAuth()
+  const { user, profile, isAdmin, isDemo, loading: authLoading, signOut } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const handleLogout = useCallback(async () => {
@@ -973,6 +1069,11 @@ export default function AdminPage() {
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
     try {
       await updateSubmissionStatus(id, newStatus)
+      logAudit({
+        userId: user?.id, userName: profile?.full_name || user?.email,
+        action: 'submission_status_changed', targetType: 'submission', targetId: id,
+        details: { from: prevStatus, to: newStatus, pm_number: sub.pm_number, customer_name: sub.customer_name },
+      })
     } catch(e) {
       console.error('Status update failed:', e)
       alert('Status update failed: ' + (e.message || e) + '\nReverting to "' + prevStatus.toUpperCase() + '".')
@@ -988,6 +1089,11 @@ export default function AdminPage() {
     try {
       await deleteSubmission(s.id)
       setSubmissions(prev => prev.filter(x => x.id !== s.id))
+      logAudit({
+        userId: user?.id, userName: profile?.full_name || user?.email,
+        action: 'submission_deleted', targetType: 'submission', targetId: s.id,
+        details: { pm_number: s.pm_number, customer_name: s.customer_name, type: lbl, date: s.date },
+      })
     } catch(e) {
       alert('Delete failed: ' + e.message)
     } finally {
@@ -1140,6 +1246,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('analytics')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'analytics' ? '#16a34a' : '#fff', color: activeTab === 'analytics' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             📊 Analytics
           </button>
+          <button onClick={() => setActiveTab('audit')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'audit' ? '#0f1f38' : '#fff', color: activeTab === 'audit' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            📜 Audit Log
+          </button>
         </div>
 
         {/* EXPENSE ANALYTICS TAB */}
@@ -1171,6 +1280,9 @@ export default function AdminPage() {
 
         {/* ANALYTICS TAB */}
         {activeTab === 'analytics' && <AnalyticsAdmin submissions={submissions} />}
+
+        {/* AUDIT LOG TAB */}
+        {activeTab === 'audit' && <AuditLogAdmin />}
         {/* SUBMISSIONS TAB */}
         {activeTab === 'submissions' && (
           <>
