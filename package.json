@@ -8,26 +8,29 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "echo 'lint not configured yet'"
+    "lint": "echo 'lint not configured yet'",
+    "check:api": "node scripts/check-api.mjs",
+    "check": "npm run check:api && npm run build",
+    "prepare": "husky"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "browser-image-compression": "^2.0.2",
+    "html2pdf.js": "^0.10.2",
     "lucide-react": "^0.453.0",
+    "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "pdf-lib": "^1.17.1",
-    "react-router-dom": "^6.27.0",
-    "html2pdf.js": "^0.10.2"
+    "react-router-dom": "^6.27.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "husky": "^9.1.7",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.10"
   }
 }
-

@@ -1,0 +1,8 @@
+# Pre-push gate: refuse to push if `vite build` fails or any api/*.js
+# has a syntax error. Catches the kind of typo that crashed the lambda
+# (FUNCTION_INVOCATION_FAILED) and the JSX errors that quietly broke
+# Vercel deploys for hours.
+#
+# To bypass in an emergency: `git push --no-verify` (think twice).
+
+npm run check

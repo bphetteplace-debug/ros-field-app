@@ -1,6 +1,6 @@
 // One-time setup endpoint to confirm the demo user and create their profile
 // Call: GET /api/setup-demo (protected by a simple secret check)
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const SUPA_URL = process.env.VITE_SUPABASE_URL || 'https://idddbbvotykfairirmwn.supabase.co';
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SERVICE_KEY) {
