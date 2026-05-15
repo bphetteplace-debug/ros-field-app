@@ -18,6 +18,7 @@ import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
 import { compressImage } from '../lib/imageCompress'
 import MicButton from '../components/MicButton'
+import CameraOcrButton from '../components/CameraOcrButton'
 
 // Photos straight off a phone camera are 3-5MB. compressImage shrinks them
 // to ~500KB, which is the difference between uploads succeeding and silently
@@ -874,7 +875,14 @@ export default function FormPage() {
             <div style={fld}><label style={lbl}>GL Code</label><input style={inp} value={glCode} onChange={e=>setGlCode(e.target.value)} /></div>
           </div>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Asset Tag</label><input style={inp} value={assetTag} onChange={e=>setAssetTag(e.target.value)} /></div>
+            <div style={fld}>
+              <label style={lbl}>Asset Tag</label>
+              <div style={{position:'relative'}}>
+                <input style={{...inp,paddingRight:74}} value={assetTag} onChange={e=>setAssetTag(e.target.value)} placeholder="Scan or type" />
+                <CameraOcrButton onResult={setAssetTag} currentValue={assetTag} append />
+                <MicButton value={assetTag} onChange={setAssetTag} size={28} top={6} right={6} />
+              </div>
+            </div>
             <div style={fld}><label style={lbl}>Work Area</label><input style={inp} value={workArea} onChange={e=>setWorkArea(e.target.value)} /></div>
           </div>
           <div style={{marginBottom:14}}>
@@ -990,7 +998,8 @@ export default function FormPage() {
           <div>
             <label style={lbl}>Equipment / Serial Numbers</label>
             <div style={{position:'relative'}}>
-              <input style={{...inp,paddingRight:42}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Compressor SN, Tank ID, etc." />
+              <input style={{...inp,paddingRight:74}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Scan nameplate, dictate, or type" />
+              <CameraOcrButton onResult={setEquipment} currentValue={equipment} append />
               <MicButton value={equipment} onChange={setEquipment} size={28} top={6} right={6} />
             </div>
           </div>
@@ -1036,7 +1045,13 @@ export default function FormPage() {
                     {arrestors.length>1&&<button type="button" onClick={()=>setArrestors(a=>a.filter((_,idx)=>idx!==i))} style={{background:'none',border:'none',color:T.red,cursor:'pointer',fontSize:18,padding:0,fontWeight:700}}>✕</button>}
                   </div>
                   <div style={row}>
-                    <div style={fld}><label style={lbl}>ID / Tag #</label><input style={inp} value={a.arrestorId} onChange={e=>updArr(i,'arrestorId',e.target.value)} placeholder="ARR-001" /></div>
+                    <div style={fld}>
+                      <label style={lbl}>ID / Tag #</label>
+                      <div style={{position:'relative'}}>
+                        <input style={{...inp,paddingRight:42}} value={a.arrestorId} onChange={e=>updArr(i,'arrestorId',e.target.value)} placeholder="ARR-001 or scan" />
+                        <CameraOcrButton onResult={v=>updArr(i,'arrestorId',v)} currentValue={a.arrestorId} top={6} right={6} />
+                      </div>
+                    </div>
                     <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={a.condition} onChange={e=>updArr(i,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
                   <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer',marginBottom:10,userSelect:'none'}}>
@@ -1075,7 +1090,13 @@ export default function FormPage() {
                     {flares.length>1&&<button type="button" onClick={()=>setFlares(f=>f.filter((_,idx)=>idx!==i))} style={{background:'none',border:'none',color:T.red,cursor:'pointer',fontSize:18,padding:0}}>✕</button>}
                   </div>
                   <div style={row}>
-                    <div style={fld}><label style={lbl}>Flare ID / Tag #</label><input style={inp} value={f.flareId} onChange={e=>updFlare(i,'flareId',e.target.value)} placeholder="FLR-001" /></div>
+                    <div style={fld}>
+                      <label style={lbl}>Flare ID / Tag #</label>
+                      <div style={{position:'relative'}}>
+                        <input style={{...inp,paddingRight:42}} value={f.flareId} onChange={e=>updFlare(i,'flareId',e.target.value)} placeholder="FLR-001 or scan" />
+                        <CameraOcrButton onResult={v=>updFlare(i,'flareId',v)} currentValue={f.flareId} top={6} right={6} />
+                      </div>
+                    </div>
                     <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={f.condition} onChange={e=>updFlare(i,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
                   <div style={{...row,alignItems:'center'}}>
@@ -1114,7 +1135,13 @@ export default function FormPage() {
                     {heaters.length>1&&<button type="button" onClick={()=>setHeaters(h=>h.filter((_,idx)=>idx!==hi))} style={{background:'none',border:'none',color:T.red,cursor:'pointer',fontSize:18,padding:0}}>✕</button>}
                   </div>
                   <div style={row}>
-                    <div style={fld}><label style={lbl}>ID / Tag #</label><input style={inp} value={h.heaterId} onChange={e=>updHT(hi,'heaterId',e.target.value)} placeholder="HT-001" /></div>
+                    <div style={fld}>
+                      <label style={lbl}>ID / Tag #</label>
+                      <div style={{position:'relative'}}>
+                        <input style={{...inp,paddingRight:42}} value={h.heaterId} onChange={e=>updHT(hi,'heaterId',e.target.value)} placeholder="HT-001 or scan" />
+                        <CameraOcrButton onResult={v=>updHT(hi,'heaterId',v)} currentValue={h.heaterId} top={6} right={6} />
+                      </div>
+                    </div>
                     <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={h.condition} onChange={e=>updHT(hi,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
                   <div style={{marginBottom:10}}><label style={lbl}>Last Tube Clean Date</label><input type="date" style={inp} value={h.lastCleanDate} onChange={e=>updHT(hi,'lastCleanDate',e.target.value)} /></div>

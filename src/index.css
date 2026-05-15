@@ -134,6 +134,11 @@ button:not(:disabled):active {
   100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
+/* OCR scan spinner — for CameraOcrButton */
+@keyframes ocrSpin {
+  to { transform: rotate(360deg); }
+}
+
 /* Subtle shimmer for loading states */
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .shimmer {
