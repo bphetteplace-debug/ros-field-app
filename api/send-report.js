@@ -437,6 +437,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ PARTS & MATERIALS ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
+  globalThis.__partsTrace = [];
   if (parts.length > 0) {
     // Section header (and column header) — break to new page if not enough room
     if (y - 36 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
@@ -457,6 +458,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       var partPhotosForRow = (Array.isArray(allPhotos) && partSku)
         ? allPhotos.filter(function(ph) { return ph && ph.section === 'part-' + partSku; })
         : [];
+      globalThis.__partsTrace.push({ pi: pi, sku: partSku, partKeys: Object.keys(p), photoCount: partPhotosForRow.length });
       var rowH = 14 + (partPhotosForRow.length > 0 ? 56 : 0);
       // New page if this row + photos won't fit
       if (y - rowH < 30) {
@@ -489,18 +491,30 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
         var rendered = 0;
         for (var ppi = 0; ppi < partPhotosForRow.length && rendered < 8; ppi++) {
           var pp = partPhotosForRow[ppi];
-          if (!pp.storage_path) continue;
+          if (!pp.storage_path) {
+            globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'no_path' });
+            continue;
+          }
           try {
             var ppB = await fetchPhotoBytes(pp.storage_path);
-            if (!ppB) continue;
+            if (!ppB) {
+              globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'fetch_null', path: pp.storage_path });
+              continue;
+            }
             var ppI;
             try { ppI = await pdfDoc.embedJpg(ppB); } catch(e1) {
-              try { ppI = await pdfDoc.embedPng(ppB); } catch(e2) { continue; }
+              try { ppI = await pdfDoc.embedPng(ppB); } catch(e2) {
+                globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'embed_failed', err: String(e2.message||e2).slice(0,60) });
+                continue;
+              }
             }
             page.drawImage(ppI, { x: ppx, y: y - ppSize - 2, width: ppSize, height: ppSize });
+            globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'drawn', y: Math.round(y), ppx: Math.round(ppx) });
             ppx += ppSize + 4;
             rendered++;
-          } catch(e) { /* skip */ }
+          } catch(e) {
+            globalThis.__partsTrace.push({ pi: pi, ppi: ppi, status: 'caught', err: String(e.message||e).slice(0,60) });
+          }
         }
         if (rendered > 0) y -= ppSize + 6;
       }
@@ -681,6 +695,7 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
       sectionCounts,
       partsCount: (parts || []).length,
       workPhotoTrace: globalThis.__workPhotoTrace || [],
+      partsTrace: globalThis.__partsTrace || [],
     }
   });
 }
