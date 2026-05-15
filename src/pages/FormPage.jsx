@@ -13,6 +13,11 @@ import {
   fetchSubmission,
   fetchSubmissions,
 } from '../lib/submissions'
+import {
+  saveDraft as saveDraftToStore,
+  loadDraft as loadDraftFromStore,
+  clearDraft as clearDraftFromStore,
+} from '../lib/draftStore'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
@@ -466,22 +471,45 @@ export default function FormPage() {
   },[CUSTOMERS]) // eslint-disable-line
 
   const draftKey = `form_draft_${user?.id}`
+  // Full draft snapshot — text fields, structured objects, AND photo state.
+  // The pre-IDB version stripped photos out (and stripped arrestor/flare/
+  // heater photo fields too); now everything goes in so a refresh
+  // restores the form exactly as it was. IDB clones Blobs natively.
   const getDraftData = useCallback(()=>({
     jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,
     customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,
     departureTime,lastServiceDate,description,reportedIssue,rootCause,
     techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,
-    arrestors:arrestors.map(a=>({arrestorId:a.arrestorId,condition:a.condition,filterChanged:a.filterChanged,notes:a.notes})),
-    flares:flares.map(f=>({flareId:f.flareId,condition:f.condition,pilotLit:f.pilotLit,lastIgnition:f.lastIgnition,notes:f.notes})),
-    heaters:heaters.map(h=>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length})),
+    arrestors, // FULL (includes before1/before2/after1/after2 photo Blobs)
+    flares,    // FULL (includes photo1/photo2 Blobs)
+    heaters,   // FULL (firetubes include photo1/photo2 Blobs)
     scEquipment,
-  }),[jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment])
+    customerSig, // data URL string
+  }),[jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,customerSig])
 
-  const saveDraft = useCallback(()=>{
-    try{localStorage.setItem(draftKey,JSON.stringify(getDraftData()));setDraftSaved(true);setTimeout(()=>setDraftSaved(false),2500)}catch(e){}
-  },[draftKey,getDraftData])
+  // Photo bundle — the loose photo state slots that aren't embedded in
+  // structured objects. Kept separate from `fields` for clarity but IDB
+  // treats them the same.
+  const getPhotosBundle = useCallback(()=>({
+    photos,
+    siteSignPhoto,
+    partPhotos,
+    arrivalVideo,
+    departureVideo,
+  }),[photos,siteSignPhoto,partPhotos,arrivalVideo,departureVideo])
 
-  const loadDraft = useCallback(d=>{
+  const saveDraft = useCallback(async (overrideData, overridePhotos)=>{
+    if(!user?.id) return
+    try {
+      await saveDraftToStore('workOrder',
+        overrideData || getDraftData(),
+        overridePhotos || getPhotosBundle(),
+        draftKey)
+      setDraftSaved(true); setTimeout(()=>setDraftSaved(false),2500)
+    } catch(e) { console.warn('[Form] saveDraft failed:', e?.message || e) }
+  },[draftKey,getDraftData,getPhotosBundle,user?.id])
+
+  const applyLoadedDraft = useCallback(d=>{
     if(d.jobType)handleJobTypeChange(d.jobType)
     const sets=[['warrantyWork',setWarrantyWork],['customerName',setCustomerName],['truckNumber',setTruckNumber],['locationName',setLocationName],['customerContact',setCustomerContact],['customerWorkOrder',setCustomerWorkOrder],['typeOfWork',setTypeOfWork],['glCode',setGlCode],['assetTag',setAssetTag],['workArea',setWorkArea],['date',setDate],['startTime',setStartTime],['departureTime',setDepartureTime],['lastServiceDate',setLastServiceDate],['description',setDescription],['reportedIssue',setReportedIssue],['rootCause',setRootCause],['equipment',setEquipment],['miles',setMiles],['costPerMile',setCostPerMile],['laborHours',setLaborHours],['hourlyRate',setHourlyRate],['billableTechs',setBillableTechs]]
     sets.forEach(([k,fn])=>{ if(d[k]!==undefined)fn(d[k]) })
@@ -489,10 +517,61 @@ export default function FormPage() {
     if(d.permitsRequired?.length)setPermitsRequired(d.permitsRequired)
     if(d.parts?.length)setParts(d.parts)
     if(d.scEquipment?.length)setScEquipment(d.scEquipment)
+    if(Array.isArray(d.arrestors)&&d.arrestors.length>0)setArrestors(d.arrestors)
+    if(Array.isArray(d.flares)&&d.flares.length>0)setFlares(d.flares)
+    if(Array.isArray(d.heaters)&&d.heaters.length>0){
+      // Legacy drafts (pre-IDB) stripped heater photos AND firetubes,
+      // leaving objects like { heaterId, condition, ..., firetubeCnt }
+      // with no firetubes array. JSX renders h.firetubes.length /
+      // h.firetubes.map directly, so a missing array crashes. Ensure
+      // each loaded heater has at least one firetube.
+      setHeaters(d.heaters.map(h => ({
+        ...h,
+        firetubes: Array.isArray(h.firetubes) && h.firetubes.length > 0
+          ? h.firetubes
+          : [mkFT()],
+      })))
+    }
+    if(typeof d.customerSig==='string')setCustomerSig(d.customerSig)
   },[]) // eslint-disable-line
 
-  useEffect(()=>{ try{if(localStorage.getItem(draftKey))setHasDraft(true)}catch(e){} },[draftKey])
-  useEffect(()=>{ draftTimerRef.current=setInterval(saveDraft,30000); return()=>clearInterval(draftTimerRef.current) },[saveDraft])
+  // Auto-load saved draft on mount. Reads from IDB (with one-time fallback
+  // to the legacy localStorage `form_draft_${userId}` key if the tech is
+  // mid-shift across the deploy). Photos restored separately from text.
+  useEffect(()=>{
+    if(!user?.id) return
+    let cancelled = false
+    ;(async()=>{
+      try {
+        const draft = await loadDraftFromStore('workOrder', draftKey)
+        if (cancelled || !draft) return
+        applyLoadedDraft(draft.fields || {})
+        const p = draft.photos || {}
+        if (Array.isArray(p.photos) && p.photos.length > 0) setPhotos(p.photos)
+        if (p.siteSignPhoto) setSiteSignPhoto(p.siteSignPhoto)
+        if (p.partPhotos && typeof p.partPhotos === 'object') setPartPhotos(p.partPhotos)
+        if (p.arrivalVideo) setArrivalVideo(p.arrivalVideo)
+        if (p.departureVideo) setDepartureVideo(p.departureVideo)
+        // Surface the legacy banner-and-button UX too in case the tech
+        // wants to confirm "yes restore this" — purely cosmetic now since
+        // we already auto-applied.
+        setHasDraft(true)
+      } catch (e) {
+        console.warn('[Form] loadDraft failed:', e?.message || e)
+      }
+    })()
+    return ()=>{ cancelled = true }
+  },[user?.id]) // eslint-disable-line
+
+  // 2-second debounced autosave on any change (text, structured, or photos).
+  // Matches the JHA/Inspection/Expense pattern; previously this was a 30s
+  // setInterval which lost photos to refresh-within-window.
+  useEffect(()=>{
+    if(!user?.id) return
+    if(draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(saveDraft, 2000)
+    return ()=>{ if(draftTimerRef.current) clearTimeout(draftTimerRef.current) }
+  },[user?.id,jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,customerSig,photos,siteSignPhoto,partPhotos,arrivalVideo,departureVideo,saveDraft])
 
   // Fetch the user's most recent matching submission once, so we can offer
   // a "Start from last job" template. Filtered to the SAME template as the
@@ -519,7 +598,7 @@ export default function FormPage() {
   }, [user?.id, jobType]) // eslint-disable-line
 
   // Convert a submission row (snake_case top-level + JSONB data) into the
-  // loadDraft-shaped object that already knows how to populate form state.
+  // applyLoadedDraft-shaped object that knows how to populate form state.
   // Deliberately omits: photos, signatures, GPS, date/time, pm_number,
   // work_order — those are specific to each visit and must be filled fresh.
   function applyTemplateFromSubmission(s) {
@@ -552,7 +631,7 @@ export default function FormPage() {
       hourlyRate: num(s.labor_rate),
       billableTechs: num(d.billableTechs),
     }
-    loadDraft(draft)
+    applyLoadedDraft(draft)
     setTemplateApplied(true)
     setHasDraft(false)
   }
@@ -608,7 +687,7 @@ export default function FormPage() {
       console.error('Email send failed:', err);
       alert('Email failed for PM #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe submission was saved. Open it from the list and use "Send Report" to retry.');
     });
-    try { localStorage.removeItem(draftKey) } catch(e) {}
+    try { await clearDraftFromStore('workOrder', draftKey) } catch(e) {}
     setPendingSubmission(null);
     setFailedEntries([]);
     setSaveStatus('');
@@ -752,10 +831,10 @@ export default function FormPage() {
         {/* ── Draft banner ─── */}
         {hasDraft&&(
           <div style={{background:'#fff7ed',border:`1.5px solid ${T.orange}`,borderRadius:9,padding:'10px 16px',marginBottom:16,fontSize:13,display:'flex',justifyContent:'space-between',alignItems:'center',boxShadow:T.shadowSm}}>
-            <span style={{color:'#92400e'}}>📋 <strong>Draft saved</strong> — restore your last entry?</span>
-            <button type="button" onClick={()=>{ try{const r=localStorage.getItem(draftKey);if(r){loadDraft(JSON.parse(r));setHasDraft(false)}}catch(e){} }}
+            <span style={{color:'#92400e'}}>📋 <strong>Draft resumed</strong> — picked up where you left off.</span>
+            <button type="button" onClick={()=>{ setHasDraft(false) }}
               style={{fontSize:12,padding:'5px 14px',background:T.orange,color:'#fff',border:'none',borderRadius:6,cursor:'pointer',fontWeight:700}}>
-              Restore
+              Dismiss
             </button>
           </div>
         )}

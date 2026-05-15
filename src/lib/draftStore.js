@@ -62,7 +62,7 @@ export async function saveDraft(formType, fields, photos) {
   })
 }
 
-export async function loadDraft(formType) {
+export async function loadDraft(formType, legacyKeyOverride) {
   if (!formType) throw new Error('loadDraft: formType is required')
   const db = await openIDB()
   const fromIdb = await new Promise((resolve, reject) => {
@@ -74,8 +74,11 @@ export async function loadDraft(formType) {
   if (fromIdb) return fromIdb
   // Fall back to a legacy localStorage draft if one is present for this
   // formType. Migrates it into IDB so the next load is a hit and the
-  // localStorage entry can age out naturally.
-  const legacyKey = LEGACY_KEYS[formType]
+  // localStorage entry can age out naturally. Callers with dynamic
+  // localStorage keys (e.g. FormPage's `form_draft_${userId}`) can pass
+  // an explicit legacyKeyOverride that takes precedence over the static
+  // LEGACY_KEYS map.
+  const legacyKey = legacyKeyOverride || LEGACY_KEYS[formType]
   if (legacyKey && typeof localStorage !== 'undefined') {
     try {
       const raw = localStorage.getItem(legacyKey)
@@ -90,7 +93,7 @@ export async function loadDraft(formType) {
   return null
 }
 
-export async function clearDraft(formType) {
+export async function clearDraft(formType, legacyKeyOverride) {
   if (!formType) throw new Error('clearDraft: formType is required')
   const db = await openIDB()
   await new Promise((resolve, reject) => {
@@ -101,7 +104,7 @@ export async function clearDraft(formType) {
   })
   // Best-effort: also clear the legacy localStorage entry so we don't
   // re-migrate it on next load after the user submitted/cleared.
-  const legacyKey = LEGACY_KEYS[formType]
+  const legacyKey = legacyKeyOverride || LEGACY_KEYS[formType]
   if (legacyKey && typeof localStorage !== 'undefined') {
     try { localStorage.removeItem(legacyKey) } catch (_) {}
   }
