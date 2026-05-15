@@ -1213,33 +1213,56 @@ export default function FormPage() {
           )}
         </Section>
 
-        {/* ══ ERROR ══ */}
-        {saveError&&(
-          <div style={{background:'#fef2f2',border:`1.5px solid ${T.red}`,borderRadius:9,padding:'12px 16px',marginBottom:14,fontSize:13,color:T.red,fontWeight:600,display:'flex',alignItems:'center',gap:8,boxShadow:T.shadowSm}}>
-            ⚠️ {saveError}
-          </div>
-        )}
-
-        {/* ══ SUBMIT BAR ══ */}
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <button type="button" onClick={saveDraft}
-            style={{width:'100%',padding:13,background:draftSaved?T.green:T.inputBg,color:draftSaved?'#fff':T.muted,border:`1.5px solid ${draftSaved?T.green:T.border}`,borderRadius:9,fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-            {draftSaved?'✅ Draft Saved!':'💾 Save Draft'}
-          </button>
-          {pendingSubmission ? (
-            <button type="button" onClick={handleRetry} disabled={saving}
-              style={{width:'100%',padding:18,background:saving?'#9ca3af':'#dc2626',color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(220,38,38,0.32)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
-              {saving?`⏳ ${saveStatus||'Retrying…'}`:`🔄 Retry photo upload (${failedEntries.length} ${failedEntries.length===1?'photo':'photos'})`}
-            </button>
-          ) : (
-            <button type="button" onClick={handleSubmit} disabled={saving}
-              style={{width:'100%',padding:18,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
-              {saving?`⏳ ${saveStatus||'Saving…'}`:`Submit ${jtConfig.short} — ${jtConfig.icon} ${jobType}`}
-            </button>
-          )}
-        </div>
-
       <PhotoLightbox photos={photos} idx={lightboxIdx} onClose={()=>setLightboxIdx(-1)} onPrev={()=>setLightboxIdx(i=>i-1)} onNext={()=>setLightboxIdx(i=>i+1)} />
+      </div>
+
+      {/* ═══ STICKY BOTTOM ACTION BAR ═══
+         Pinned to the bottom of the viewport so Save Draft / Submit are
+         always one tap away — tech never has to scroll back to the end
+         of the form. Error banner stacks above the buttons when present
+         so it's visible the moment a submit fails. */}
+      <div style={{
+        position:'fixed', bottom:0, left:0, right:0, zIndex:50,
+        background:'rgba(255,255,255,0.96)',
+        backdropFilter:'blur(10px)',
+        WebkitBackdropFilter:'blur(10px)',
+        borderTop:`1px solid ${T.border}`,
+        boxShadow:'0 -4px 20px rgba(15,23,42,0.08)',
+        paddingBottom:'env(safe-area-inset-bottom)',
+      }}>
+        <div style={{maxWidth:680,margin:'0 auto',padding:'8px 14px 12px'}}>
+          {/* Compact identity line — always visible so the tech knows which
+             job they're on without scrolling back to the WO Hero banner. */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:saveError?8:6,fontSize:11,color:T.muted,fontWeight:600,letterSpacing:0.3,textTransform:'uppercase',minHeight:14}}>
+            <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {jtConfig.icon} WO #{woNumber||'…'}
+              {customerName && <span style={{color:T.text,marginLeft:8,textTransform:'none',letterSpacing:0,fontWeight:700}}>· {customerName}</span>}
+            </span>
+            {locationName && <span style={{color:T.muted,fontWeight:500,textTransform:'none',letterSpacing:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'40%',textAlign:'right'}}>{locationName}</span>}
+          </div>
+          {saveError && (
+            <div style={{background:'#fef2f2',border:`1.5px solid ${T.red}`,borderRadius:9,padding:'10px 14px',marginBottom:10,fontSize:13,color:T.red,fontWeight:600,display:'flex',alignItems:'center',gap:8}}>
+              ⚠️ {saveError}
+            </div>
+          )}
+          <div style={{display:'flex',gap:8}}>
+            <button type="button" onClick={saveDraft}
+              style={{flex:'0 0 44%',padding:14,background:draftSaved?T.green:'#fff',color:draftSaved?'#fff':T.muted,border:`1.5px solid ${draftSaved?T.green:T.border}`,borderRadius:10,fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              {draftSaved?'✅ Saved':'💾 Save Draft'}
+            </button>
+            {pendingSubmission ? (
+              <button type="button" onClick={handleRetry} disabled={saving}
+                style={{flex:1,padding:14,background:saving?'#9ca3af':'#dc2626',color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:15,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 14px rgba(220,38,38,0.32)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
+                {saving?`⏳ ${saveStatus||'Retrying…'}`:`🔄 Retry (${failedEntries.length})`}
+              </button>
+            ) : (
+              <button type="button" onClick={handleSubmit} disabled={saving}
+                style={{flex:1,padding:14,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:15,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 14px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                {saving?`⏳ ${saveStatus||'Saving…'}`:`Submit ${jtConfig.icon}`}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
