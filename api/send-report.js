@@ -377,36 +377,53 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 6;
   }
 
+  // Work Photos. Filter out signatures (rendered in sign-off) and part photos
+  // (rendered inline next to each part below).
   if (Array.isArray(allPhotos)) {
-    page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
-    page.drawText('WORK PHOTOS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
-    y -= 22;
-    var photoW = (W-M*2-12)/3;
-    var photoH = photoW * 0.75;
-    var px = M; var photoCount = 0;
-    // Filter out signature photos from work photos (rendered separately in sign-off)
-    var workPhotos = allPhotos.filter(function(p) { return p.section !== 'customer-sig' && !(p.section && p.section.startsWith('sig-')); });
-    for (var phi=0; phi<workPhotos.length && y-photoH > 80; phi++) {
-      var photo = workPhotos[phi];
-      if (!photo.storage_path) continue;
-      try {
-        var pBytes = await fetchPhotoBytes(photo.storage_path);
-        if (!pBytes) continue;
-        var pImg;
-        try { pImg = await pdfDoc.embedJpg(pBytes); } catch(e2) {
-          try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) { continue; }
+    var workPhotos = allPhotos.filter(function(p) {
+      if (!p) return false;
+      if (p.section === 'customer-sig') return false;
+      if (p.section && p.section.startsWith('sig-')) return false;
+      if (p.section && p.section.startsWith('part-')) return false;
+      return true;
+    });
+    if (workPhotos.length > 0) {
+      // Section header
+      if (y - 30 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
+      page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
+      page.drawText('WORK PHOTOS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
+      y -= 22;
+      var photoW = (W-M*2-12)/3;
+      var photoH = photoW * 0.75;
+      var px = M; var photoCount = 0;
+      for (var phi=0; phi<workPhotos.length; phi++) {
+        var photo = workPhotos[phi];
+        if (!photo.storage_path) continue;
+        // New page if next row won't fit
+        if (photoCount % 3 === 0 && y - photoH < 30) {
+          page = pdfDoc.addPage([612, 792]); y = H - 40;
         }
-        page.drawImage(pImg, { x:px, y:y-photoH, width:photoW, height:photoH });
-        px += photoW+6; photoCount++;
-        if (photoCount % 3 === 0) { px=M; y-=photoH+6; }
-      } catch(e) { /* skip failed photo */ }
+        try {
+          var pBytes = await fetchPhotoBytes(photo.storage_path);
+          if (!pBytes) continue;
+          var pImg;
+          try { pImg = await pdfDoc.embedJpg(pBytes); } catch(e2) {
+            try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) { continue; }
+          }
+          page.drawImage(pImg, { x:px, y:y-photoH, width:photoW, height:photoH });
+          px += photoW+6; photoCount++;
+          if (photoCount % 3 === 0) { px=M; y-=photoH+6; }
+        } catch(e) { /* skip failed photo */ }
+      }
+      if (photoCount > 0 && photoCount % 3 !== 0) y -= photoH+6;
+      y -= 6;
     }
-    if (photoCount > 0 && photoCount % 3 !== 0) y -= photoH+6;
-    y -= 6;
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ PARTS & MATERIALS ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
-  if (parts.length > 0 && y > 120) {
+  if (parts.length > 0) {
+    // Section header (and column header) — break to new page if not enough room
+    if (y - 36 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
     page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
     page.drawText('PARTS & MATERIALS', { x:M+6, y:y-11, size:8, font:hBold, color:white });
     y -= 22;
@@ -417,13 +434,31 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     page.drawText('Unit $',       { x:M+395,  y:y-10, size:7, font:hBold, color:darkGray });
     page.drawText('Total',        { x:M+448,  y:y-10, size:7, font:hBold, color:darkGray });
     y -= 14;
-    for (var pi=0; pi<parts.length && y>90; pi++) {
+    for (var pi=0; pi<parts.length; pi++) {
       var p = parts[pi];
+      // Look up photos for this part by section name "part-<sku>"
+      var partSku = safeStr(p.sku||p.part_number||p.part_no||p.partNumber||p.code||'');
+      var partPhotosForRow = (Array.isArray(allPhotos) && partSku)
+        ? allPhotos.filter(function(ph) { return ph && ph.section === 'part-' + partSku; })
+        : [];
+      var rowH = 14 + (partPhotosForRow.length > 0 ? 56 : 0);
+      // New page if this row + photos won't fit
+      if (y - rowH < 30) {
+        page = pdfDoc.addPage([612, 792]); y = H - 40;
+        // Re-draw the column header on the new page so the table reads right
+        page.drawRectangle({ x:M, y:y-14, width:W-M*2, height:14, color:lightGray });
+        page.drawText('Description',  { x:M+5,   y:y-10, size:7, font:hBold, color:darkGray });
+        page.drawText('Part #',       { x:M+270,  y:y-10, size:7, font:hBold, color:darkGray });
+        page.drawText('Qty',          { x:M+360,  y:y-10, size:7, font:hBold, color:darkGray });
+        page.drawText('Unit $',       { x:M+395,  y:y-10, size:7, font:hBold, color:darkGray });
+        page.drawText('Total',        { x:M+448,  y:y-10, size:7, font:hBold, color:darkGray });
+        y -= 14;
+      }
       var pDesc  = safeStr(p.description||p.name||p.part_description||'').substring(0,42);
-      var pNum   = safeStr(p.part_number||p.part_no||p.partNumber||'').substring(0,18);
+      var pNum   = partSku.substring(0,18);
       var pQty   = safeStr(p.qty||p.quantity||'1');
       var pUnit  = fmtMoney(p.unit_price||p.price||p.unitPrice||0);
-      var pTot   = fmtMoney(p.total||(parseFloat(p.unit_price||0)*parseFloat(p.qty||1)));
+      var pTot   = fmtMoney(p.total||(parseFloat(p.unit_price||p.price||p.unitPrice||0)*parseFloat(p.qty||1)));
       page.drawRectangle({ x:M, y:y-14, width:W-M*2, height:14, color:pi%2===0?white:altRow });
       page.drawText(pDesc, { x:M+5,   y:y-10, size:8, font:hFont, color:darkGray });
       page.drawText(pNum,  { x:M+270,  y:y-10, size:8, font:hFont, color:darkGray });
@@ -431,12 +466,39 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       page.drawText(pUnit, { x:M+390,  y:y-10, size:8, font:hFont, color:darkGray });
       page.drawText(pTot,  { x:M+443,  y:y-10, size:8, font:hFont, color:darkGray });
       y -= 14;
+      // Inline part photos under the row
+      if (partPhotosForRow.length > 0) {
+        var ppSize = 50;
+        var ppx = M + 10;
+        var rendered = 0;
+        for (var ppi = 0; ppi < partPhotosForRow.length && rendered < 8; ppi++) {
+          var pp = partPhotosForRow[ppi];
+          if (!pp.storage_path) continue;
+          try {
+            var ppB = await fetchPhotoBytes(pp.storage_path);
+            if (!ppB) continue;
+            var ppI;
+            try { ppI = await pdfDoc.embedJpg(ppB); } catch(e1) {
+              try { ppI = await pdfDoc.embedPng(ppB); } catch(e2) { continue; }
+            }
+            page.drawImage(ppI, { x: ppx, y: y - ppSize - 2, width: ppSize, height: ppSize });
+            ppx += ppSize + 4;
+            rendered++;
+          } catch(e) { /* skip */ }
+        }
+        if (rendered > 0) y -= ppSize + 6;
+      }
     }
     y -= 6;
   }
 
   // ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ COST SUMMARY ÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂ
-  if (y > 90) {
+  // Cost Summary — needs ~95px (header 22 + 3 rows × 14 + total 28 + padding).
+  // ALWAYS render this section. Add a new page if not enough room rather than
+  // silently dropping it (which is what hid hours/mileage/cost/total from the
+  // PDF for any submission with lots of photos).
+  {
+    if (y - 95 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
     var sX = W/2; var sW = W/2-M;
     page.drawRectangle({ x:M, y:y-16, width:W-M*2, height:16, color:navy });
     page.drawText('COST SUMMARY', { x:M+6, y:y-11, size:8, font:hBold, color:white });
@@ -446,7 +508,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       ['Labor ('+laborHours.toFixed(1)+' hrs @ '+fmtMoney(laborRate)+'/hr):', fmtMoney(laborTotal)],
       ['Mileage ('+mileage+' mi @ '+fmtMoney(mileageRate)+'/mi):', fmtMoney(mileageTotal)],
     ];
-    for (var ci=0; ci<costRows.length && y>70; ci++) {
+    for (var ci=0; ci<costRows.length; ci++) {
       page.drawRectangle({ x:sX, y:y-14, width:sW, height:14, color:ci%2===0?white:altRow });
       page.drawText(costRows[ci][0], { x:sX+5,    y:y-10, size:8, font:hFont, color:darkGray });
       page.drawText(costRows[ci][1], { x:sX+sW-60, y:y-10, size:8, font:hBold, color:darkGray });
