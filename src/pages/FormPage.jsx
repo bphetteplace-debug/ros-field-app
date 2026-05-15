@@ -19,6 +19,7 @@ import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
 import { compressImage } from '../lib/imageCompress'
 import MicButton from '../components/MicButton'
 import CameraOcrButton from '../components/CameraOcrButton'
+import PolishButton from '../components/PolishButton'
 import SortablePhotoGrid from '../components/SortablePhotoGrid'
 
 // Photos straight off a phone camera are 3-5MB. compressImage shrinks them
@@ -989,14 +990,16 @@ export default function FormPage() {
               <div style={{marginBottom:14}}>
                 <label style={lbl}>Reported Issue *</label>
                 <div style={{position:'relative'}}>
-                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:46}} value={reportedIssue} onChange={e=>setReportedIssue(e.target.value)} placeholder="What was the customer-reported problem?" />
+                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:84}} value={reportedIssue} onChange={e=>setReportedIssue(e.target.value)} placeholder="What was the customer-reported problem?" />
+                  <PolishButton value={reportedIssue} onChange={setReportedIssue} top={6} right={44} size={32} />
                   <MicButton value={reportedIssue} onChange={setReportedIssue} />
                 </div>
               </div>
               <div style={{marginBottom:14}}>
                 <label style={lbl}>Root Cause</label>
                 <div style={{position:'relative'}}>
-                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:46}} value={rootCause} onChange={e=>setRootCause(e.target.value)} placeholder="Identified root cause..." />
+                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:84}} value={rootCause} onChange={e=>setRootCause(e.target.value)} placeholder="Identified root cause..." />
+                  <PolishButton value={rootCause} onChange={setRootCause} top={6} right={44} size={32} />
                   <MicButton value={rootCause} onChange={setRootCause} />
                 </div>
               </div>
@@ -1005,15 +1008,17 @@ export default function FormPage() {
           <div style={{marginBottom:14}}>
             <label style={lbl}>{showIssueFields?'Work Performed':'Description'}</label>
             <div style={{position:'relative'}}>
-              <textarea style={{...inp,minHeight:88,resize:'vertical',paddingRight:46}} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe all work performed..." />
+              <textarea style={{...inp,minHeight:88,resize:'vertical',paddingRight:84}} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe all work performed..." />
+              <PolishButton value={description} onChange={setDescription} top={6} right={44} size={32} />
               <MicButton value={description} onChange={setDescription} />
             </div>
           </div>
           <div>
             <label style={lbl}>Equipment / Serial Numbers</label>
             <div style={{position:'relative'}}>
-              <input style={{...inp,paddingRight:74}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Scan nameplate, dictate, or type" />
+              <input style={{...inp,paddingRight:108}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Scan nameplate, dictate, or type" />
               <CameraOcrButton onResult={setEquipment} currentValue={equipment} append />
+              <PolishButton value={equipment} onChange={setEquipment} size={28} top={6} right={70} />
               <MicButton value={equipment} onChange={setEquipment} size={28} top={6} right={6} />
             </div>
           </div>
@@ -1075,7 +1080,8 @@ export default function FormPage() {
                   <div style={{marginBottom:10}}>
                     <label style={lbl}>Notes</label>
                     <div style={{position:'relative'}}>
-                      <input style={{...inp,paddingRight:42}} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <input style={{...inp,paddingRight:74}} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <PolishButton value={a.notes} onChange={v=>updArr(i,'notes',v)} size={28} top={6} right={38} />
                       <MicButton value={a.notes} onChange={v=>updArr(i,'notes',v)} size={28} top={6} right={6} />
                     </div>
                   </div>
@@ -1123,7 +1129,8 @@ export default function FormPage() {
                   <div style={{marginBottom:10}}>
                     <label style={lbl}>Notes</label>
                     <div style={{position:'relative'}}>
-                      <input style={{...inp,paddingRight:42}} value={f.notes} onChange={e=>updFlare(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <input style={{...inp,paddingRight:74}} value={f.notes} onChange={e=>updFlare(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <PolishButton value={f.notes} onChange={v=>updFlare(i,'notes',v)} size={28} top={6} right={38} />
                       <MicButton value={f.notes} onChange={v=>updFlare(i,'notes',v)} size={28} top={6} right={6} />
                     </div>
                   </div>
@@ -1162,7 +1169,8 @@ export default function FormPage() {
                   <div style={{marginBottom:10}}>
                     <label style={lbl}>Notes</label>
                     <div style={{position:'relative'}}>
-                      <input style={{...inp,paddingRight:42}} value={h.notes} onChange={e=>updHT(hi,'notes',e.target.value)} placeholder="Notes…" />
+                      <input style={{...inp,paddingRight:74}} value={h.notes} onChange={e=>updHT(hi,'notes',e.target.value)} placeholder="Notes…" />
+                      <PolishButton value={h.notes} onChange={v=>updHT(hi,'notes',v)} size={28} top={6} right={38} />
                       <MicButton value={h.notes} onChange={v=>updHT(hi,'notes',v)} size={28} top={6} right={6} />
                     </div>
                   </div>

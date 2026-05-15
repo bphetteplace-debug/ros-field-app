@@ -139,6 +139,12 @@ button:not(:disabled):active {
   to { transform: rotate(360deg); }
 }
 
+/* AI Polish — soft gradient pulse while the request is in flight */
+@keyframes polishPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.6); opacity: 1; }
+  50%      { box-shadow: 0 0 0 8px rgba(168, 85, 247, 0); opacity: 0.85; }
+}
+
 /* Subtle shimmer for loading states */
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .shimmer {
