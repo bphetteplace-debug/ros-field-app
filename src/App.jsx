@@ -8,6 +8,7 @@ import SubmissionsListPage from './pages/SubmissionsListPage.jsx';
 import ViewSubmissionPage from './pages/ViewSubmissionPage.jsx';
 import EditSubmissionPage from './pages/EditSubmissionPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import SharePage from './pages/SharePage.jsx';
 import ExpenseReportPage from './pages/ExpenseReportPage.jsx';
 import DailyInspectionPage from './pages/DailyInspectionPage.jsx';
 import JHAPage from './pages/JHAPage.jsx';
@@ -19,15 +20,22 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="text-slate-500 text-sm">Loading…</div>
-      </div>
+      <Routes>
+        {/* Share links are public — never gated by auth */}
+        <Route path="/share/:token" element={<SharePage />} />
+        <Route path="*" element={
+          <div className="min-h-screen flex items-center justify-center bg-slate-100">
+            <div className="text-slate-500 text-sm">Loading…</div>
+          </div>
+        } />
+      </Routes>
     );
   }
 
   if (!user) {
     return (
       <Routes>
+        <Route path="/share/:token" element={<SharePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
@@ -37,6 +45,8 @@ export default function App() {
   return (
     <Layout>
       <Routes>
+        {/* Public share — works whether or not the visitor is logged in */}
+        <Route path="/share/:token" element={<SharePage />} />
         <Route path="/submissions" element={<SubmissionsListPage />} />
         <Route path="/form" element={<FormPage />} />
         <Route path="/expense" element={<ExpenseReportPage />} />

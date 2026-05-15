@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken } from '../lib/submissions'
 import { supabase } from '../lib/supabase'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -718,6 +718,11 @@ function describeAudit(entry) {
       const cust = d.customer_name ? ' (' + d.customer_name + ')' : ''
       return 'Deleted ' + (d.type || 'submission') + ' ' + who + cust
     }
+    case 'submission_shared': {
+      const who = d.pm_number ? '#' + d.pm_number : (id || '')
+      const cust = d.customer_name ? ' (' + d.customer_name + ')' : ''
+      return 'Generated share link for ' + who + cust
+    }
     default:
       return entry.action + (entry.target_type ? ' on ' + entry.target_type : '') + (id ? ' ' + id : '')
   }
@@ -1080,6 +1085,23 @@ export default function AdminPage() {
       console.error('Status update failed:', e)
       alert('Status update failed: ' + (e.message || e) + '\nReverting to "' + prevStatus.toUpperCase() + '".')
       setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: prevStatus } : s))
+    }
+  }
+
+  const handleShare = async (s) => {
+    try {
+      const token = await ensureShareToken(s)
+      setSubmissions(prev => prev.map(x => x.id === s.id ? { ...x, share_token: token } : x))
+      const url = window.location.origin + '/share/' + token
+      try { await navigator.clipboard.writeText(url) } catch {}
+      logAudit({
+        userId: user?.id, userName: profile?.full_name || user?.email,
+        action: 'submission_shared', targetType: 'submission', targetId: s.id,
+        details: { pm_number: s.pm_number, customer_name: s.customer_name },
+      })
+      alert('Share link copied to clipboard:\n\n' + url + '\n\nAnyone with this link can view this submission read-only. Send it to the customer.')
+    } catch (e) {
+      alert('Couldn\'t generate share link: ' + (e.message || e))
     }
   }
 
@@ -1550,6 +1572,9 @@ export default function AdminPage() {
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
                         {(lbl === 'PM' || lbl === 'SC') && (
                           <button onClick={() => navigate('/edit/' + s.id)} title="Edit submission" style={{ background: '#f0f7ff', border: '1px solid #93c5fd', color: '#2563eb', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✏️ Edit</button>
+                        )}
+                        {!isDemo && (
+                          <button onClick={() => handleShare(s)} title={s.share_token ? 'Copy existing share link' : 'Generate share link for customer'} style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#16a34a', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🔗</button>
                         )}
                         {!isDemo && <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
                           {isBeingDeleted ? '...' : '🗑 Del'}

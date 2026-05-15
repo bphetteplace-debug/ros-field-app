@@ -115,6 +115,39 @@ export async function logAudit({ userId, userName, action, targetType, targetId,
   }
 }
 
+// ── SHARE LINKS ─────────────────────────────────────────────────────────────────
+// Each submission can have a stable random share_token. Admin generates one
+// (idempotent — if the row already has a token we reuse it), then anyone with
+// the URL can view the submission read-only via the public RPC below.
+export async function ensureShareToken(submission) {
+  if (submission?.share_token) return submission.share_token;
+  if (!submission?.id) throw new Error('Cannot create share link — missing submission id');
+  const token = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const updated = await supaRest('PATCH', 'submissions?id=eq.' + submission.id, { share_token: token });
+  const row = Array.isArray(updated) ? updated[0] : updated;
+  return row?.share_token || token;
+}
+
+// Public read of a shared submission — no auth needed; calls the SECURITY
+// DEFINER RPC get_shared_submission which gates on the random token.
+export async function fetchSharedSubmission(token) {
+  if (!token) throw new Error('Missing share token');
+  const res = await fetch(SUPA_URL + '/rest/v1/rpc/get_shared_submission', {
+    method: 'POST',
+    headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_token: token }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error('Share link not found or expired' + (text ? ': ' + text : ''));
+  }
+  const payload = await res.json();
+  if (!payload || !payload.submission) throw new Error('Share link not found');
+  return payload;
+}
+
 export async function fetchAuditLog(limit = 200) {
   try {
     const data = await supaRest('GET', 'audit_log?select=*&order=created_at.desc&limit=' + limit);
