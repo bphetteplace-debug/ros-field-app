@@ -8,7 +8,6 @@ import SubmissionsListPage from './pages/SubmissionsListPage.jsx';
 import ViewSubmissionPage from './pages/ViewSubmissionPage.jsx';
 import EditSubmissionPage from './pages/EditSubmissionPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
-import SettingsPage from './pages/SettingsPage.jsx';
 import ExpenseReportPage from './pages/ExpenseReportPage.jsx';
 import DailyInspectionPage from './pages/DailyInspectionPage.jsx';
 import JHAPage from './pages/JHAPage.jsx';
@@ -49,7 +48,7 @@ export default function App() {
         <Route path="/view/:id" element={<ViewSubmissionPage />} />
         <Route path="/edit/:id" element={isAdmin ? <EditSubmissionPage /> : <Navigate to="/submissions" replace />} />
         <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/submissions" replace />} />
-        <Route path="/settings" element={isAdmin ? <SettingsPage /> : <Navigate to="/submissions" replace />} />
+        <Route path="/settings" element={<Navigate to="/admin" replace />} />
         <Route path="/login" element={<Navigate to="/submissions" replace />} />
         <Route path="*" element={<Navigate to="/submissions" replace />} />
       </Routes>
