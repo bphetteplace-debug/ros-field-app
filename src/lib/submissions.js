@@ -43,16 +43,12 @@ async function supaRest(method, path, body) {
   }
 }
 
-// ── PM REPORT NUMBER ── shared counter across PM + SC, never repeats
-export async function getNextPmNumber() {
-  try {
-    const data = await supaRest('GET', 'submissions?select=pm_number&order=pm_number.desc&limit=1');
-    if (!data || data.length === 0) return 9136;
-    return (data[0].pm_number || 9135) + 1;
-  } catch {
-    return 9136;
-  }
-}
+// PM number is no longer a separate counter. Every submission's pm_number is
+// the same numeric value as its wo_number (claimed atomically from wo_counter
+// via claim_next_wo_number). saveSubmission below derives pm_number from the
+// wo_number claim; FormPage claims wo_number once and uses it for both display
+// fields. The legacy getNextPmNumber export was removed in May 2026 when the
+// 91xx PM range was retired in favour of the unified 10000+ pool.
 
 // ── WORK ORDER NUMBER ── shared counter across ALL form types, never repeats, starts at 10000
 // work_order is stored as a numeric string e.g. "10001" — we parse to int to find the max
@@ -120,12 +116,12 @@ export async function saveSubmission(formData, userId, templateOverride) {
     jhaMeetingPoint, jhaAdditionalHazards, jhaCrewMembers, jhaSupervisor, jhaHighRiskCount,
   } = formData;
 
-  // Always ensure pm_number is set
-  const effectivePmNumber = pmNumber || await getNextPmNumber();
-
   // Work order: use the auto-generated one passed in from the form (customerWorkOrder is now numeric)
   // If somehow empty (e.g. offline queue fallback), generate a fresh one
   const effectiveWoNumber = woNumber || String(await getNextWoNumber());
+
+  // pm_number is unified with wo_number — single sequential identifier across PM + SC
+  const effectivePmNumber = pmNumber || parseInt(effectiveWoNumber, 10);
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
@@ -211,8 +207,30 @@ export async function saveSubmission(formData, userId, templateOverride) {
     },
   };
 
-  const result = await supaRest('POST', 'submissions', payload);
-  if (!result || result.length === 0) throw new Error('Save returned no data');
+  // Retry on duplicate-key error (23505): if the unique constraint on pm_number
+  // ever fires, claim a fresh wo_number, update both pm_number + work_order, retry.
+  // Up to 3 attempts so a brief race or counter drift doesn't reach the tech.
+  let result;
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      result = await supaRest('POST', 'submissions', payload);
+      break;
+    } catch (e) {
+      lastError = e;
+      const msg = (e && e.message) ? e.message : String(e);
+      if (!msg.includes('23505') && !msg.includes('duplicate key')) throw e;
+      const freshWo = String(await getNextWoNumber());
+      payload.work_order = freshWo;
+      payload.pm_number = parseInt(freshWo, 10);
+      if (payload.data && payload.data.customerWorkOrder) {
+        payload.data.customerWorkOrder = freshWo;
+      }
+      console.warn('submission INSERT hit duplicate key, retrying with fresh wo_number ' + freshWo + ' (attempt ' + (attempt + 2) + ' of 3)');
+    }
+  }
+  if (!result) throw lastError || new Error('Save failed after 3 attempts');
+  if (Array.isArray(result) && result.length === 0) throw new Error('Save returned no data');
   return Array.isArray(result) ? result[0] : result;
 }
 

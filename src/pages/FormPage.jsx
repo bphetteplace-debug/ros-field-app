@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import {
   saveSubmission, uploadPhotos,
-  getNextPmNumber, getNextWoNumber,
+  getNextWoNumber,
   fetchSettings,
   DEFAULT_CUSTOMERS, DEFAULT_TRUCKS, DEFAULT_TECHS,
   queueOfflineSubmission,
@@ -436,8 +436,15 @@ export default function FormPage() {
   }, [user, jobType])
 
   useEffect(()=>{
-    getNextPmNumber().then(n=>{if(n)setPmNumber(n)}).catch(()=>{})
-    getNextWoNumber().then(n=>{if(n)setWoNumber(n)}).catch(()=>{})
+    // Unified numbering: claim one wo_number atomically; pm_number mirrors it.
+    // The 91xx PM range is retired — all submissions live in the 10000+ pool.
+    getNextWoNumber().then(n=>{
+      if(n){
+        const num = String(n)
+        setWoNumber(num)
+        setPmNumber(parseInt(num, 10))
+      }
+    }).catch(()=>{})
     fetchPartsCatalog().then(p=>{if(p&&p.length)setPartsCatalog(p.map(r=>({code:r.code||'',desc:r.description,name:r.description,price:parseFloat(r.price||0),category:r.category||''})))}).catch(()=>{})
     fetchSettings().then(s=>{
       if(!s)return
