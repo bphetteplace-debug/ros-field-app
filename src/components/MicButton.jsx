@@ -21,7 +21,6 @@ export default function MicButton({ value, onChange, lang = 'en-US', size = 32, 
   const [listening, setListening] = useState(false);
   const recRef = useRef(null);
   const baselineRef = useRef('');     // value the field had when mic was tapped
-  const finalsRef   = useRef('');     // finalized phrases accumulated this session
 
   // Detect support once at render time. The hook (not constructor) is
   // capability detection — `new SR()` doesn't fire the mic permission prompt;
@@ -49,24 +48,22 @@ export default function MicButton({ value, onChange, lang = 'en-US', size = 32, 
     rec.interimResults = true;   // show words as they're recognized
     rec.lang = lang;
     baselineRef.current = value || '';
-    finalsRef.current = '';
-    // onresult fires repeatedly. e.results is a growing list across the
-    // whole session; e.resultIndex points at where the NEW items start.
-    // Standard Web Speech pattern: walk only from resultIndex, accumulate
-    // finalized phrases into a session-scoped buffer (finalsRef), and
-    // re-derive `interim` fresh each call (it represents the current
-    // in-progress phrase only). Without this, naïvely concatenating all
-    // `e.results` on every callback double-counts interim chunks and
-    // produces output like "sealsealseal leakseal on…" instead of
-    // "seal leak on…".
+    // Dirt-simple, can't-double-count pattern:
+    // SpeechRecognitionEvent.results contains the full transcript history
+    // for the current session (every phrase, in order). On EACH event we
+    // rebuild the entire transcript from results from scratch and call
+    // onChange with the full string. No accumulation refs, no resultIndex
+    // arithmetic — just "the latest state of the recognizer". Previous
+    // implementations that tried to incrementally append produced
+    // duplication like "sealsealseal leak" because of subtle differences
+    // in how Chrome vs Safari delivers interim updates. This pattern is
+    // immune to those.
     rec.onresult = (e) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const piece = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalsRef.current += piece + ' ';
-        else interim += piece;
+      let transcript = '';
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
       }
-      const out = (baselineRef.current.replace(/\s+$/, '') + ' ' + finalsRef.current + interim)
+      const out = (baselineRef.current.replace(/\s+$/, '') + ' ' + transcript)
         .replace(/\s+/g, ' ')
         .trim();
       onChange(out);
