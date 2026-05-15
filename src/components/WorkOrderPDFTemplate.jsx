@@ -156,7 +156,7 @@ export function WorkOrderPDFTemplate({ data }) {
     const custSig  = photos.find(p =>
           /^customer[\s_-]?sig/i.test(p.caption) ||
           p.caption === 'Customer Signature' ||
-           p.section       p.section === 'customer-sig'
+          p.section === 'customer-sig'
         );
     const techSigs = photos.filter(p =>
           (/\bSignature\b/i.test(p.caption) && p !== custSig) ||

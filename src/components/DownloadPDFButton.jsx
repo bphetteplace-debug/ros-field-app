@@ -64,6 +64,6 @@ export function DownloadPDFButton({ sub, style }) {
   return (
         <button onClick={handleDownload} disabled={busy} style={style}>
           {busy ? 'Generating PDF...' : 'Download PDF'}
-        </button>button>
+        </button>
       );
 }
