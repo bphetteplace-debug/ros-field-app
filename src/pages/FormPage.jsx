@@ -1305,7 +1305,7 @@ export default function FormPage() {
           {photos.length>0 && (
             <div style={{marginBottom:14}}>
               <div style={{fontSize:11,color:T.muted,fontWeight:600,marginBottom:8,letterSpacing:0.3}}>
-                Drag to reorder · Tap a tag for one-tap captions · Tap photo to enlarge
+                Hold ⋮⋮ handle to drag · Tap photo to enlarge · Tap a tag for captions
               </div>
               <SortablePhotoGrid
                 items={photos}

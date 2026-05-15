@@ -20,7 +20,8 @@ import { useEffect, useRef, useState } from 'react';
 export default function MicButton({ value, onChange, lang = 'en-US', size = 32, top = 6, right = 6 }) {
   const [listening, setListening] = useState(false);
   const recRef = useRef(null);
-  const baselineRef = useRef('');
+  const baselineRef = useRef('');     // value the field had when mic was tapped
+  const finalsRef   = useRef('');     // finalized phrases accumulated this session
 
   // Detect support once at render time. The hook (not constructor) is
   // capability detection — `new SR()` doesn't fire the mic permission prompt;
@@ -48,19 +49,27 @@ export default function MicButton({ value, onChange, lang = 'en-US', size = 32, 
     rec.interimResults = true;   // show words as they're recognized
     rec.lang = lang;
     baselineRef.current = value || '';
+    finalsRef.current = '';
+    // onresult fires repeatedly. e.results is a growing list across the
+    // whole session; e.resultIndex points at where the NEW items start.
+    // Standard Web Speech pattern: walk only from resultIndex, accumulate
+    // finalized phrases into a session-scoped buffer (finalsRef), and
+    // re-derive `interim` fresh each call (it represents the current
+    // in-progress phrase only). Without this, naïvely concatenating all
+    // `e.results` on every callback double-counts interim chunks and
+    // produces output like "sealsealseal leakseal on…" instead of
+    // "seal leak on…".
     rec.onresult = (e) => {
-      let finalSoFar = '';
       let interim = '';
-      for (let i = 0; i < e.results.length; i++) {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
         const piece = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalSoFar += piece;
+        if (e.results[i].isFinal) finalsRef.current += piece + ' ';
         else interim += piece;
       }
-      // Append to the value the user had when they pressed mic.
-      const combined = baselineRef.current
-        ? (baselineRef.current.replace(/\s+$/, '') + ' ' + (finalSoFar + interim).trim()).replace(/\s+/g, ' ').trim()
-        : (finalSoFar + interim).trim();
-      onChange(combined);
+      const out = (baselineRef.current.replace(/\s+$/, '') + ' ' + finalsRef.current + interim)
+        .replace(/\s+/g, ' ')
+        .trim();
+      onChange(out);
     };
     rec.onerror = () => setListening(false);
     rec.onend = () => setListening(false);

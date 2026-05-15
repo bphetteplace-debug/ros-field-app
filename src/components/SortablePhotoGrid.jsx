@@ -40,20 +40,53 @@ function SortableItem({ item, onRemove, onCaption, onItemTap, quickTags, T }) {
     transition,
     opacity: isDragging ? 0.55 : 1,
     zIndex: isDragging ? 10 : 'auto',
-    touchAction: 'manipulation',
   };
   const src = item.dataUrl || (item.file ? URL.createObjectURL(item.file) : '');
   return (
     <div ref={setNodeRef} style={{ ...style, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', border: '1px solid ' + T.border, boxShadow: '0 2px 6px rgba(15,23,42,0.06)', background: '#f1f5f9' }}>
+        {/* The image itself opens the lightbox on tap. It deliberately does
+            NOT receive the drag listeners — on iOS Safari long-press on an
+            <img> triggers the OS "Save Image" sheet, which preempts dnd-kit
+            and is the reason drag-to-reorder was failing on phones. */}
         <img
           src={src}
           alt={item.caption || ''}
           onClick={() => onItemTap && onItemTap(item.id)}
+          draggable={false}
+          style={{
+            width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in',
+            // Suppress the iOS image action sheet and selection halo.
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+            // Don't let the browser interpret touches on the image as scroll
+            // or zoom gestures — they're either a tap (lightbox) or pass
+            // through to the drag handle.
+            touchAction: 'manipulation',
+            pointerEvents: 'auto',
+          }}
+        />
+        {/* Drag handle — explicit, discoverable target for reordering.
+            This is the element wired to dnd-kit's listeners + attributes,
+            so a tap on the rest of the tile stays "open lightbox" / "remove". */}
+        <button
+          type="button"
           {...listeners}
           {...attributes}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: isDragging ? 'grabbing' : 'grab' }}
-        />
+          aria-label="Drag to reorder"
+          title="Drag to reorder"
+          style={{
+            position: 'absolute', top: 6, left: 6,
+            background: 'rgba(15,31,56,0.82)', color: '#fff',
+            border: 'none', borderRadius: 6,
+            width: 28, height: 28, fontSize: 14, fontWeight: 700,
+            cursor: isDragging ? 'grabbing' : 'grab',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+            touchAction: 'none', // dnd-kit needs touch-action:none on the activator
+            zIndex: 2,
+          }}
+        >⋮⋮</button>
         <button
           type="button"
           onClick={() => onRemove(item.id)}
@@ -99,12 +132,12 @@ function SortableItem({ item, onRemove, onCaption, onItemTap, quickTags, T }) {
 
 export default function SortablePhotoGrid({ items, onReorder, onRemove, onCaption, onItemTap, quickTags = DEFAULT_TAGS, T }) {
   const sensors = useSensors(
-    // Pointer sensor with a small activation distance prevents tap-to-zoom
-    // from getting hijacked as a drag start.
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    // Touch sensor uses a slight delay + tolerance so a tap on the × button
-    // doesn't accidentally start a drag.
-    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    // Pointer (mouse) — small distance so the drag handle responds immediately.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    // Touch — since the drag is initiated from an explicit handle (not the
+    // image itself), there's no ambiguity to disambiguate via long-press
+    // delay. A tiny tolerance avoids stray jitter starting a drag on a tap.
+    useSensor(TouchSensor, { activationConstraint: { delay: 0, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
