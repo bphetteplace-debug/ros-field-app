@@ -65,12 +65,20 @@ export default function ExpenseReportPage() {
       // the old localStorage version did. We pass the full expenses array
       // through the photos slot so the Blobs survive the round trip.
       await saveDraftToStore('expense',
-        { techName, truckNumber, date, notes },
+        { techName, truckNumber, date, notes, gpsLat, gpsLng, gpsAccuracy },
         { expenses })
       setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2000)
     } catch(e) { console.warn('[Expense] saveDraft failed:', e?.message || e) }
   }
   const clearDraft = async () => { try { await clearDraftFromStore('expense') } catch(e) {} }
+
+  // Auto-save every 2s on any change so a tech who refreshes mid-form
+  // doesn't have to remember to hit "Save Draft" first.
+  useEffect(() => {
+    const t = setTimeout(saveDraft, 2000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techName, truckNumber, date, notes, expenses, gpsLat, gpsLng, gpsAccuracy])
 
   function mkExp() { return { category: EXPENSE_CATEGORIES[0], description: '', amount: '', receipt: null, itemPhoto: null } }
 
@@ -95,6 +103,9 @@ export default function ExpenseReportPage() {
         if (saved.truckNumber) setTruckNumber(saved.truckNumber)
         if (saved.date) setDate(saved.date)
         if (saved.notes) setNotes(saved.notes)
+        if (saved.gpsLat != null) setGpsLat(saved.gpsLat)
+        if (saved.gpsLng != null) setGpsLng(saved.gpsLng)
+        if (saved.gpsAccuracy != null) setGpsAccuracy(saved.gpsAccuracy)
         const expensesWithPhotos = draft.photos && Array.isArray(draft.photos.expenses) ? draft.photos.expenses : null
         if (expensesWithPhotos && expensesWithPhotos.length > 0) {
           setExpenses(expensesWithPhotos)

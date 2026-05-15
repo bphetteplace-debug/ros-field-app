@@ -78,10 +78,12 @@ export default function JHAPage() {
   const getDraftData = useCallback(() => ({
     techName, truckNumber, date, jobLocation, workOrder, jobDescription,
     supervisor, crewMembers, steps, selectedPPE, emergencyContact,
-    nearestHospital, meetingPoint, additionalHazards
+    nearestHospital, meetingPoint, additionalHazards,
+    gpsLat, gpsLng, gpsAccuracy,
   }), [techName, truckNumber, date, jobLocation, workOrder, jobDescription,
        supervisor, crewMembers, steps, selectedPPE, emergencyContact,
-       nearestHospital, meetingPoint, additionalHazards])
+       nearestHospital, meetingPoint, additionalHazards,
+       gpsLat, gpsLng, gpsAccuracy])
 
   const saveDraft = useCallback(async () => {
     try {
@@ -137,6 +139,9 @@ export default function JHAPage() {
         if (saved.nearestHospital) setNearestHospital(saved.nearestHospital)
         if (saved.meetingPoint) setMeetingPoint(saved.meetingPoint)
         if (saved.additionalHazards) setAdditionalHazards(saved.additionalHazards)
+        if (saved.gpsLat != null) setGpsLat(saved.gpsLat)
+        if (saved.gpsLng != null) setGpsLng(saved.gpsLng)
+        if (saved.gpsAccuracy != null) setGpsAccuracy(saved.gpsAccuracy)
         if (Array.isArray(draft.photos) && draft.photos.length > 0) {
           setPhotos(draft.photos)
         }

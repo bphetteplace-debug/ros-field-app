@@ -84,12 +84,21 @@ export default function DailyInspectionPage() {
   const saveDraft = async () => {
     try {
       await saveDraftToStore('inspection',
-        { techName, truckNumber, inspType, date, odometer, checks, defects },
+        { techName, truckNumber, inspType, date, odometer, checks, defects,
+          gpsLat, gpsLng, gpsAccuracy },
         photos)
       setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2000)
     } catch(e) { console.warn('[Inspection] saveDraft failed:', e?.message || e) }
   }
   const clearDraft = async () => { try { await clearDraftFromStore('inspection') } catch(e) {} }
+
+  // Auto-save every 2s on any change so a tech who refreshes mid-form
+  // doesn't have to remember to hit "Save Draft" first.
+  useEffect(() => {
+    const t = setTimeout(saveDraft, 2000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techName, truckNumber, inspType, date, odometer, checks, defects, photos, gpsLat, gpsLng, gpsAccuracy])
 
   useEffect(() => {
     fetchSettings().then(s => {
@@ -115,6 +124,9 @@ export default function DailyInspectionPage() {
         if (saved.odometer) setOdometer(saved.odometer)
         if (saved.checks) setChecks(saved.checks)
         if (saved.defects) setDefects(saved.defects)
+        if (saved.gpsLat != null) setGpsLat(saved.gpsLat)
+        if (saved.gpsLng != null) setGpsLng(saved.gpsLng)
+        if (saved.gpsAccuracy != null) setGpsAccuracy(saved.gpsAccuracy)
         if (Array.isArray(draft.photos) && draft.photos.length > 0) setPhotos(draft.photos)
       } catch (e) {
         console.warn('[Inspection] loadDraft failed:', e?.message || e)
