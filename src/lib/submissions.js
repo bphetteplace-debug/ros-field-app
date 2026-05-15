@@ -7,8 +7,9 @@ const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const DEFAULT_CUSTOMERS = ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS'];
 export const DEFAULT_TRUCKS = ['0001','0002','0003','0004','0005','0006','0007'];
 export const DEFAULT_TECHS = ['Matthew Reid','Vladimir Rivero','Pedro Perez'];
-// Helper: get auth token from localStorage
-function getAuthToken() {
+// Helper: get auth token from localStorage. Exported so other modules
+// can avoid duplicating the same prefix/suffix lookup pattern.
+export function getAuthToken() {
   const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
   if (!key) return null;
   try { return JSON.parse(localStorage.getItem(key))?.access_token; } catch { return null; }

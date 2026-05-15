@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken } from '../lib/submissions'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -276,8 +276,6 @@ function LivePresence() {
 // ── PARTS CATALOG ADMIN ───────────────────────────────────────────────
 // ─── BRANDING ADMIN ──────────────────────────────────────────────────────────
 function BrandingAdmin() {
-  const SUPA_URL = 'https://idddbbvotykfairirmwn.supabase.co'
-  const SUPA_KEY = window.__supa_key__ || (document.cookie.match(/supa_anon=([^;]+)/)||[])[1] || ''
   const [branding, setBranding] = useState({
     company_name: 'Reliable Oilfield Services',
     tagline: 'Field Operations Management',
@@ -478,7 +476,6 @@ function SettingsAdmin() {
 // ─── USERS ADMIN ─────────────────────────────────────────────────────────────
 function UsersAdmin() {
   const { user } = useAuth()
-  const SUPA_URL = 'https://idddbbvotykfairirmwn.supabase.co'
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
@@ -487,19 +484,11 @@ function UsersAdmin() {
   const ROLES = ['admin', 'supervisor', 'technician', 'read-only']
   const ROLE_COLORS = { admin: '#ef4444', supervisor: '#f97316', technician: '#0891b2', 'read-only': '#6b7280' }
 
-  const getToken = () => {
-    try {
-      const raw = localStorage.getItem('sb-idddbbvotykfairirmwn-auth-token')
-      if (raw) return JSON.parse(raw).access_token
-    } catch (e) {}
-    return null
-  }
-
   const loadProfiles = async () => {
     setLoading(true); setError(null)
     try {
-      const token = getToken()
-      const res = await fetch(SUPA_URL + '/rest/v1/profiles?select=*&order=created_at.asc', {
+      const token = getAuthToken()
+      const res = await fetch(SUPA_URL_P + '/rest/v1/profiles?select=*&order=created_at.asc', {
         headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
       })
       if (!res.ok) throw new Error('Failed to load profiles: ' + res.status)
@@ -515,8 +504,8 @@ function UsersAdmin() {
   const updateRole = async (userId, role) => {
     setSaving(userId)
     try {
-      const token = getToken()
-      const res = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId, {
+      const token = getAuthToken()
+      const res = await fetch(SUPA_URL_P + '/rest/v1/profiles?id=eq.' + userId, {
         method: 'PATCH',
         headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify({ role })
