@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
+import { saveDraft as saveDraftToStore, loadDraft as loadDraftFromStore, clearDraft as clearDraftFromStore } from '../lib/draftStore'
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
@@ -57,14 +58,19 @@ export default function ExpenseReportPage() {
   }
   const [saveError, setSaveError] = useState(null)
   const [draftSaved, setDraftSaved] = useState(false)
-  const DRAFT_KEY = 'ros_expense_draft'
-  const saveDraft = () => {
+  const saveDraft = async () => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ techName, truckNumber, date, notes, expenses: expenses.map(e => ({...e, receipt: null, itemPhoto: null})) }))
+      // The expenses array embeds Blobs (receipt + itemPhoto) directly in
+      // each row. IDB persists those natively — no need to strip them like
+      // the old localStorage version did. We pass the full expenses array
+      // through the photos slot so the Blobs survive the round trip.
+      await saveDraftToStore('expense',
+        { techName, truckNumber, date, notes },
+        { expenses })
       setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2000)
-    } catch(e) {}
+    } catch(e) { console.warn('[Expense] saveDraft failed:', e?.message || e) }
   }
-  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY) } catch(e) {} }
+  const clearDraft = async () => { try { await clearDraftFromStore('expense') } catch(e) {} }
 
   function mkExp() { return { category: EXPENSE_CATEGORIES[0], description: '', amount: '', receipt: null, itemPhoto: null } }
 
@@ -79,17 +85,25 @@ export default function ExpenseReportPage() {
   useEffect(() => {
     if (profile?.full_name) setTechName(profile.full_name)
     if (profile?.truck_number) setTruckNumber(profile.truck_number)
-    // Load saved draft
-    try {
-      const saved = JSON.parse(localStorage.getItem('ros_expense_draft') || 'null')
-      if (saved) {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const draft = await loadDraftFromStore('expense')
+        if (cancelled || !draft) return
+        const saved = draft.fields || {}
         if (saved.techName) setTechName(saved.techName)
         if (saved.truckNumber) setTruckNumber(saved.truckNumber)
         if (saved.date) setDate(saved.date)
         if (saved.notes) setNotes(saved.notes)
-        if (saved.expenses && saved.expenses.length > 0) setExpenses(saved.expenses.map(e => ({...e, receipt: null, itemPhoto: null})))
+        const expensesWithPhotos = draft.photos && Array.isArray(draft.photos.expenses) ? draft.photos.expenses : null
+        if (expensesWithPhotos && expensesWithPhotos.length > 0) {
+          setExpenses(expensesWithPhotos)
+        }
+      } catch (e) {
+        console.warn('[Expense] loadDraft failed:', e?.message || e)
       }
-    } catch(e) {}
+    })()
+    return () => { cancelled = true }
   }, [profile?.full_name, profile?.truck_number])
 
   const updExp = (i, k, v) => setExpenses(es => es.map((e, idx) => idx === i ? { ...e, [k]: v } : e))
@@ -145,7 +159,7 @@ export default function ExpenseReportPage() {
         const token = getAuthToken()
         fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: submission.id, userToken: token }) }).then(async r => { if (!r.ok) { const t = await r.text().catch(() => r.statusText || ''); throw new Error('HTTP ' + r.status + ' — ' + (t || '').slice(0, 240)); } }).catch(err => { console.error('Email send failed:', err); alert('Email failed for expense report #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe report was saved. Open it from the list and use "Send Report" to retry.'); })
       } catch (_) {}
-      clearDraft()
+      await clearDraft()
       navigate('/submissions')
     } catch (e) {
       setSaveError(e.message || 'Save failed')

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
+import { saveDraft as saveDraftToStore, loadDraft as loadDraftFromStore, clearDraft as clearDraftFromStore } from '../lib/draftStore'
 
 // Pre-trip / post-trip inspection checklist items
 const INSPECTION_ITEMS = [
@@ -80,14 +81,15 @@ export default function DailyInspectionPage() {
   }
   const [saveError, setSaveError] = useState(null)
   const [draftSaved, setDraftSaved] = useState(false)
-  const INSP_DRAFT_KEY = 'ros_inspection_draft'
-  const saveDraft = () => {
+  const saveDraft = async () => {
     try {
-      localStorage.setItem(INSP_DRAFT_KEY, JSON.stringify({ techName, truckNumber, inspType, date, odometer, checks, defects }))
+      await saveDraftToStore('inspection',
+        { techName, truckNumber, inspType, date, odometer, checks, defects },
+        photos)
       setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2000)
-    } catch(e) {}
+    } catch(e) { console.warn('[Inspection] saveDraft failed:', e?.message || e) }
   }
-  const clearDraft = () => { try { localStorage.removeItem(INSP_DRAFT_KEY) } catch(e) {} }
+  const clearDraft = async () => { try { await clearDraftFromStore('inspection') } catch(e) {} }
 
   useEffect(() => {
     fetchSettings().then(s => {
@@ -100,10 +102,12 @@ export default function DailyInspectionPage() {
   useEffect(() => {
     if (profile?.full_name) setTechName(profile.full_name)
     if (profile?.truck_number) setTruckNumber(profile.truck_number)
-    // Load saved draft
-    try {
-      const saved = JSON.parse(localStorage.getItem('ros_inspection_draft') || 'null')
-      if (saved) {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const draft = await loadDraftFromStore('inspection')
+        if (cancelled || !draft) return
+        const saved = draft.fields || {}
         if (saved.techName) setTechName(saved.techName)
         if (saved.truckNumber) setTruckNumber(saved.truckNumber)
         if (saved.inspType) setInspType(saved.inspType)
@@ -111,8 +115,12 @@ export default function DailyInspectionPage() {
         if (saved.odometer) setOdometer(saved.odometer)
         if (saved.checks) setChecks(saved.checks)
         if (saved.defects) setDefects(saved.defects)
+        if (Array.isArray(draft.photos) && draft.photos.length > 0) setPhotos(draft.photos)
+      } catch (e) {
+        console.warn('[Inspection] loadDraft failed:', e?.message || e)
       }
-    } catch(e) {}
+    })()
+    return () => { cancelled = true }
   }, [profile?.full_name, profile?.truck_number])
 
   const setCheck = (id, val) => setChecks(c => ({ ...c, [id]: val }))
@@ -183,7 +191,7 @@ export default function DailyInspectionPage() {
         const token = getAuthToken()
         fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: submission.id, userToken: token }) }).then(async r => { if (!r.ok) { const t = await r.text().catch(() => r.statusText || ''); throw new Error('HTTP ' + r.status + ' — ' + (t || '').slice(0, 240)); } }).catch(err => { console.error('Email send failed:', err); alert('Email failed for inspection #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe inspection was saved. Open it from the list and use "Send Report" to retry.'); })
       } catch (_) {}
-      clearDraft()
+      await clearDraft()
       navigate('/submissions')
     } catch (e) {
       setSaveError(e.message || 'Save failed')
