@@ -159,14 +159,19 @@ function LivePresence() {
 
   async function fetchPresence() {
     try {
+      const tokenKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+      let token = null
+      try { token = tokenKey ? JSON.parse(localStorage.getItem(tokenKey))?.access_token : null } catch { token = null }
       const res = await fetch(SUPA_URL_P + '/rest/v1/user_presence?select=*&order=updated_at.desc', {
-        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + SUPA_KEY_P }
+        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + (token || SUPA_KEY_P) }
       })
       if (res.ok) {
         const data = await res.json()
         setPresence(data || [])
+      } else {
+        console.warn('presence fetch failed:', res.status)
       }
-    } catch(e) {}
+    } catch(e) { console.warn('presence fetch error:', e) }
     setLastRefresh(new Date())
     setLoading(false)
   }

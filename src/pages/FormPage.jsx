@@ -414,13 +414,18 @@ export default function FormPage() {
     if (!user) return
     const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
     const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-    const headers = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }
+    const tokenKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    let token = null
+    try { token = tokenKey ? JSON.parse(localStorage.getItem(tokenKey))?.access_token : null } catch { token = null }
+    if (!token) return
+    const headers = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }
     const formLabel = jobType || 'Work Order'
     const upsertPresence = () => {
       fetch(SUPA_URL + '/rest/v1/user_presence', {
         method: 'POST', headers,
         body: JSON.stringify({ user_id: user.id, user_name: profile?.full_name || user.email, form_type: jobType || 'form', form_label: formLabel, started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      }).catch(()=>{})
+      }).then(r => { if (!r.ok) console.warn('presence upsert failed:', r.status) })
+        .catch(e => console.warn('presence upsert error:', e))
     }
     upsertPresence()
     const interval = setInterval(upsertPresence, 30000)
