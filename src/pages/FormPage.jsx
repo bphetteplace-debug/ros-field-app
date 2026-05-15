@@ -19,6 +19,7 @@ import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
 import { compressImage } from '../lib/imageCompress'
 import MicButton from '../components/MicButton'
 import CameraOcrButton from '../components/CameraOcrButton'
+import SortablePhotoGrid from '../components/SortablePhotoGrid'
 
 // Photos straight off a phone camera are 3-5MB. compressImage shrinks them
 // to ~500KB, which is the difference between uploads succeeding and silently
@@ -155,10 +156,12 @@ function PhotoPicker({ label, value, onChange }) {
 }
 
 // --- PhotoLightbox ---
+// Accepts photos as either File[] (legacy) or { file: File }[] / { dataUrl }[].
 function PhotoLightbox({ photos, idx, onClose, onPrev, onNext }) {
   if (idx < 0 || idx >= photos.length) return null;
   const ph = photos[idx];
-  const src = URL.createObjectURL(ph);
+  const blob = ph && ph.file ? ph.file : ph;
+  const src = ph && ph.dataUrl ? ph.dataUrl : (blob ? URL.createObjectURL(blob) : '');
   const savePhoto = () => { const a = document.createElement('a'); a.href = src; a.download = 'photo-' + (idx+1) + '.jpg'; a.click(); };
   return (
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -295,8 +298,10 @@ export default function FormPage() {
   const [hourlyRate,    setHourlyRate]    = useState('115.00')
   const [billableTechs, setBillableTechs] = useState('')
 
-  const [photos,         setPhotos]         = useState([])
-  const [photoCaptions,  setPhotoCaptions]  = useState({})
+  // Photos are stored as { id, file, caption } so the drag-to-reorder grid
+  // can identify each item across re-renders, and captions travel with their
+  // photo (no separate index-keyed map to drift out of sync after reorder).
+  const [photos, setPhotos] = useState([])
   const [arrivalVideo,   setArrivalVideo]   = useState(null)
   const [departureVideo, setDepartureVideo] = useState(null)
   const [lightboxIdx, setLightboxIdx]   = useState(-1)
@@ -369,7 +374,16 @@ export default function FormPage() {
   const qtyChange       = (sku,d)=>setParts(ps=>ps.map(x=>x.sku===sku?{...x,qty:Math.max(0,x.qty+d)}:x).filter(x=>x.qty>0))
   const addPartPhoto    = async (sku,file)=>{ const c=await compressFile(file); setPartPhotos(pp=>({...pp,[sku]:[...(pp[sku]||[]),{file:c,caption:''}]})) }
   const removePartPhoto = (sku,idx)=>setPartPhotos(pp=>({...pp,[sku]:(pp[sku]||[]).filter((_,i)=>i!==idx)}))
-  const addPhoto        = async files=>{ const arr=Array.from(files||[]); const compressed=await Promise.all(arr.map(compressFile)); setPhotos(p=>[...p,...compressed]) }
+  const addPhoto        = async files=>{
+    const arr = Array.from(files||[]);
+    const compressed = await Promise.all(arr.map(compressFile));
+    const stamped = compressed.map((file, i) => ({
+      id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + i,
+      file,
+      caption: '',
+    }));
+    setPhotos(p => [...p, ...stamped]);
+  }
 
   const handleJobTypeChange = newType => {
     setJobType(newType)
@@ -614,7 +628,7 @@ export default function FormPage() {
     try{
       const photoDataUrls={}
       if(siteSignPhoto){const u=await toDataUrl(siteSignPhoto);if(u)photoDataUrls['site']=[{dataUrl:u,caption:'Site Sign'}]}
-    if(photos.length>0) photoDataUrls['work']=await Promise.all(photos.map(async(f,i)=>({dataUrl:await toDataUrl(f),caption:photoCaptions[i]||''})))
+    if(photos.length>0) photoDataUrls['work']=await Promise.all(photos.map(async(p)=>({dataUrl:await toDataUrl(p.file),caption:p.caption||''})))
       for(const p of parts){ const pf=partPhotos[p.sku]||[]; if(pf.length) photoDataUrls[`part-${p.sku}`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption}))) }
       if(showVideos){
         if(arrivalVideo){const u=await toDataUrl(arrivalVideo);if(u)photoDataUrls['arrival-video']=[{dataUrl:u,caption:'Arrival Video'}]}
@@ -1288,22 +1302,19 @@ export default function FormPage() {
 
         {/* == JOB PHOTOS == */}
         <Section icon="photo" title="Job Photos" accent={accent}>
-          {photos.length>0&&(
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(110px, 1fr))',gap:10,marginBottom:14}}>
-              {photos.map((ph,i)=>(
-                <div key={i} style={{display:'flex',flexDirection:'column',gap:4}}>
-                  <div style={{position:'relative',aspectRatio:'1 / 1',borderRadius:10,overflow:'hidden',border:'1px solid '+T.border,boxShadow:'0 2px 6px rgba(15,23,42,0.06)'}}>
-                    <img src={URL.createObjectURL(ph)} alt="" onClick={()=>setLightboxIdx(i)}
-                      style={{width:'100%',height:'100%',objectFit:'cover',display:'block',cursor:'zoom-in'}} />
-                    <button type="button" onClick={()=>setPhotos(p=>p.filter((_,pi)=>pi!==i))}
-                      style={{position:'absolute',top:6,right:6,background:'rgba(15,31,56,0.78)',color:'#fff',border:'none',borderRadius:'50%',width:24,height:24,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,fontWeight:700}}>×</button>
-                    <button type="button" title="Save to gallery" onClick={()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(ph); a.download='photo-'+(i+1)+'.jpg'; a.click(); }}
-                      style={{position:'absolute',top:6,left:6,background:'rgba(15,31,56,0.78)',color:'#fff',border:'none',borderRadius:'50%',width:24,height:24,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0,fontWeight:700}}>DL</button>
-                  </div>
-                  <input style={{...inp,width:'100%',padding:'4px 8px',fontSize:11,borderRadius:6}} placeholder="Caption"
-                    value={photoCaptions[i]||''} onChange={e=>setPhotoCaptions(c=>({...c,[i]:e.target.value}))} />
-                </div>
-              ))}
+          {photos.length>0 && (
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,color:T.muted,fontWeight:600,marginBottom:8,letterSpacing:0.3}}>
+                Drag to reorder · Tap a tag for one-tap captions · Tap photo to enlarge
+              </div>
+              <SortablePhotoGrid
+                items={photos}
+                onReorder={newPhotos => setPhotos(newPhotos)}
+                onRemove={id => setPhotos(p => p.filter(x => x.id !== id))}
+                onCaption={(id, caption) => setPhotos(p => p.map(x => x.id === id ? { ...x, caption } : x))}
+                onItemTap={id => { const idx = photos.findIndex(p => p.id === id); if (idx >= 0) setLightboxIdx(idx) }}
+                T={T}
+              />
             </div>
           )}
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
