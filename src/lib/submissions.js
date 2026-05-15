@@ -7,6 +7,18 @@ const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const DEFAULT_CUSTOMERS = ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS'];
 export const DEFAULT_TRUCKS = ['0001','0002','0003','0004','0005','0006','0007'];
 export const DEFAULT_TECHS = ['Matthew Reid','Vladimir Rivero','Pedro Perez'];
+// Round labor hours to the nearest 0.25 increment so quarter-hour
+// billing is preserved exactly on save. Techs sometimes type 3.3 or
+// 3.8 by habit (the HTML5 step=0.25 input is a soft constraint they
+// can bypass); this normalizes to 3.25 / 3.75 before the row reaches
+// Postgres, keeping labor totals consistent with how the techs and
+// customers expect them to be billed.
+export function roundQuarter(n) {
+  const num = parseFloat(n);
+  if (!isFinite(num)) return 0;
+  return Math.round(num * 4) / 4;
+}
+
 // Helper: get auth token from localStorage. Exported so other modules
 // can avoid duplicating the same prefix/suffix lookup pattern.
 export function getAuthToken() {
@@ -244,7 +256,8 @@ export async function saveSubmission(formData, userId, templateOverride) {
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
   const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
-  const laborTotal = warrantyWork ? 0 : parseFloat(laborHours || 0) * parseFloat(hourlyRate || 115.00) * effectiveBillable;
+  const roundedLaborHours = roundQuarter(laborHours);
+  const laborTotal = warrantyWork ? 0 : roundedLaborHours * parseFloat(hourlyRate || 115.00) * effectiveBillable;
 
   // Determine template
   let template;
@@ -282,11 +295,11 @@ export async function saveSubmission(formData, userId, templateOverride) {
     summary: description,
     miles: parseFloat(miles || 0),
     cost_per_mile: parseFloat(costPerMile || 0),
-    labor_hours: parseFloat(laborHours || 0),
+    labor_hours: roundedLaborHours,
     labor_rate: parseFloat(hourlyRate || 0),
     data: {
       jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
-      laborHours, hourlyRate, billableTechs: effectiveBillable, description,
+      laborHours: roundedLaborHours, hourlyRate, billableTechs: effectiveBillable, description,
       glCode, assetTag, workArea, startTime, departureTime, typeOfWork,
       customerWorkOrder: customerWorkOrder || '', customerContact,
       partsTotal, mileageTotal, laborTotal,
@@ -627,7 +640,8 @@ export async function updateSubmission(id, formData) {
   const effBill = parseInt(billableTechs)||(techs||[]).length
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0)
   const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50)
-  const laborTotal = warrantyWork ? 0 : parseFloat(laborHours||0)*parseFloat(hourlyRate||115)*effBill
+  const roundedLaborHours = roundQuarter(laborHours)
+  const laborTotal = warrantyWork ? 0 : roundedLaborHours*parseFloat(hourlyRate||115)*effBill
   const grandTotal = warrantyWork ? 0 : partsTotal+mileageTotal+laborTotal
   return supaRest('PATCH', 'submissions?id=eq.' + id, {
     customer_name: customerName,
@@ -644,12 +658,12 @@ export async function updateSubmission(id, formData) {
     summary: description,
     miles: parseFloat(miles||0),
     cost_per_mile: parseFloat(costPerMile||1.50),
-    labor_hours: parseFloat(laborHours||0),
+    labor_hours: roundedLaborHours,
     labor_rate: parseFloat(hourlyRate||115),
     updated_at: new Date().toISOString(),
     data: {
       jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
-      laborHours, hourlyRate, billableTechs: effBill, description,
+      laborHours: roundedLaborHours, hourlyRate, billableTechs: effBill, description,
       glCode, assetTag, workArea, startTime, departureTime, typeOfWork, lastServiceDate,
       customerWorkOrder, customerContact,
       partsTotal, mileageTotal, laborTotal, grandTotal,
