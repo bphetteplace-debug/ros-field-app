@@ -2,7 +2,7 @@
 // Client-side PDF download using html2pdf.js
 import { useState } from 'react';
 import { buildPDFData } from '../lib/pdfData';
-import { getPhotoUrl } from '../lib/submissions';
+import { getPhotoUrl, fetchSettings } from '../lib/submissions';
 
 async function loadHtml2Pdf() {
     const mod = await import('html2pdf.js');
@@ -16,6 +16,9 @@ export function DownloadPDFButton({ sub, style }) {
         setBusy(true);
         try {
                 const data = await buildPDFData(sub, (path) => getPhotoUrl(path));
+                const settings = await fetchSettings().catch(() => null);
+                const layout   = settings && Array.isArray(settings.pdf_layout) ? settings.pdf_layout : null;
+                const branding = settings && settings.branding && typeof settings.branding === 'object' ? settings.branding : null;
                 const { WorkOrderPDFTemplate } = await import('./WorkOrderPDFTemplate.jsx');
                 const { createRoot }           = await import('react-dom/client');
                 const { createElement }        = await import('react');
@@ -26,7 +29,7 @@ export function DownloadPDFButton({ sub, style }) {
 
           await new Promise((resolve) => {
                     const root = createRoot(container);
-                    root.render(createElement(WorkOrderPDFTemplate, { data }));
+                    root.render(createElement(WorkOrderPDFTemplate, { data, layout, branding }));
 
                                     // Wait for initial render, then wait for every image to actually load
                                     setTimeout(async () => {

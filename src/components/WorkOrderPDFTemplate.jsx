@@ -1,8 +1,55 @@
 // src/components/WorkOrderPDFTemplate.jsx
-// ReliableTrack Work Order PDF â completely rebuilt layout
+// ReliableTrack Work Order PDF â completely rebuilt layout
 // Clean, professional field-service report format
 
-export function WorkOrderPDFTemplate({ data }) {
+// Section catalog used by the admin layout editor.
+// IDs are stable: do not rename without a migration in PdfLayoutAdmin.
+export const PDF_SECTION_DEFS = [
+  { id: 'customer_info',  label: 'Job Information' },
+  { id: 'field_techs',    label: 'Field Technicians' },
+  { id: 'site_sign_gps',  label: 'Site Sign & GPS' },
+  { id: 'description',    label: 'Description of Work' },
+  { id: 'equipment',      label: 'Equipment Serviced' },
+  { id: 'parts',          label: 'Parts Used' },
+  { id: 'labor_mileage',  label: 'Labor & Mileage' },
+  { id: 'cost_summary',   label: 'Cost Summary' },
+  { id: 'completed_work', label: 'Work Photos' },
+  { id: 'signatures',     label: 'Authorization & Sign-Off' },
+];
+
+export const DEFAULT_PDF_LAYOUT = PDF_SECTION_DEFS.map(s => ({ ...s, enabled: true }));
+
+export const DEFAULT_BRANDING = {
+  company_name: 'RELIABLE OILFIELD SERVICES',
+  tagline: 'ReliableTrack Field Report',
+  primary_color: '#1A1A1A',
+  accent_color: '#E35B04',
+  logo_url: '',
+  pdf_header: '',
+  pdf_footer: 'Reliable Oilfield Services Â· reports@reliable-oilfield-services.com',
+};
+
+// Reconciles a saved layout with the current section catalog.
+// Drops unknown IDs, appends missing IDs with enabled=true.
+export function normalizePdfLayout(saved) {
+  const known = new Set(PDF_SECTION_DEFS.map(s => s.id));
+  const byId  = new Map(PDF_SECTION_DEFS.map(s => [s.id, s]));
+  const out = [];
+  const seen = new Set();
+  if (Array.isArray(saved)) {
+    for (const s of saved) {
+      if (!s || !known.has(s.id) || seen.has(s.id)) continue;
+      seen.add(s.id);
+      out.push({ id: s.id, label: byId.get(s.id).label, enabled: s.enabled !== false });
+    }
+  }
+  for (const def of PDF_SECTION_DEFS) {
+    if (!seen.has(def.id)) out.push({ ...def, enabled: true });
+  }
+  return out;
+}
+
+export function WorkOrderPDFTemplate({ data, layout, branding }) {
   const d = data;
   const parts  = d.parts  || [];
   const photos = d.photos || [];
@@ -19,8 +66,11 @@ export function WorkOrderPDFTemplate({ data }) {
   const showIssue = ['Service Call','Repair','service_call','repair'].includes(d.job_type) || d.job_type?.startsWith('service_') || d.job_type?.startsWith('repair');
   const permits   = d.permits_required || [];
 
-  const ORANGE = '#E35B04';
-  const DARK   = '#1A1A1A';
+  const b = { ...DEFAULT_BRANDING, ...(branding || {}) };
+  const sections = normalizePdfLayout(layout);
+
+  const ORANGE = b.accent_color  || DEFAULT_BRANDING.accent_color;
+  const DARK   = b.primary_color || DEFAULT_BRANDING.primary_color;
   const MID    = '#444444';
   const LIGHT  = '#F5F5F5';
   const BORDER = '#DDDDDD';
@@ -148,7 +198,7 @@ export function WorkOrderPDFTemplate({ data }) {
   const F = (label, val, last) => (
     <div style={last ? infoCellLast : infoCell}>
       <div style={infoLabel}>{label}</div>
-      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>â</span>}</div>
+      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>â</span>}</div>
     </div>
   );
 
@@ -179,87 +229,108 @@ export function WorkOrderPDFTemplate({ data }) {
           !/^part[-_]/i.test(p.section || '') &&
           !/^(arrestor|flare|heater)[-_]/i.test(p.section || '')
         );
-  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs Ã $${d.labor_rate}/hr Ã ${techCount} tech${plural}` : 'â';
-  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi Ã $${d.mileage_rate}/mi` : 'â';
+  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs Ã $${d.labor_rate}/hr Ã ${techCount} tech${plural}` : 'â';
+  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi Ã $${d.mileage_rate}/mi` : 'â';
 
   const jobTypeFull = d.job_type === 'PM' ? 'Preventive Maintenance'
     : d.job_type === 'SC' ? 'Service Call'
     : (d.job_type || '');
 
-  return (
-    <div style={page}>
+  // ── Section renderers ────────────────────────────────────────────────────
+  // Each renderer returns the JSX for a single configurable section, or null
+  // if there's nothing to render. The render loop below skips null returns.
 
-      {/* HEADER */}
-      <div style={header}>
-        <div>
-          <div style={coName}>RELIABLE OILFIELD SERVICES</div>
-          <div style={coSub}>ReliableTrack Field Report</div>
-          {jobTypeFull && <div style={jobTag}>{jobTypeFull}</div>}
-          {d.warranty_work && (
-            <div style={{ color: '#FF6B00', fontWeight: 'bold', fontSize: '8pt', marginTop: 4 }}>⚠ WARRANTY WORK</div>
+  const renderCustomerInfo = () => (
+    <>
+      <div style={sectionBar}>Job Information</div>
+      <div style={infoGrid}>
+        {F('Customer', d.customer)}
+        {F('Location / Site', d.location)}
+        {F('Customer WO #', d.customer_wo_number, true)}
+        {F('Type of Work', d.type_of_work)}
+        {F('Work Area', d.work_area)}
+        {F('Site Contact', d.contact, true)}
+        {F('Start Time', d.start_time)}
+        {F('Departure Time', d.departure_time)}
+        {F('Truck #', d.truck_number, true)}
+        {F('GL Code', d.gl_code)}
+        {F('Asset Tag', d.asset_tag)}
+        {F('Last Service', d.last_service_date, true)}
+      </div>
+    </>
+  );
+
+  const renderFieldTechs = () => (
+    <>
+      <div style={sectionBar}>Field Technicians ({techCount})</div>
+      <div style={badgesWrap}>
+        {techs.length > 0
+          ? techs.map((t, i) => <span key={i} style={techBadge}>{t}</span>)
+          : <span style={emptyNote}>No technicians listed</span>}
+      </div>
+    </>
+  );
+
+  const renderSiteSignGps = () => {
+    const hasGps = d.gps_lat != null && d.gps_lng != null;
+    if (!siteSig && !hasGps) return null;
+    return (
+      <>
+        <div style={sectionBar}>Site Sign &amp; GPS</div>
+        <div style={{ border: `1px solid ${BORDER}`, borderTop: 'none', background: LIGHT, padding: '10px 14px', display: 'grid', gridTemplateColumns: siteSig && hasGps ? '1fr 1fr' : '1fr', gap: 12, alignItems: 'center' }}>
+          {siteSig && (
+            <div>
+              <img src={siteSig.url} alt={siteSig.caption || 'Site sign'} style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 3, border: `1px solid ${BORDER}` }} crossOrigin="anonymous" />
+              <div style={photoCap}>{siteSig.caption || 'Site Sign'}</div>
+            </div>
+          )}
+          {hasGps && (
+            <div style={{ fontSize: '8.5pt', lineHeight: 1.6 }}>
+              <div style={infoLabel}>GPS Coordinates</div>
+              <div style={{ fontWeight: 'bold', color: DARK }}>{Number(d.gps_lat).toFixed(6)}, {Number(d.gps_lng).toFixed(6)}</div>
+              {d.gps_accuracy != null && (
+                <div style={{ color: MID, marginTop: 2 }}>Accuracy: Â±{Math.round(d.gps_accuracy)} m</div>
+              )}
+            </div>
           )}
         </div>
-        <div style={woBlock}>
-          <div style={woLabel}>Work Order</div>
-          <div style={woNum}>#{d.customer_wo_number}</div>
-          <div style={dateStr}>{d.date_long}</div>
-        </div>
+      </>
+    );
+  };
+
+  const renderDescription = () => (
+    <>
+      <div style={sectionBar}>Description of Work</div>
+      <div style={descBox}>
+        {d.description_of_work || <span style={emptyNote}>No description provided.</span>}
       </div>
+      {showIssue && d.reported_issue && (
+        <>
+          <div style={sectionBar}>Reported Issue</div>
+          <div style={descBox}>{d.reported_issue}</div>
+        </>
+      )}
+      {showIssue && d.root_cause && (
+        <>
+          <div style={sectionBar}>Root Cause</div>
+          <div style={descBox}>{d.root_cause}</div>
+        </>
+      )}
+      {permits.length > 0 && (
+        <>
+          <div style={sectionBar}>Permits Required</div>
+          <div style={{...badgesWrap, borderTop:'none'}}>
+            {permits.map((p,i)=><span key={i} style={equipTag}>{p}</span>)}
+          </div>
+        </>
+      )}
+    </>
+  );
 
-      <div style={body}>
-
-        {/* JOB INFORMATION */}
-        <div style={sectionBar}>Job Information</div>
-        <div style={infoGrid}>
-          {F('Customer', d.customer)}
-          {F('Location / Site', d.location)}
-          {F('Customer WO #', d.customer_wo_number, true)}
-          {F('Type of Work', d.type_of_work)}
-          {F('Work Area', d.work_area)}
-          {F('Site Contact', d.contact, true)}
-          {F('Start Time', d.start_time)}
-          {F('Departure Time', d.departure_time)}
-          {F('Truck #', d.truck_number, true)}
-          {F('GL Code', d.gl_code)}
-          {F('Asset Tag', d.asset_tag)}
-          {F('Last Service', d.last_service_date, true)}
-        </div>
-
-        {/* FIELD TECHNICIANS */}
-        <div style={sectionBar}>Field Technicians ({techCount})</div>
-        <div style={badgesWrap}>
-          {techs.length > 0
-            ? techs.map((t, i) => <span key={i} style={techBadge}>{t}</span>)
-            : <span style={emptyNote}>No technicians listed</span>}
-        </div>
-
-        {/* DESCRIPTION OF WORK */}
-        <div style={sectionBar}>Description of Work</div>
-        <div style={descBox}>
-          {d.description_of_work || <span style={emptyNote}>No description provided.</span>}
-        </div>
-        {showIssue && d.reported_issue && (
-          <>
-            <div style={sectionBar}>Reported Issue</div>
-            <div style={descBox}>{d.reported_issue}</div>
-          </>
-        )}
-        {showIssue && d.root_cause && (
-          <>
-            <div style={sectionBar}>Root Cause</div>
-            <div style={descBox}>{d.root_cause}</div>
-          </>
-        )}
-        {permits.length > 0 && (
-          <>
-            <div style={sectionBar}>Permits Required</div>
-            <div style={{...badgesWrap, borderTop:'none'}}>
-              {permits.map((p,i)=><span key={i} style={equipTag}>{p}</span>)}
-            </div>
-          </>
-        )}
-
-        {/* EQUIPMENT SERVICED */}
+  const renderEquipment = () => {
+    if (equip.length === 0 && (!isSC || scEquip.length === 0) && (!isPM || (arrestors.length === 0 && flares.length === 0 && heaters.length === 0))) return null;
+    return (
+      <>
         {equip.length > 0 && (
           <>
             <div style={sectionBar}>Equipment Serviced</div>
@@ -268,7 +339,6 @@ export function WorkOrderPDFTemplate({ data }) {
             </div>
           </>
         )}
-
         {isSC && scEquip.length > 0 && (
           <>
             <div style={sectionBar}>SC Equipment ({scEquip.length})</div>
@@ -283,7 +353,7 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {arrestors.map((a,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' · Filter Changed':''}{a.notes?' · '+a.notes:''}
+                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' Â· Filter Changed':''}{a.notes?' Â· '+a.notes:''}
                 </div>
               ))}
             </div>
@@ -295,7 +365,7 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {flares.map((f,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' · Last Ignition: '+f.last_ignition:''}{f.notes?' · '+f.notes:''}
+                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' Â· Last Ignition: '+f.last_ignition:''}{f.notes?' Â· '+f.notes:''}
                 </div>
               ))}
             </div>
@@ -307,141 +377,205 @@ export function WorkOrderPDFTemplate({ data }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {heaters.map((h,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{h.notes?' · '+h.notes:''}
+                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{h.notes?' Â· '+h.notes:''}
                 </div>
               ))}
             </div>
           </>
         )}
-        {/* PARTS USED */}
-        <div style={sectionBar}>Parts Used ({parts.length})</div>
-        {parts.length > 0 ? (
-          <table style={tbl}>
-              <colgroup><col style={{width:'42%'}}/><col style={{width:'20%'}}/><col style={{width:'8%'}}/><col style={{width:'15%'}}/><col style={{width:'15%'}}/></colgroup>
-            <thead>
-              <tr>
-                <th style={th}>SKU / Part #</th>
-                <th style={th}>Description</th>
-                <th style={thR}>Qty</th>
-                <th style={thR}>Unit Price</th>
-                <th style={thR}>Line Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {parts.map((p, i) => {
-                              const alt = i % 2 === 1;
-                              return (
-                                                    <tr key={i}>
-                                                                          <td style={alt ? tdA : td}>{p.sku || '\u2014'}</td>
-                                                                          <td style={alt ? { ...tdA, maxWidth: '180px', wordBreak: 'break-word' } : { ...td, maxWidth: '180px', wordBreak: 'break-word' }}>
-                                                                            {p.description}
-                                                                            {p.photos && p.photos.length > 0 && (
-                                                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
-                                                                                  {p.photos.map((ph, pi) => (
-                                                                                                                <img
-                                                                                                                                                  key={pi}
-                                                                                                                                                  src={ph.url}
-                                                                                                                                                  alt={ph.caption || 'Part photo'}
-                                                                                                                                                  style={{ width: 55, height: 55, objectFit: 'cover', borderRadius: 2, border: '1px solid ' + BORDER }}
-                                                                                                                                                  crossOrigin="anonymous"
-                                                                                                                                                />
-                                                                                                              ))}
-                                                                                  </div>
-                                                                                                  )}
-                                                                          </td>
-                                                                          <td style={alt ? tdAR : tdR}>{p.qty}</td>
-                                                                          <td style={alt ? tdAR : tdR}>{p.unit_price}</td>
-                                                                          <td style={alt ? { ...tdAR, fontWeight: 'bold' } : { ...tdR, fontWeight: 'bold' }}>{p.line_total}</td>
-                                                    </tr>
-                                                  );
-          })}</tbody>
-          </table>
-        ) : (
-          <div style={{ ...descBox, minHeight: '30px' }}>
-            <span style={emptyNote}>No parts used on this job.</span>
-          </div>
-        )}
+      </>
+    );
+  };
 
-        {/* LABOR & MILEAGE */}
-        <div style={sectionBar}>Labor &amp; Mileage</div>
-        <div style={infoGrid}>
-          {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : 'â')}
-          {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : 'â')}
-          {F('Labor Total', d.cost_labor, true)}
-          {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : 'â')}
-          {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : 'â')}
-          {F('Mileage Total', d.cost_mileage, true)}
+  const renderParts = () => (
+    <>
+      <div style={sectionBar}>Parts Used ({parts.length})</div>
+      {parts.length > 0 ? (
+        <table style={tbl}>
+            <colgroup><col style={{width:'42%'}}/><col style={{width:'20%'}}/><col style={{width:'8%'}}/><col style={{width:'15%'}}/><col style={{width:'15%'}}/></colgroup>
+          <thead>
+            <tr>
+              <th style={th}>SKU / Part #</th>
+              <th style={th}>Description</th>
+              <th style={thR}>Qty</th>
+              <th style={thR}>Unit Price</th>
+              <th style={thR}>Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parts.map((p, i) => {
+              const alt = i % 2 === 1;
+              return (
+                <tr key={i}>
+                  <td style={alt ? tdA : td}>{p.sku || '—'}</td>
+                  <td style={alt ? { ...tdA, maxWidth: '180px', wordBreak: 'break-word' } : { ...td, maxWidth: '180px', wordBreak: 'break-word' }}>
+                    {p.description}
+                    {p.photos && p.photos.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                        {p.photos.map((ph, pi) => (
+                          <img
+                            key={pi}
+                            src={ph.url}
+                            alt={ph.caption || 'Part photo'}
+                            style={{ width: 55, height: 55, objectFit: 'cover', borderRadius: 2, border: '1px solid ' + BORDER }}
+                            crossOrigin="anonymous"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td style={alt ? tdAR : tdR}>{p.qty}</td>
+                  <td style={alt ? tdAR : tdR}>{p.unit_price}</td>
+                  <td style={alt ? { ...tdAR, fontWeight: 'bold' } : { ...tdR, fontWeight: 'bold' }}>{p.line_total}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <div style={{ ...descBox, minHeight: '30px' }}>
+          <span style={emptyNote}>No parts used on this job.</span>
         </div>
+      )}
+    </>
+  );
 
-        {/* COST SUMMARY */}
-        <div style={sectionBar}>Cost Summary</div>
-        <div style={costBlock}>
-          <div style={costRow}>
-            <span style={{ color: MID }}>Parts &amp; Materials</span>
-            <span style={{ fontWeight: 'bold' }}>{d.cost_parts}</span>
-          </div>
-          <div style={costRow}>
-            <span style={{ color: MID }}>Labor ({laborLine})</span>
-            <span style={{ fontWeight: 'bold' }}>{d.cost_labor}</span>
-          </div>
-          <div style={costRow}>
-            <span style={{ color: MID }}>Mileage ({mileageLine})</span>
-            <span style={{ fontWeight: 'bold' }}>{d.cost_mileage}</span>
-          </div>
-          <div style={costTotal}>
-            <span>TOTAL DUE</span>
-            <span style={{ color: ORANGE }}>{d.cost_total}</span>
-          </div>
+  const renderLaborMileage = () => (
+    <>
+      <div style={sectionBar}>Labor &amp; Mileage</div>
+      <div style={infoGrid}>
+        {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : 'â')}
+        {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : 'â')}
+        {F('Labor Total', d.cost_labor, true)}
+        {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : 'â')}
+        {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : 'â')}
+        {F('Mileage Total', d.cost_mileage, true)}
+      </div>
+    </>
+  );
+
+  const renderCostSummary = () => (
+    <>
+      <div style={sectionBar}>Cost Summary</div>
+      <div style={costBlock}>
+        <div style={costRow}>
+          <span style={{ color: MID }}>Parts &amp; Materials</span>
+          <span style={{ fontWeight: 'bold' }}>{d.cost_parts}</span>
         </div>
+        <div style={costRow}>
+          <span style={{ color: MID }}>Labor ({laborLine})</span>
+          <span style={{ fontWeight: 'bold' }}>{d.cost_labor}</span>
+        </div>
+        <div style={costRow}>
+          <span style={{ color: MID }}>Mileage ({mileageLine})</span>
+          <span style={{ fontWeight: 'bold' }}>{d.cost_mileage}</span>
+        </div>
+        <div style={costTotal}>
+          <span>TOTAL DUE</span>
+          <span style={{ color: ORANGE }}>{d.cost_total}</span>
+        </div>
+      </div>
+    </>
+  );
 
-        {/* WORK PHOTOS */}
-        {workPics.length > 0 && (
-          <>
-            <div style={sectionBar}>Work Photos ({workPics.length})</div>
-            <div style={photosGrid}>
-              {workPics.map((ph, i) => (
-                <div key={i}>
-                  <img src={ph.url} alt={ph.caption || 'Photo'} style={photoImg} crossOrigin="anonymous" />
-                  {ph.caption && <div style={photoCap}>{ph.caption}</div>}
+  const renderWorkPhotos = () => {
+    if (workPics.length === 0) return null;
+    return (
+      <>
+        <div style={sectionBar}>Work Photos ({workPics.length})</div>
+        <div style={photosGrid}>
+          {workPics.map((ph, i) => (
+            <div key={i}>
+              <img src={ph.url} alt={ph.caption || 'Photo'} style={photoImg} crossOrigin="anonymous" />
+              {ph.caption && <div style={photoCap}>{ph.caption}</div>}
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
+
+  const renderSignatures = () => (
+    <>
+      <div style={sectionBar}>Authorization &amp; Sign-Off</div>
+      <div style={sigGrid}>
+        <div style={sigCell}>
+          <div style={sigLabel}>Customer Signature</div>
+          {custSig
+            ? <img src={custSig.url} alt="Customer signature" style={sigImg} crossOrigin="anonymous" />
+            : <div style={sigLine} />}
+          <div style={{ ...sigLabel, marginTop: 6 }}>Customer / Authorized Representative</div>
+        </div>
+        <div style={sigCellLast}>
+          <div style={sigLabel}>Technician Certification</div>
+          <div style={{ fontSize: '8pt', color: MID, marginTop: 4, lineHeight: 1.5 }}>
+            I certify the work described above was performed professionally and all information is accurate.
+          </div>
+          {techSigs.length > 0
+            ? techSigs.map((ts, i) => (
+                <div key={i} style={{ marginTop: 8 }}>
+                  <img src={ts.url} alt={ts.caption} style={sigImg} crossOrigin="anonymous" />
+                  <div style={{ ...sigLabel, marginTop: 4 }}>{ts.caption}</div>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
+              ))
+            : <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || 'â'}</strong></div>
+          }
+          <div style={{ ...sigLabel, marginTop: 4 }}>Date: <strong>{d.date_long}</strong></div>
+        </div>
+      </div>
+    </>
+  );
 
-        {/* SIGN-OFF */}
-        <div style={sectionBar}>Authorization &amp; Sign-Off</div>
-        <div style={sigGrid}>
-          <div style={sigCell}>
-            <div style={sigLabel}>Customer Signature</div>
-            {custSig
-              ? <img src={custSig.url} alt="Customer signature" style={sigImg} crossOrigin="anonymous" />
-              : <div style={sigLine} />}
-            <div style={{ ...sigLabel, marginTop: 6 }}>Customer / Authorized Representative</div>
-          </div>
-          <div style={sigCellLast}>
-            <div style={sigLabel}>Technician Certification</div>
-            <div style={{ fontSize: '8pt', color: MID, marginTop: 4, lineHeight: 1.5 }}>
-              I certify the work described above was performed professionally and all information is accurate.
-            </div>
-            {techSigs.length > 0
-              ? techSigs.map((ts, i) => (
-                  <div key={i} style={{ marginTop: 8 }}>
-                    <img src={ts.url} alt={ts.caption} style={sigImg} crossOrigin="anonymous" />
-                    <div style={{ ...sigLabel, marginTop: 4 }}>{ts.caption}</div>
-                  </div>
-                ))
-              : <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || 'â'}</strong></div>
-            }
-            <div style={{ ...sigLabel, marginTop: 4 }}>Date: <strong>{d.date_long}</strong></div>
+  const RENDERERS = {
+    customer_info:  renderCustomerInfo,
+    field_techs:    renderFieldTechs,
+    site_sign_gps:  renderSiteSignGps,
+    description:    renderDescription,
+    equipment:      renderEquipment,
+    parts:          renderParts,
+    labor_mileage:  renderLaborMileage,
+    cost_summary:   renderCostSummary,
+    completed_work: renderWorkPhotos,
+    signatures:     renderSignatures,
+  };
+
+  return (
+    <div style={page}>
+
+      {/* HEADER */}
+      <div style={header}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          {b.logo_url ? (
+            <img src={b.logo_url} alt="Logo" style={{ height: 44, maxWidth: 120, objectFit: 'contain', background: 'transparent' }} crossOrigin="anonymous" />
+          ) : null}
+          <div>
+            <div style={coName}>{b.company_name || 'COMPANY NAME'}</div>
+            <div style={coSub}>{b.tagline || ''}</div>
+            {b.pdf_header && <div style={{ fontSize: '7.5pt', color: '#CCCCCC', marginTop: 3 }}>{b.pdf_header}</div>}
+            {jobTypeFull && <div style={jobTag}>{jobTypeFull}</div>}
+            {d.warranty_work && (
+              <div style={{ color: '#FF6B00', fontWeight: 'bold', fontSize: '8pt', marginTop: 4 }}>â WARRANTY WORK</div>
+            )}
           </div>
         </div>
+        <div style={woBlock}>
+          <div style={woLabel}>Work Order</div>
+          <div style={woNum}>#{d.customer_wo_number}</div>
+          <div style={dateStr}>{d.date_long}</div>
+        </div>
+      </div>
 
+      <div style={body}>
+        {sections.filter(s => s.enabled && RENDERERS[s.id]).map(s => {
+          const node = RENDERERS[s.id]();
+          if (node == null) return null;
+          return <div key={s.id}>{node}</div>;
+        })}
       </div>
 
       {/* FOOTER */}
       <div style={footer}>
-        <span>Reliable Oilfield Services Â· reports@reliable-oilfield-services.com</span>
+        <span>{b.pdf_footer || DEFAULT_BRANDING.pdf_footer}</span>
         <span>Generated {d.generated_at}</span>
         <span>WO #{d.customer_wo_number}</span>
       </div>

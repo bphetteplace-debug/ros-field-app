@@ -3,6 +3,10 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings } from '../lib/submissions'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { PDF_SECTION_DEFS, DEFAULT_PDF_LAYOUT, normalizePdfLayout } from '../components/WorkOrderPDFTemplate'
 
 function getTypeLabel(s) {
   if (s.template === 'pm_flare_combustor') return 'PM'
@@ -650,103 +654,138 @@ function AnalyticsAdmin({ submissions }) {
 
 // ─── PDF LAYOUT ADMIN ────────────────────────────────────────────────────────
 function PdfLayoutAdmin() {
-  const DEFAULT_SECTIONS = [
-    { id: 'customer_info', label: 'Customer Information', enabled: true },
-    { id: 'site_sign_gps', label: 'Site Sign & GPS Photo', enabled: true },
-    { id: 'description', label: 'Description of Work', enabled: true },
-    { id: 'completed_work', label: 'Completed Work Photos', enabled: true },
-    { id: 'signatures', label: 'Technician Signatures', enabled: true },
-    { id: 'parts', label: 'Parts Table', enabled: true },
-    { id: 'cost_summary', label: 'Cost Summary', enabled: true },
-  ]
-  const [sections, setSections] = useState(DEFAULT_SECTIONS)
+  const [sections, setSections] = useState(DEFAULT_PDF_LAYOUT)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
-  const [dragging, setDragging] = useState(null)
-  const [dragOver, setDragOver] = useState(null)
+  const [migrated, setMigrated] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   useEffect(() => {
     fetchSettings().then(all => {
-      if (all && Array.isArray(all.pdf_layout) && all.pdf_layout.length > 0) {
-        setSections(all.pdf_layout)
+      const raw = all && Array.isArray(all.pdf_layout) ? all.pdf_layout : null
+      const normalized = normalizePdfLayout(raw)
+      setSections(normalized)
+      if (raw && (raw.length !== normalized.length || raw.some((s, i) => s?.id !== normalized[i]?.id))) {
+        setMigrated(true)
       }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
 
-  const move = (from, to) => {
-    if (from === to) return
+  const handleDragEnd = (event) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
     setSections(prev => {
-      const next = [...prev]
-      const [item] = next.splice(from, 1)
-      next.splice(to, 0, item)
-      return next
+      const oldIdx = prev.findIndex(s => s.id === active.id)
+      const newIdx = prev.findIndex(s => s.id === over.id)
+      if (oldIdx === -1 || newIdx === -1) return prev
+      return arrayMove(prev, oldIdx, newIdx)
     })
+  }
+
+  const move = (from, to) => {
+    if (from === to || to < 0 || to >= sections.length) return
+    setSections(prev => arrayMove(prev, from, to))
   }
 
   const toggle = (id) => setSections(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s))
 
+  const enabledCount = sections.filter(s => s.enabled).length
+  const canSave = enabledCount > 0 && !saving
+
   const save = async () => {
+    if (!canSave) return
     setSaving(true); setMsg('')
     try {
       await saveSettings('pdf_layout', sections)
       setMsg('Saved!')
+      setMigrated(false)
     } catch(e) { setMsg('Error: ' + e.message) } finally { setSaving(false) }
   }
+
+  const reset = () => { setSections(normalizePdfLayout(null)); setMsg('') }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxWidth: 600 }}>
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxWidth: 640 }}>
       <div style={{ fontSize: 17, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>📄 PDF Section Layout</div>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>Drag to reorder sections. Toggle to show/hide. Changes apply to all new PDFs.</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {sections.map((sec, i) => (
-          <div
-            key={sec.id}
-            draggable
-            onDragStart={() => setDragging(i)}
-            onDragOver={e => { e.preventDefault(); setDragOver(i) }}
-            onDrop={() => { move(dragging, i); setDragging(null); setDragOver(null) }}
-            onDragEnd={() => { setDragging(null); setDragOver(null) }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 14px', borderRadius: 8,
-              border: dragOver === i ? '2px solid #0891b2' : '1.5px solid #e2e8f0',
-              background: dragging === i ? '#f0f9ff' : dragOver === i ? '#e0f2fe' : '#f8fafc',
-              cursor: 'grab', transition: 'all 0.1s', opacity: sec.enabled ? 1 : 0.5,
-              userSelect: 'none',
-            }}
-          >
-            <span style={{ fontSize: 18, color: '#9ca3af', cursor: 'grab' }}>⋮⋮</span>
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#1a2332' }}>
-              {i + 1}. {sec.label}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button type="button" onClick={() => move(i, Math.max(0, i - 1))} disabled={i === 0}
-                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 8px', cursor: i === 0 ? 'not-allowed' : 'pointer', opacity: i === 0 ? 0.3 : 1, fontSize: 12, fontWeight: 700 }}>↑</button>
-              <button type="button" onClick={() => move(i, Math.min(sections.length - 1, i + 1))} disabled={i === sections.length - 1}
-                style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 8px', cursor: i === sections.length - 1 ? 'not-allowed' : 'pointer', opacity: i === sections.length - 1 ? 0.3 : 1, fontSize: 12, fontWeight: 700 }}>↓</button>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 13 }}>
-                <input type="checkbox" checked={sec.enabled} onChange={() => toggle(sec.id)} style={{ width: 15, height: 15, cursor: 'pointer' }} />
-                <span style={{ color: sec.enabled ? '#16a34a' : '#9ca3af', fontWeight: 700, fontSize: 12 }}>{sec.enabled ? 'ON' : 'OFF'}</span>
-              </label>
-            </div>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Drag to reorder. Toggle to show/hide. Changes apply to all new PDFs.</div>
+      {migrated && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 12 }}>
+          ✨ Section list updated — new sections added or stale ones removed. Review the order, then save to confirm.
+        </div>
+      )}
+      {enabledCount === 0 && (
+        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#b91c1c', marginBottom: 12 }}>
+          ⚠ All sections are hidden. Enable at least one before saving.
+        </div>
+      )}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {sections.map((sec, i) => (
+              <PdfLayoutRow
+                key={sec.id}
+                sec={sec}
+                index={i}
+                total={sections.length}
+                onToggle={toggle}
+                onMove={move}
+              />
+            ))}
           </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
-        <button onClick={save} disabled={saving} style={{ background: '#0f1f38', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+        <button onClick={save} disabled={!canSave} style={{ background: canSave ? '#0f1f38' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: canSave ? 'pointer' : 'not-allowed' }}>
           {saving ? 'Saving...' : '💾 Save Layout'}
         </button>
-        <button onClick={() => setSections(DEFAULT_SECTIONS)} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: '#555' }}>
+        <button onClick={reset} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: '#555' }}>
           Reset to Default
         </button>
         {msg && <span style={{ color: msg.startsWith('Error') ? '#dc2626' : '#16a34a', fontWeight: 700, fontSize: 13 }}>{msg}</span>}
       </div>
       <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8f9fa', borderRadius: 8, fontSize: 12, color: '#888', border: '1px solid #e5e7eb' }}>
-        💡 Tip: Drag sections up/down or use the ↑↓ buttons. Uncheck to hide a section from the PDF output.
+        💡 Tip: Drag the ⋮⋮ handle (touch and keyboard supported) or use the ↑↓ buttons. Header, footer, colors, and logo are controlled in the Branding tab.
+      </div>
+    </div>
+  )
+}
+
+function PdfLayoutRow({ sec, index, total, onToggle, onMove }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sec.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 14px', borderRadius: 8,
+    border: isDragging ? '2px solid #0891b2' : '1.5px solid #e2e8f0',
+    background: isDragging ? '#f0f9ff' : '#f8fafc',
+    opacity: sec.enabled ? (isDragging ? 0.85 : 1) : 0.5,
+    userSelect: 'none',
+    cursor: 'default',
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      <span {...attributes} {...listeners} style={{ fontSize: 18, color: '#9ca3af', cursor: 'grab', touchAction: 'none', padding: '0 4px' }}>⋮⋮</span>
+      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#1a2332' }}>
+        {index + 1}. {sec.label}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button type="button" onClick={() => onMove(index, Math.max(0, index - 1))} disabled={index === 0}
+          style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 8px', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.3 : 1, fontSize: 12, fontWeight: 700 }}>↑</button>
+        <button type="button" onClick={() => onMove(index, Math.min(total - 1, index + 1))} disabled={index === total - 1}
+          style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '2px 8px', cursor: index === total - 1 ? 'not-allowed' : 'pointer', opacity: index === total - 1 ? 0.3 : 1, fontSize: 12, fontWeight: 700 }}>↓</button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 13 }}>
+          <input type="checkbox" checked={sec.enabled} onChange={() => onToggle(sec.id)} style={{ width: 15, height: 15, cursor: 'pointer' }} />
+          <span style={{ color: sec.enabled ? '#16a34a' : '#9ca3af', fontWeight: 700, fontSize: 12 }}>{sec.enabled ? 'ON' : 'OFF'}</span>
+        </label>
       </div>
     </div>
   )
