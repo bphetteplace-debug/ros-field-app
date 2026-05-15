@@ -15,6 +15,15 @@ import {
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
+import { compressImage } from '../lib/imageCompress'
+
+// Photos straight off a phone camera are 3-5MB. compressImage shrinks them
+// to ~500KB, which is the difference between uploads succeeding and silently
+// timing out on cell connections.
+async function compressFile(file) {
+  if (!file || !file.type || !file.type.startsWith('image/')) return file;
+  try { return await compressImage(file); } catch { return file; }
+}
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -135,7 +144,7 @@ function PhotoPicker({ label, value, onChange }) {
       ) : (
         <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'8px 12px', background:T.inputBg, border:`1.5px dashed ${T.border}`, borderRadius:7, cursor:'pointer', fontSize:12, color:T.muted, fontWeight:600 }}>
           📷 Add Photo
-          <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={e=>onChange(e.target.files[0]||null)} />
+          <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={async e=>onChange(await compressFile(e.target.files[0]||null))} />
         </label>
       )}
     </div>
@@ -339,9 +348,9 @@ export default function FormPage() {
   }
   const removePart      = sku=>{ setParts(ps=>ps.filter(x=>x.sku!==sku)); setPartPhotos(pp=>{const n={...pp};delete n[sku];return n}) }
   const qtyChange       = (sku,d)=>setParts(ps=>ps.map(x=>x.sku===sku?{...x,qty:Math.max(0,x.qty+d)}:x).filter(x=>x.qty>0))
-  const addPartPhoto    = (sku,file)=>setPartPhotos(pp=>({...pp,[sku]:[...(pp[sku]||[]),{file,caption:''}]}))
+  const addPartPhoto    = async (sku,file)=>{ const c=await compressFile(file); setPartPhotos(pp=>({...pp,[sku]:[...(pp[sku]||[]),{file:c,caption:''}]})) }
   const removePartPhoto = (sku,idx)=>setPartPhotos(pp=>({...pp,[sku]:(pp[sku]||[]).filter((_,i)=>i!==idx)}))
-  const addPhoto        = files=>{ setPhotos(p=>[...p,...Array.from(files||[])]) }
+  const addPhoto        = async files=>{ const arr=Array.from(files||[]); const compressed=await Promise.all(arr.map(compressFile)); setPhotos(p=>[...p,...compressed]) }
 
   const handleJobTypeChange = newType => {
     setJobType(newType)
@@ -472,7 +481,14 @@ export default function FormPage() {
         scEquipment:showSCEquip?scEquipment:[],
       }
       const submission=await saveSubmission(formData,user.id,template)
-      if(submission?.id&&Object.keys(photoDataUrls).length>0) await uploadPhotos(submission.id,photoDataUrls)
+      if(submission?.id&&Object.keys(photoDataUrls).length>0){
+        const upRes=await uploadPhotos(submission.id,photoDataUrls)
+        if(upRes&&upRes.failed>0){
+          setSaveError(`Submission saved (PM #${submission.pm_number||''}) but ${upRes.failed} of ${upRes.total} photos failed to upload — check your signal and re-submit, or edit this submission later to add the missing photos.`)
+          setSaving(false)
+          return
+        }
+      }
               if (submission?.id) {
                           let pdfBase64 = null;
                           try {
@@ -678,7 +694,7 @@ export default function FormPage() {
             ) : (
               <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
                 🚧 Site Sign Photo
-                <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e=>setSiteSignPhoto(e.target.files[0]||null)} />
+                <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={async e=>setSiteSignPhoto(await compressFile(e.target.files[0]||null))} />
               </label>
             )}
           </div>

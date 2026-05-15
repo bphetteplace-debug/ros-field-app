@@ -290,22 +290,23 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
           return null;
     }
 
-    // Upload one entry; returns the inserted photo metadata row or null on failure
+    // Upload one entry; returns { ok: true, row } on success or { ok: false, reason } on failure.
+    // Retries up to 3 times on network/5xx errors. 4xx responses are treated as terminal.
     async function uploadOne(entry) {
           const { photo, section: sec, order } = entry;
-          if (!photo) return null;
+          if (!photo) return { ok: false, reason: 'no photo' };
 
           let blob;
           try {
                   blob = await entryToBlob(photo);
           } catch (e) {
                   console.warn('[uploadPhotos] blob conversion failed for section=' + sec + ' order=' + order + ':', e);
-                  return null;
+                  return { ok: false, reason: 'blob conversion' };
           }
 
           if (!blob || blob.size === 0) {
                   console.warn('[uploadPhotos] empty blob for section=' + sec + ' order=' + order);
-                  return null;
+                  return { ok: false, reason: 'empty blob' };
           }
 
           const ext =
@@ -314,7 +315,7 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
                   blob.type === 'video/mp4'         ? 'mp4'  :
                   blob.type === 'video/webm'        ? 'webm' :
                   blob.type === 'video/quicktime'   ? 'mov'  :
-                  blob.type.startsWith('video/')    ? 'mp4'  :
+                  (blob.type && blob.type.startsWith('video/')) ? 'mp4' :
                   'jpg';
 
           const path = submissionId + '/' + sec + '-' + order + '.' + ext;
@@ -326,21 +327,27 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
           };
           if (token) storageHeaders['Authorization'] = 'Bearer ' + token;
 
-          let upRes;
-          try {
-                  upRes = await fetch(storageBase + path, {
-                            method: 'POST', headers: storageHeaders, body: blob,
-                  });
-          } catch (e) {
-                  console.warn('[uploadPhotos] storage fetch error section=' + sec + ' order=' + order + ':', e);
-                  return null;
+          // Storage upload with retries on network errors and 5xx
+          let storageOk = false;
+          for (let attempt = 1; attempt <= 3 && !storageOk; attempt++) {
+                  try {
+                          const upRes = await fetch(storageBase + path, {
+                                  method: 'POST', headers: storageHeaders, body: blob,
+                          });
+                          if (upRes.ok) { storageOk = true; break; }
+                          // 4xx is terminal (auth, payload too large, etc.) — don't retry
+                          if (upRes.status >= 400 && upRes.status < 500) {
+                                  const errText = await upRes.text().catch(() => String(upRes.status));
+                                  console.warn('[uploadPhotos] storage ' + upRes.status + ' (terminal) section=' + sec + ' order=' + order + ':', errText);
+                                  return { ok: false, reason: 'storage ' + upRes.status };
+                          }
+                          console.warn('[uploadPhotos] storage ' + upRes.status + ' attempt ' + attempt + '/3 section=' + sec + ' order=' + order);
+                  } catch (e) {
+                          console.warn('[uploadPhotos] storage network error attempt ' + attempt + '/3 section=' + sec + ' order=' + order + ':', e);
+                  }
+                  if (!storageOk && attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           }
-
-          if (!upRes.ok) {
-                  const errText = await upRes.text().catch(function() { return String(upRes.status); });
-                  console.warn('[uploadPhotos] storage upload failed ' + upRes.status + ' section=' + sec + ' order=' + order + ':', errText);
-                  return null;
-          }
+          if (!storageOk) return { ok: false, reason: 'storage upload exhausted retries' };
 
           const metaHeaders = {
                   'apikey':        SUPA_KEY,
@@ -348,51 +355,57 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
                   'Prefer':        'return=representation',
           };
           if (token) metaHeaders['Authorization'] = 'Bearer ' + token;
+          const metaBody = JSON.stringify({
+                  submission_id: submissionId,
+                  storage_path:  path,
+                  caption:       photo.caption || '',
+                  display_order: order,
+                  section:       sec,
+          });
 
-          let metaRes;
-          try {
-                  metaRes = await fetch(restBase, {
-                            method: 'POST',
-                            headers: metaHeaders,
-                            body: JSON.stringify({
-                                        submission_id: submissionId,
-                                        storage_path:  path,
-                                        caption:       photo.caption || '',
-                                        display_order: order,
-                                        section:       sec,
-                            }),
-                  });
-          } catch (e) {
-                  console.warn('[uploadPhotos] metadata insert error section=' + sec + ' order=' + order + ':', e);
-                  // Storage upload succeeded — photo is in bucket but metadata row missing
-                  // Return a partial record so we don't lose the file reference
-                  return { storage_path: path, caption: photo.caption || '', section: sec };
+          // Metadata insert with retries on network errors and 5xx
+          for (let attempt = 1; attempt <= 3; attempt++) {
+                  try {
+                          const metaRes = await fetch(restBase, { method: 'POST', headers: metaHeaders, body: metaBody });
+                          const metaText = await metaRes.text().catch(() => '');
+                          if (metaRes.ok) {
+                                  try {
+                                          const parsed = metaText ? JSON.parse(metaText) : null;
+                                          return { ok: true, row: Array.isArray(parsed) ? parsed[0] : parsed };
+                                  } catch (_e) {
+                                          return { ok: true, row: { storage_path: path, caption: photo.caption || '', section: sec } };
+                                  }
+                          }
+                          if (metaRes.status >= 400 && metaRes.status < 500) {
+                                  console.warn('[uploadPhotos] metadata ' + metaRes.status + ' (terminal):', metaText);
+                                  // File is in storage but metadata insert was rejected — orphan
+                                  return { ok: false, reason: 'metadata ' + metaRes.status, orphanPath: path };
+                          }
+                          console.warn('[uploadPhotos] metadata ' + metaRes.status + ' attempt ' + attempt + '/3:', metaText);
+                  } catch (e) {
+                          console.warn('[uploadPhotos] metadata network error attempt ' + attempt + '/3:', e);
+                  }
+                  if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
           }
-
-          const metaText = await metaRes.text().catch(function() { return ''; });
-          if (!metaRes.ok) {
-                  console.warn('[uploadPhotos] metadata insert failed ' + metaRes.status + ':', metaText);
-                  return { storage_path: path, caption: photo.caption || '', section: sec };
-          }
-
-          try {
-                  const parsed = metaText ? JSON.parse(metaText) : null;
-                  return Array.isArray(parsed) ? parsed[0] : parsed;
-          } catch (_e) {
-                  return { storage_path: path, caption: photo.caption || '', section: sec };
-          }
+          return { ok: false, reason: 'metadata insert exhausted retries', orphanPath: path };
     }
 
-    // Upload all entries in parallel batches of 5 to avoid overwhelming the connection
-    const BATCH = 5;
-    const results = [];
+    // Upload in parallel batches of 3 — gentle enough for cell connections
+    // while still being faster than serial.
+    const BATCH = 3;
+    const rows = [];
+    let uploaded = 0;
+    let failed = 0;
     for (let i = 0; i < entries.length; i += BATCH) {
           const batch = entries.slice(i, i + BATCH);
           const batchResults = await Promise.all(batch.map(uploadOne));
-          results.push(...batchResults.filter(Boolean));
+          for (const r of batchResults) {
+                  if (r && r.ok) { uploaded++; if (r.row) rows.push(r.row); }
+                  else failed++;
+          }
     }
 
-    return results;
+    return { rows, uploaded, failed, total: entries.length };
 }
 export async function fetchSubmissions(userId) {
   try {
