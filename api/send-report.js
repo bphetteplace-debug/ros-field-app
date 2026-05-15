@@ -379,6 +379,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
 
   // Work Photos. Filter out signatures (rendered in sign-off) and part photos
   // (rendered inline next to each part below).
+  globalThis.__workPhotoTrace = [];
   if (Array.isArray(allPhotos)) {
     var workPhotos = allPhotos.filter(function(p) {
       if (!p) return false;
@@ -387,6 +388,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       if (p.section && p.section.startsWith('part-')) return false;
       return true;
     });
+    globalThis.__workPhotoTrace.push({ stage: 'filtered', count: workPhotos.length });
     if (workPhotos.length > 0) {
       // Section header
       if (y - 30 < 30) { page = pdfDoc.addPage([612, 792]); y = H - 40; }
@@ -398,25 +400,39 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
       var px = M; var photoCount = 0;
       for (var phi=0; phi<workPhotos.length; phi++) {
         var photo = workPhotos[phi];
-        if (!photo.storage_path) continue;
+        if (!photo.storage_path) {
+          globalThis.__workPhotoTrace.push({ phi: phi, status: 'no_path', section: photo.section });
+          continue;
+        }
         // New page if next row won't fit
         if (photoCount % 3 === 0 && y - photoH < 30) {
           page = pdfDoc.addPage([612, 792]); y = H - 40;
+          globalThis.__workPhotoTrace.push({ phi: phi, status: 'new_page' });
         }
         try {
           var pBytes = await fetchPhotoBytes(photo.storage_path);
-          if (!pBytes) continue;
+          if (!pBytes) {
+            globalThis.__workPhotoTrace.push({ phi: phi, status: 'fetch_null', path: photo.storage_path });
+            continue;
+          }
           var pImg;
           try { pImg = await pdfDoc.embedJpg(pBytes); } catch(e2) {
-            try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) { continue; }
+            try { pImg = await pdfDoc.embedPng(pBytes); } catch(e3) {
+              globalThis.__workPhotoTrace.push({ phi: phi, status: 'embed_failed', path: photo.storage_path, err: String(e3.message||e3).slice(0,80) });
+              continue;
+            }
           }
           page.drawImage(pImg, { x:px, y:y-photoH, width:photoW, height:photoH });
+          globalThis.__workPhotoTrace.push({ phi: phi, status: 'drawn', y: Math.round(y), px: Math.round(px), photoCount: photoCount });
           px += photoW+6; photoCount++;
           if (photoCount % 3 === 0) { px=M; y-=photoH+6; }
-        } catch(e) { /* skip failed photo */ }
+        } catch(e) {
+          globalThis.__workPhotoTrace.push({ phi: phi, status: 'caught', err: String(e.message||e).slice(0,80) });
+        }
       }
       if (photoCount > 0 && photoCount % 3 !== 0) y -= photoH+6;
       y -= 6;
+      globalThis.__workPhotoTrace.push({ stage: 'done', renderedCount: photoCount });
     }
   }
 
@@ -660,7 +676,12 @@ async function sendPmScReport(res, sub, d, photos, pdfBase64 = null) {
   return res.status(200).json({
     ok: true,
     emailId: emailData.id,
-    debug: { photoCount: (photos || []).length, sectionCounts, partsCount: (parts || []).length }
+    debug: {
+      photoCount: (photos || []).length,
+      sectionCounts,
+      partsCount: (parts || []).length,
+      workPhotoTrace: globalThis.__workPhotoTrace || [],
+    }
   });
 }
 
