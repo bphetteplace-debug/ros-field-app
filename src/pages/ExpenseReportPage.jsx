@@ -58,15 +58,18 @@ export default function ExpenseReportPage() {
   }
   const [saveError, setSaveError] = useState(null)
   const [draftSaved, setDraftSaved] = useState(false)
-  const saveDraft = async () => {
+  const saveDraft = async (expensesOverride) => {
     try {
       // The expenses array embeds Blobs (receipt + itemPhoto) directly in
       // each row. IDB persists those natively — no need to strip them like
       // the old localStorage version did. We pass the full expenses array
       // through the photos slot so the Blobs survive the round trip.
+      // expensesOverride lets callers (e.g. updExp on a photo add) pass the
+      // post-update array without waiting for React to commit the state
+      // and the autosave debounce to fire.
       await saveDraftToStore('expense',
         { techName, truckNumber, date, notes, gpsLat, gpsLng, gpsAccuracy },
-        { expenses })
+        { expenses: expensesOverride || expenses })
       setDraftSaved(true); setTimeout(() => setDraftSaved(false), 2000)
     } catch(e) { console.warn('[Expense] saveDraft failed:', e?.message || e) }
   }
@@ -117,7 +120,15 @@ export default function ExpenseReportPage() {
     return () => { cancelled = true }
   }, [profile?.full_name, profile?.truck_number])
 
-  const updExp = (i, k, v) => setExpenses(es => es.map((e, idx) => idx === i ? { ...e, [k]: v } : e))
+  const updExp = (i, k, v) => {
+    const next = expenses.map((e, idx) => idx === i ? { ...e, [k]: v } : e)
+    setExpenses(next)
+    // Photo additions/removals: save immediately so a quick refresh
+    // doesn't drop the receipt within the 2s autosave debounce window.
+    if (k === 'receipt' || k === 'itemPhoto') {
+      saveDraft(next).catch(() => {})
+    }
+  }
   const removeExp = (i) => setExpenses(es => es.filter((_, idx) => idx !== i))
   const addExp = () => setExpenses(es => [...es, mkExp()])
   const grandTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
