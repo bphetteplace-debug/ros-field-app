@@ -1059,6 +1059,8 @@ export default function AdminPage() {
   const [dateTo, setDateTo] = useState('')
   const [deleting, setDeleting] = useState(null)
   const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses' | 'parts'
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   const handleStatusChange = async (id, newStatus) => {
     const sub = submissions.find(s => s.id === id)
@@ -1078,6 +1080,69 @@ export default function AdminPage() {
       console.error('Status update failed:', e)
       alert('Status update failed: ' + (e.message || e) + '\nReverting to "' + prevStatus.toUpperCase() + '".')
       setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: prevStatus } : s))
+    }
+  }
+
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const bulkUpdateStatus = async (newStatus) => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    if (!window.confirm('Mark ' + ids.length + ' submission' + (ids.length !== 1 ? 's' : '') + ' as ' + newStatus.toUpperCase() + '?')) return
+    setBulkBusy(true)
+    try {
+      for (const id of ids) {
+        const sub = submissions.find(s => s.id === id)
+        if (!sub) continue
+        const prevStatus = sub.status || 'submitted'
+        if (prevStatus === newStatus) continue
+        try {
+          await updateSubmissionStatus(id, newStatus)
+          setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
+          logAudit({
+            userId: user?.id, userName: profile?.full_name || user?.email,
+            action: 'submission_status_changed', targetType: 'submission', targetId: id,
+            details: { from: prevStatus, to: newStatus, pm_number: sub.pm_number, customer_name: sub.customer_name, bulk: true },
+          })
+        } catch (e) {
+          console.warn('Bulk status update failed for ' + id + ':', e)
+        }
+      }
+      clearSelection()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const bulkDeleteSelected = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    if (!window.confirm('Permanently delete ' + ids.length + ' submission' + (ids.length !== 1 ? 's' : '') + '?\nThis cannot be undone.')) return
+    setBulkBusy(true)
+    try {
+      for (const id of ids) {
+        const sub = submissions.find(s => s.id === id)
+        if (!sub) continue
+        try {
+          await deleteSubmission(id)
+          setSubmissions(prev => prev.filter(x => x.id !== id))
+          logAudit({
+            userId: user?.id, userName: profile?.full_name || user?.email,
+            action: 'submission_deleted', targetType: 'submission', targetId: id,
+            details: { pm_number: sub.pm_number, customer_name: sub.customer_name, type: getTypeLabel(sub), date: sub.date, bulk: true },
+          })
+        } catch (e) {
+          console.warn('Bulk delete failed for ' + id + ':', e)
+        }
+      }
+      clearSelection()
+    } finally {
+      setBulkBusy(false)
     }
   }
 
@@ -1398,10 +1463,42 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* BULK ACTION BAR */}
+            {!isDemo && selectedIds.size > 0 && (
+              <div style={{ position: 'sticky', top: 0, zIndex: 5, background: '#0f1f38', color: '#fff', padding: '10px 14px', borderRadius: 10, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+                <span style={{ fontWeight: 800, fontSize: 13 }}>{selectedIds.size} selected</span>
+                <span style={{ flex: 1 }} />
+                <button onClick={() => bulkUpdateStatus('submitted')} disabled={bulkBusy} style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: bulkBusy ? 'not-allowed' : 'pointer', opacity: bulkBusy ? 0.6 : 1 }}>Submitted</button>
+                <button onClick={() => bulkUpdateStatus('reviewed')} disabled={bulkBusy} style={{ background: '#d97706', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: bulkBusy ? 'not-allowed' : 'pointer', opacity: bulkBusy ? 0.6 : 1 }}>Reviewed</button>
+                <button onClick={() => bulkUpdateStatus('invoiced')} disabled={bulkBusy} style={{ background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: bulkBusy ? 'not-allowed' : 'pointer', opacity: bulkBusy ? 0.6 : 1 }}>Invoiced</button>
+                <span style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.2)' }} />
+                <button onClick={bulkDeleteSelected} disabled={bulkBusy} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: bulkBusy ? 'not-allowed' : 'pointer', opacity: bulkBusy ? 0.6 : 1 }}>🗑 Delete</button>
+                <button onClick={clearSelection} disabled={bulkBusy} style={{ background: 'transparent', color: '#aaa', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Clear</button>
+                {bulkBusy && <span style={{ fontSize: 12, color: '#fcd34d', fontWeight: 700 }}>Working…</span>}
+              </div>
+            )}
+
             {/* TABLE */}
             {!loading && !error && filtered.length > 0 && (
               <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px', alignItems: 'center' }}>
+                  <div>
+                    {!isDemo && (
+                      <input
+                        type="checkbox"
+                        title={filtered.every(s => selectedIds.has(s.id)) ? 'Deselect all visible' : 'Select all visible'}
+                        checked={filtered.length > 0 && filtered.every(s => selectedIds.has(s.id))}
+                        onChange={() => setSelectedIds(prev => {
+                          const next = new Set(prev)
+                          const allSel = filtered.every(s => next.has(s.id))
+                          if (allSel) { for (const s of filtered) next.delete(s.id) }
+                          else { for (const s of filtered) next.add(s.id) }
+                          return next
+                        })}
+                        style={{ width: 14, height: 14, cursor: 'pointer' }}
+                      />
+                    )}
+                  </div>
                   <div>Type</div><div>Name / Location</div><div>Techs</div><div>Date</div><div>Status</div><div>By</div><div style={{ textAlign: 'right' }}>Total</div><div style={{ textAlign: 'center' }}>Actions</div>
                 </div>
                 {filtered.map((s, i) => {
@@ -1419,7 +1516,17 @@ export default function AdminPage() {
                   const displayName = lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || '-') : (s.customer_name || '-')
                   const displaySub = lbl === 'EXP' ? 'Expense Report' : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || '?') : (s.location_name || '')
                   return (
-                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa'), alignItems: 'center', borderLeft: '3px solid ' + color }}>
+                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: selectedIds.has(s.id) ? '#eff6ff' : (isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa')), alignItems: 'center', borderLeft: '3px solid ' + color }}>
+                      <div onClick={e => e.stopPropagation()}>
+                        {!isDemo && (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(s.id)}
+                            onChange={() => toggleSelect(s.id)}
+                            style={{ width: 14, height: 14, cursor: 'pointer' }}
+                          />
+                        )}
+                      </div>
                       <div style={{ cursor: 'pointer' }} onClick={() => navigate('/view/' + s.id)}>
                         <span style={{ background: color, color: '#fff', fontWeight: 700, fontSize: 10, padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
                           {lbl}{s.pm_number && lbl !== 'EXP' && lbl !== 'INSP' ? ' #' + s.pm_number : ''}
