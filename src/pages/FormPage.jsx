@@ -535,7 +535,15 @@ export default function FormPage() {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ submissionId: submission.id, pdfBase64 }),
-                          }).catch(err => console.warn('Email send failed:', err));
+                          }).then(async r => {
+                                        if (!r.ok) {
+                                                      const txt = await r.text().catch(() => r.statusText || '');
+                                                      throw new Error('HTTP ' + r.status + ' — ' + (txt || '').slice(0, 240));
+                                        }
+                          }).catch(err => {
+                                        console.error('Email send failed:', err);
+                                        alert('Email failed for PM #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe submission was saved. Open it from the list and use "Send Report" to retry.');
+                          });
               }try{localStorage.removeItem(draftKey)}catch(e){}
       navigate('/submissions')
     }catch(err){
