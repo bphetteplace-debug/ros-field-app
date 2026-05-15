@@ -1,5 +1,5 @@
 // src/components/WorkOrderPDFTemplate.jsx
-// ReliableTrack Work Order PDF â completely rebuilt layout
+// ReliableTrack Work Order PDF — completely rebuilt layout
 // Clean, professional field-service report format
 
 // Section catalog used by the admin layout editor.
@@ -26,7 +26,7 @@ export const DEFAULT_BRANDING = {
   accent_color: '#E35B04',
   logo_url: '',
   pdf_header: '',
-  pdf_footer: 'Reliable Oilfield Services Â· reports@reliable-oilfield-services.com',
+  pdf_footer: 'Reliable Oilfield Services · reports@reliable-oilfield-services.com',
 };
 
 // Reconciles a saved layout with the current section catalog.
@@ -198,7 +198,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
   const F = (label, val, last) => (
     <div style={last ? infoCellLast : infoCell}>
       <div style={infoLabel}>{label}</div>
-      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>â</span>}</div>
+      <div style={infoVal}>{val || <span style={{ color: '#CCC' }}>—</span>}</div>
     </div>
   );
 
@@ -229,8 +229,8 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
           !/^part[-_]/i.test(p.section || '') &&
           !/^(arrestor|flare|heater)[-_]/i.test(p.section || '')
         );
-  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs Ã $${d.labor_rate}/hr Ã ${techCount} tech${plural}` : 'â';
-  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi Ã $${d.mileage_rate}/mi` : 'â';
+  const laborLine   = d.labor_hours > 0 ? `${d.labor_hours} hrs × $${d.labor_rate}/hr × ${techCount} tech${plural}` : '—';
+  const mileageLine = d.mileage_miles > 0 ? `${d.mileage_miles} mi × $${d.mileage_rate}/mi` : '—';
 
   const jobTypeFull = d.job_type === 'PM' ? 'Preventive Maintenance'
     : d.job_type === 'SC' ? 'Service Call'
@@ -353,7 +353,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {arrestors.map((a,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' Â· Filter Changed':''}{a.notes?' Â· '+a.notes:''}
+                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' · Filter Changed':''}{a.notes?' · '+a.notes:''}
                 </div>
               ))}
             </div>
@@ -365,7 +365,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {flares.map((f,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' Â· Last Ignition: '+f.last_ignition:''}{f.notes?' Â· '+f.notes:''}
+                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' · Last Ignition: '+f.last_ignition:''}{f.notes?' · '+f.notes:''}
                 </div>
               ))}
             </div>
@@ -377,7 +377,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {heaters.map((h,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{h.notes?' Â· '+h.notes:''}
+                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{h.notes?' · '+h.notes:''}
                 </div>
               ))}
             </div>
@@ -444,11 +444,11 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
     <>
       <div style={sectionBar}>Labor &amp; Mileage</div>
       <div style={infoGrid}>
-        {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : 'â')}
-        {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : 'â')}
+        {F('Labor Hours', d.labor_hours > 0 ? d.labor_hours + ' hrs' : '—')}
+        {F('Labor Rate', d.labor_rate ? '$' + d.labor_rate + '/hr' : '—')}
         {F('Labor Total', d.cost_labor, true)}
-        {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : 'â')}
-        {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : 'â')}
+        {F('Miles Driven', d.mileage_miles > 0 ? d.mileage_miles + ' mi' : '—')}
+        {F('Mileage Rate', d.mileage_rate ? '$' + d.mileage_rate + '/mi' : '—')}
         {F('Mileage Total', d.cost_mileage, true)}
       </div>
     </>
@@ -518,7 +518,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
                   <div style={{ ...sigLabel, marginTop: 4 }}>{ts.caption}</div>
                 </div>
               ))
-            : <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || 'â'}</strong></div>
+            : <div style={{ ...sigLabel, marginTop: 10 }}>Performed by: <strong>{techs.join(', ') || '—'}</strong></div>
           }
           <div style={{ ...sigLabel, marginTop: 4 }}>Date: <strong>{d.date_long}</strong></div>
         </div>
@@ -554,7 +554,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             {b.pdf_header && <div style={{ fontSize: '7.5pt', color: '#CCCCCC', marginTop: 3 }}>{b.pdf_header}</div>}
             {jobTypeFull && <div style={jobTag}>{jobTypeFull}</div>}
             {d.warranty_work && (
-              <div style={{ color: '#FF6B00', fontWeight: 'bold', fontSize: '8pt', marginTop: 4 }}>â WARRANTY WORK</div>
+              <div style={{ color: '#FF6B00', fontWeight: 'bold', fontSize: '8pt', marginTop: 4 }}>⚠ WARRANTY WORK</div>
             )}
           </div>
         </div>
