@@ -11,6 +11,7 @@ export default function EquipmentCard({
   removeEquipment,
 }) {
   const photoRef = useRef();
+  const galleryRef = useRef();
   const yesNo = ['', 'Yes', 'No', 'N/A'];
 
   return (
@@ -101,7 +102,14 @@ export default function EquipmentCard({
           className="photo-cell border-2 border-dashed border-slate-300 hover:border-orange-500 flex flex-col items-center justify-center text-slate-500 hover:text-orange-600 transition bg-white"
         >
           <Plus className="w-6 h-6 mb-1" />
-          <span className="text-xs font-bold uppercase tracking-wider">Photo</span>
+          <span className="text-xs font-bold uppercase tracking-wider">Camera</span>
+        </button>
+        <button
+          onClick={() => galleryRef.current?.click()}
+          className="photo-cell border-2 border-dashed border-slate-300 hover:border-orange-500 flex flex-col items-center justify-center text-slate-500 hover:text-orange-600 transition bg-white"
+        >
+          <span className="text-2xl mb-0.5 leading-none">🖼️</span>
+          <span className="text-xs font-bold uppercase tracking-wider">Gallery</span>
         </button>
       </div>
       <input
@@ -109,6 +117,17 @@ export default function EquipmentCard({
         type="file"
         accept="image/*"
         capture="environment"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          addEquipmentPhotos(eq.id, e.target.files);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
         multiple
         className="hidden"
         onChange={(e) => {

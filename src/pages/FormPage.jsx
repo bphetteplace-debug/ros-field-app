@@ -148,10 +148,16 @@ function PhotoPicker({ label, value, onChange }) {
             style={{ position:'absolute', top:4, right:4, background:'rgba(15,31,56,0.75)', color:'#fff', border:'none', borderRadius:'50%', width:20, height:20, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0 }}>✕</button>
         </div>
       ) : (
-        <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'8px 12px', background:T.inputBg, border:`1.5px dashed ${T.border}`, borderRadius:7, cursor:'pointer', fontSize:12, color:T.muted, fontWeight:600 }}>
-          📷 Add Photo
-          <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={async e=>onChange(await compressFile(e.target.files[0]||null))} />
-        </label>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'8px 12px', background:T.inputBg, border:`1.5px dashed ${T.border}`, borderRadius:7, cursor:'pointer', fontSize:12, color:T.muted, fontWeight:600 }}>
+            📷 Camera
+            <input type="file" accept="image/*" capture="environment" style={{ display:'none' }} onChange={async e=>onChange(await compressFile(e.target.files[0]||null))} />
+          </label>
+          <label style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'8px 12px', background:T.inputBg, border:`1.5px dashed ${T.border}`, borderRadius:7, cursor:'pointer', fontSize:12, color:T.muted, fontWeight:600 }}>
+            🖼️ Gallery
+            <input type="file" accept="image/*" style={{ display:'none' }} onChange={async e=>onChange(await compressFile(e.target.files[0]||null))} />
+          </label>
+        </div>
       )}
     </div>
   )
@@ -889,10 +895,16 @@ export default function FormPage() {
                 <button type="button" onClick={()=>setSiteSignPhoto(null)} style={{position:'absolute',top:4,right:4,background:'rgba(15,31,56,0.75)',color:'#fff',border:'none',borderRadius:'50%',width:20,height:20,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>X</button>
               </div>
             ) : (
-              <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
-                🚧 Site Sign Photo
-                <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={async e=>setSiteSignPhoto(await compressFile(e.target.files[0]||null))} />
-              </label>
+              <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+                <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
+                  📷 Camera
+                  <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={async e=>setSiteSignPhoto(await compressFile(e.target.files[0]||null))} />
+                </label>
+                <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
+                  🖼️ Gallery
+                  <input type="file" accept="image/*" style={{display:'none'}} onChange={async e=>setSiteSignPhoto(await compressFile(e.target.files[0]||null))} />
+                </label>
+              </div>
             )}
           </div>
           <div style={row}>
@@ -1250,10 +1262,16 @@ export default function FormPage() {
                         </div>
                       ))}
                     </div>
-                    <label style={{display:'inline-flex',alignItems:'center',gap:4,padding:'4px 10px',background:T.inputBg,border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
-                      📷 Part Photo
-                      <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e=>{if(e.target.files[0])addPartPhoto(p.sku,e.target.files[0])}} />
-                    </label>
+                    <div style={{display:'flex', gap:4, flexWrap:'wrap'}}>
+                      <label style={{display:'inline-flex',alignItems:'center',gap:4,padding:'4px 10px',background:T.inputBg,border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
+                        📷 Camera
+                        <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e=>{if(e.target.files[0])addPartPhoto(p.sku,e.target.files[0])}} />
+                      </label>
+                      <label style={{display:'inline-flex',alignItems:'center',gap:4,padding:'4px 10px',background:T.inputBg,border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
+                        🖼️ Gallery
+                        <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>{if(e.target.files[0])addPartPhoto(p.sku,e.target.files[0])}} />
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1300,11 +1318,17 @@ export default function FormPage() {
                     <button type="button" onClick={()=>setArrivalVideo(null)} style={{fontSize:12,color:T.red,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:600}}>✕ Remove</button>
                   </div>
                 ):(
-                  <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'22px 10px',background:T.inputBg,border:`2px dashed ${T.border}`,borderRadius:9,cursor:'pointer',minHeight:90,textAlign:'center'}}>
-                    <span style={{fontSize:24}}>🎬</span>
-                    <span style={{fontSize:12,color:T.muted,fontWeight:600}}>Record / Upload Arrival</span>
-                    <input type="file" accept="video/*" capture="environment" style={{display:'none'}} onChange={e=>setArrivalVideo(e.target.files[0]||null)} />
-                  </label>
+                  <>
+                    <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'22px 10px',background:T.inputBg,border:`2px dashed ${T.border}`,borderRadius:9,cursor:'pointer',minHeight:90,textAlign:'center'}}>
+                      <span style={{fontSize:24}}>🎬</span>
+                      <span style={{fontSize:12,color:T.muted,fontWeight:600}}>Record Arrival</span>
+                      <input type="file" accept="video/*" capture="environment" style={{display:'none'}} onChange={e=>setArrivalVideo(e.target.files[0]||null)} />
+                    </label>
+                    <label style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:5,padding:'6px 10px',marginTop:6,background:'transparent',border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
+                      🖼️ Or upload from gallery
+                      <input type="file" accept="video/*" style={{display:'none'}} onChange={e=>setArrivalVideo(e.target.files[0]||null)} />
+                    </label>
+                  </>
                 )}
               </div>
               <div style={fld}>
@@ -1315,11 +1339,17 @@ export default function FormPage() {
                     <button type="button" onClick={()=>setDepartureVideo(null)} style={{fontSize:12,color:T.red,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:600}}>✕ Remove</button>
                   </div>
                 ):(
-                  <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'22px 10px',background:T.inputBg,border:`2px dashed ${T.border}`,borderRadius:9,cursor:'pointer',minHeight:90,textAlign:'center'}}>
-                    <span style={{fontSize:24}}>🎬</span>
-                    <span style={{fontSize:12,color:T.muted,fontWeight:600}}>Record / Upload Departure</span>
-                    <input type="file" accept="video/*" capture="environment" style={{display:'none'}} onChange={e=>setDepartureVideo(e.target.files[0]||null)} />
-                  </label>
+                  <>
+                    <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'22px 10px',background:T.inputBg,border:`2px dashed ${T.border}`,borderRadius:9,cursor:'pointer',minHeight:90,textAlign:'center'}}>
+                      <span style={{fontSize:24}}>🎬</span>
+                      <span style={{fontSize:12,color:T.muted,fontWeight:600}}>Record Departure</span>
+                      <input type="file" accept="video/*" capture="environment" style={{display:'none'}} onChange={e=>setDepartureVideo(e.target.files[0]||null)} />
+                    </label>
+                    <label style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:5,padding:'6px 10px',marginTop:6,background:'transparent',border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
+                      🖼️ Or upload from gallery
+                      <input type="file" accept="video/*" style={{display:'none'}} onChange={e=>setDepartureVideo(e.target.files[0]||null)} />
+                    </label>
+                  </>
                 )}
               </div>
             </div>
