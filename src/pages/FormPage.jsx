@@ -319,6 +319,11 @@ export default function FormPage() {
   const [saveError,  setSaveError] = useState(null)
   const [draftSaved, setDraftSaved]= useState(false)
   const [hasDraft,   setHasDraft]  = useState(false)
+  // Partial-failure retry state. When some photos fail to upload, we keep the
+  // saved submission (already in DB) and the list of failed entries so the
+  // tech can retry just those — no new submission, no duplicate metadata rows.
+  const [pendingSubmission, setPendingSubmission] = useState(null)  // { id, pm_number }
+  const [failedEntries,     setFailedEntries]     = useState([])    // [{photo, section, order}]
   const draftTimerRef = useRef(null)
 
   const effBill      = parseInt(billableTechs)||techs.length||1
@@ -439,6 +444,81 @@ export default function FormPage() {
 
   const toDataUrl = file=>new Promise((res,rej)=>{ const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file) })
 
+  // Generate the PDF, fire the email, clean up the draft, and navigate away.
+  // Used by both the initial submit (when all photos succeed) and the retry path
+  // (after a successful re-upload of previously-failed photos).
+  const finalizeSubmission = async (submission) => {
+    let pdfBase64 = null;
+    try {
+      const full = await fetchSubmission(submission.id);
+      const { getPhotoUrl } = await import('../lib/submissions');
+      const pdfData = await buildPDFData(full, (path) => getPhotoUrl(path));
+      const { createRoot, flushSync } = await import('react-dom/client');
+      const { createElement } = await import('react');
+      const html2pdf = await import('html2pdf.js').then(m => m.default || m);
+      const container = document.createElement('div');
+      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;background:white;z-index:-1;';
+      document.body.appendChild(container);
+      const root = createRoot(container);
+      flushSync(() => { root.render(createElement(WorkOrderPDFTemplate, { data: pdfData })); });
+      await new Promise(resolve => {
+        setTimeout(async () => {
+          const imgs = Array.from(container.querySelectorAll('img'));
+          await Promise.allSettled(imgs.map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })));
+          resolve();
+        }, 500);
+      });
+      pdfBase64 = await html2pdf().set({
+        margin: 0,
+        image: { type: 'jpeg', quality: 0.92 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: false },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+      }).from(container).outputPdf('datauristring').then(uri => uri.split(',')[1]);
+      container.remove();
+    } catch (e) {
+      console.warn('PDF gen failed:', e);
+    }
+    fetch('/api/send-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submissionId: submission.id, pdfBase64 }),
+    }).then(async r => {
+      if (!r.ok) {
+        const txt = await r.text().catch(() => r.statusText || '');
+        throw new Error('HTTP ' + r.status + ' — ' + (txt || '').slice(0, 240));
+      }
+    }).catch(err => {
+      console.error('Email send failed:', err);
+      alert('Email failed for PM #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe submission was saved. Open it from the list and use "Send Report" to retry.');
+    });
+    try { localStorage.removeItem(draftKey) } catch(e) {}
+    setPendingSubmission(null);
+    setFailedEntries([]);
+    navigate('/submissions');
+  };
+
+  // Re-upload only the previously-failed photos against the existing submission.
+  // No new submission is created; storage uses x-upsert so duplicate file writes
+  // are harmless; metadata rows are only inserted for the entries we actually retry.
+  const handleRetry = async () => {
+    if (!pendingSubmission || failedEntries.length === 0) return;
+    setSaving(true); setSaveError(null);
+    try {
+      const upRes = await uploadPhotos(pendingSubmission.id, failedEntries);
+      if (upRes && upRes.failed > 0) {
+        setFailedEntries(upRes.failedEntries || []);
+        setSaveError(`Still ${upRes.failed} of ${upRes.total} failed. Tap retry again, or move to better signal first. The submission (PM #${pendingSubmission.pm_number || ''}) is already saved.`);
+        setSaving(false);
+        return;
+      }
+      await finalizeSubmission(pendingSubmission);
+    } catch (err) {
+      console.error('Retry error:', err);
+      setSaveError(err?.message || 'Retry failed.');
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (isDemo) { setSaveError('Demo mode — read only'); return }
     if(!customerName||!locationName){setSaveError('Customer and location are required');return}
@@ -484,68 +564,21 @@ export default function FormPage() {
       if(submission?.id&&Object.keys(photoDataUrls).length>0){
         const upRes=await uploadPhotos(submission.id,photoDataUrls)
         if(upRes&&upRes.failed>0){
-          setSaveError(`Submission saved (PM #${submission.pm_number||''}) but ${upRes.failed} of ${upRes.total} photos failed to upload — check your signal and re-submit, or edit this submission later to add the missing photos.`)
+          // Stash submission + the specific failed entries so the tech can retry
+          // ONLY the failed ones via the "Retry photo upload" button — preserving
+          // their original order indices so storage paths don't collide and DB
+          // metadata rows don't duplicate.
+          setPendingSubmission({ id: submission.id, pm_number: submission.pm_number })
+          setFailedEntries(upRes.failedEntries || [])
+          setSaveError(`${upRes.failed} of ${upRes.total} photos failed to upload. Submission saved as PM #${submission.pm_number||''}. Tap "Retry photo upload" below — only the failed photos will re-upload.`)
           setSaving(false)
           return
         }
       }
-              if (submission?.id) {
-                          let pdfBase64 = null;
-                          try {
-                                        const full = await fetchSubmission(submission.id);
-                                        const { getPhotoUrl } = await import('../lib/submissions');
-                                        const pdfData = await buildPDFData(full, (path) => getPhotoUrl(path));
-                                        const { createRoot, flushSync } = await import('react-dom/client');
-                                        const { createElement }         = await import('react');
-                                        const html2pdf = await import('html2pdf.js').then(m => m.default || m);
-                                        const container = document.createElement('div');
-                                        container.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;background:white;z-index:-1;';
-                                        document.body.appendChild(container);
-                                        const root = createRoot(container);
-                                        flushSync(() => { root.render(createElement(WorkOrderPDFTemplate, { data: pdfData })); });
-                                        // Wait for all images to load before capturing
-                                        await new Promise(resolve => {
-                                                        setTimeout(async () => {
-                                                                          const imgs = Array.from(container.querySelectorAll('img'));
-                                                                          await Promise.allSettled(
-                                                                                              imgs.map(img =>
-                                                                                                                    img.complete
-                                                                                                                      ? Promise.resolve()
-                                                                                                                      : new Promise(r => { img.onload = r; img.onerror = r; })
-                                                                                                                         )
-                                                                                            );
-                                                                          resolve();
-                                                        }, 500);
-                                        });
-                                        pdfBase64 = await html2pdf()
-                                                        .set({
-                                                                          margin: 0,
-                                                                          image:       { type: 'jpeg', quality: 0.92 },
-                                                                          html2canvas: { scale: 2, useCORS: true, allowTaint: false },
-                                                                          jsPDF:       { unit: 'in', format: 'letter', orientation: 'portrait' },
-                                                        })
-                                                        .from(container)
-                                                        .outputPdf('datauristring')
-                                                        .then(uri => uri.split(',')[1]);
-                                        container.remove();
-                          } catch (e) {
-                                        console.warn('PDF gen failed:', e);
-                          }
-                          fetch('/api/send-report', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ submissionId: submission.id, pdfBase64 }),
-                          }).then(async r => {
-                                        if (!r.ok) {
-                                                      const txt = await r.text().catch(() => r.statusText || '');
-                                                      throw new Error('HTTP ' + r.status + ' — ' + (txt || '').slice(0, 240));
-                                        }
-                          }).catch(err => {
-                                        console.error('Email send failed:', err);
-                                        alert('Email failed for PM #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe submission was saved. Open it from the list and use "Send Report" to retry.');
-                          });
-              }try{localStorage.removeItem(draftKey)}catch(e){}
-      navigate('/submissions')
+      if (submission?.id) {
+        await finalizeSubmission(submission)
+        return
+      }
     }catch(err){
       console.error('Submit error:',err)
       if(!navigator.onLine){ try{queueOfflineSubmission({jobType,customerName,locationName,date,description});navigate('/submissions');return}catch(e){} }
@@ -1168,10 +1201,17 @@ export default function FormPage() {
             style={{width:'100%',padding:13,background:draftSaved?T.green:T.inputBg,color:draftSaved?'#fff':T.muted,border:`1.5px solid ${draftSaved?T.green:T.border}`,borderRadius:9,fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
             {draftSaved?'✅ Draft Saved!':'💾 Save Draft'}
           </button>
-          <button type="button" onClick={handleSubmit} disabled={saving}
-            style={{width:'100%',padding:18,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
-            {saving?'⏳ Saving…':`Submit ${jtConfig.short} — ${jtConfig.icon} ${jobType}`}
-          </button>
+          {pendingSubmission ? (
+            <button type="button" onClick={handleRetry} disabled={saving}
+              style={{width:'100%',padding:18,background:saving?'#9ca3af':'#dc2626',color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(220,38,38,0.32)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
+              {saving?'⏳ Retrying…':`🔄 Retry photo upload (${failedEntries.length} ${failedEntries.length===1?'photo':'photos'})`}
+            </button>
+          ) : (
+            <button type="button" onClick={handleSubmit} disabled={saving}
+              style={{width:'100%',padding:18,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
+              {saving?'⏳ Saving…':`Submit ${jtConfig.short} — ${jtConfig.icon} ${jobType}`}
+            </button>
+          )}
         </div>
 
       <PhotoLightbox photos={photos} idx={lightboxIdx} onClose={()=>setLightboxIdx(-1)} onPrev={()=>setLightboxIdx(i=>i-1)} onNext={()=>setLightboxIdx(i=>i+1)} />

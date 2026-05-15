@@ -260,11 +260,21 @@ export async function removeFromOfflineQueue(id) {
 
 // — PHOTOS ————————————————————————————————————————————————————————————
 export async function uploadPhotos(submissionId, photosOrObj, section) {
-    if (!submissionId) return [];
+    if (!submissionId) return { rows: [], uploaded: 0, failed: 0, total: 0, failedEntries: [] };
 
-    // Normalize input: accept either array (legacy) or { sectionKey: [{dataUrl, caption, file}] }
+    // Normalize input. Accepts:
+    //  1. Array of {file/dataUrl, caption}     (legacy: section param applies to all, order = index)
+    //  2. { sectionKey: [{file/dataUrl, ...}] } (object form: order = array index per section)
+    //  3. Array of {photo, section, order}     (entries-already-normalized form, used by retries
+    //                                           so we can preserve the ORIGINAL order index for
+    //                                           failed photos and avoid storage-path collisions
+    //                                           or duplicate metadata rows)
     const entries = [];
-    if (Array.isArray(photosOrObj)) {
+    if (Array.isArray(photosOrObj) && photosOrObj.length > 0
+        && photosOrObj[0] && typeof photosOrObj[0] === 'object'
+        && 'photo' in photosOrObj[0] && 'section' in photosOrObj[0] && 'order' in photosOrObj[0]) {
+          for (const e of photosOrObj) entries.push({ photo: e.photo, section: e.section, order: e.order });
+    } else if (Array.isArray(photosOrObj)) {
           const sec = section || 'work';
           photosOrObj.forEach((p, i) => entries.push({ photo: p, section: sec, order: i }));
     } else if (photosOrObj && typeof photosOrObj === 'object') {
@@ -274,7 +284,7 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
           }
     }
 
-    if (entries.length === 0) return [];
+    if (entries.length === 0) return { rows: [], uploaded: 0, failed: 0, total: 0, failedEntries: [] };
 
     const token = getAuthToken();
     const storageBase = SUPA_URL + '/storage/v1/object/submission-photos/';
@@ -394,18 +404,20 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
     // while still being faster than serial.
     const BATCH = 3;
     const rows = [];
+    const failedEntries = [];
     let uploaded = 0;
     let failed = 0;
     for (let i = 0; i < entries.length; i += BATCH) {
           const batch = entries.slice(i, i + BATCH);
           const batchResults = await Promise.all(batch.map(uploadOne));
-          for (const r of batchResults) {
+          for (let j = 0; j < batchResults.length; j++) {
+                  const r = batchResults[j];
                   if (r && r.ok) { uploaded++; if (r.row) rows.push(r.row); }
-                  else failed++;
+                  else { failed++; failedEntries.push(batch[j]); }
           }
     }
 
-    return { rows, uploaded, failed, total: entries.length };
+    return { rows, uploaded, failed, total: entries.length, failedEntries };
 }
 export async function fetchSubmissions(userId) {
   try {
