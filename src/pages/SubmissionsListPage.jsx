@@ -140,6 +140,8 @@ export default function SubmissionsListPage() {
     window.location.replace('/login')
   }
 
+  const isAssignedDraft = (s) => !!(s && s.data && s.data.assignedBy && s.status === 'draft')
+
   const filtered = submissions.filter(s => {
     const q = search.toLowerCase().trim()
     const lbl = getTypeLabel(s)
@@ -153,6 +155,17 @@ export default function SubmissionsListPage() {
     ].filter(Boolean).join(' ').toLowerCase()
     return matchesType && haystack.includes(q)
   })
+  // Assigned-but-not-yet-started jobs float to the top regardless of date,
+  // so a dispatch from the office is the first thing the tech sees when
+  // they open the app. Within each group we preserve fetchSubmissions'
+  // existing created_at DESC ordering.
+  .sort((a, b) => {
+    const ad = isAssignedDraft(a) ? 1 : 0
+    const bd = isAssignedDraft(b) ? 1 : 0
+    return bd - ad
+  })
+
+  const assignedDraftCount = submissions.filter(isAssignedDraft).length
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -194,6 +207,13 @@ export default function SubmissionsListPage() {
       {/* NAV — two rows so buttons never overflow on small screens */}
       <NavBar user={user} isAdmin={isAdmin} isDemo={isDemo} onLogout={handleLogout} loggingOut={loggingOut} />
 
+      {!loading && !error && assignedDraftCount > 0 && (
+        <div style={{ background: 'linear-gradient(90deg, #ea580c, #f97316)', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>
+          <span style={{ fontSize: 16 }}>📤</span>
+          You have {assignedDraftCount} job{assignedDraftCount !== 1 ? 's' : ''} assigned by office — tap below to start
+        </div>
+      )}
+
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '12px 12px 80px' }}>
         {/* SEARCH + FILTER */}
         <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -224,7 +244,29 @@ export default function SubmissionsListPage() {
           </div>
         )}
 
-        {loading && <p style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Loading...</p>}
+        {loading && (
+          <div aria-label="Loading submissions">
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ background: '#fff', borderRadius: 14, marginBottom: 12, boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05)', overflow: 'hidden' }}>
+                <div style={{ height: 3, background: '#e2e8f0' }} />
+                <div style={{ padding: '14px 16px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ height: 11, width: 60, background: '#e2e8f0', borderRadius: 4, marginBottom: 8, animation: 'ros-skel 1.4s ease-in-out infinite' }} />
+                      <div style={{ height: 16, width: '70%', background: '#e2e8f0', borderRadius: 4, marginBottom: 6, animation: 'ros-skel 1.4s ease-in-out infinite' }} />
+                      <div style={{ height: 12, width: '50%', background: '#e2e8f0', borderRadius: 4, animation: 'ros-skel 1.4s ease-in-out infinite' }} />
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ height: 11, width: 50, background: '#e2e8f0', borderRadius: 4, marginBottom: 6, marginLeft: 'auto', animation: 'ros-skel 1.4s ease-in-out infinite' }} />
+                      <div style={{ height: 16, width: 70, background: '#e2e8f0', borderRadius: 4, marginLeft: 'auto', animation: 'ros-skel 1.4s ease-in-out infinite' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <style>{'@keyframes ros-skel { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }'}</style>
+          </div>
+        )}
         {error && <p style={{ textAlign: 'center', color: '#e65c00', marginTop: 40 }}>Error: {error}</p>}
         {!loading && !error && filtered.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: 60, color: '#888' }}>
