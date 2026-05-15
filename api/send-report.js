@@ -505,7 +505,7 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     y -= 22;
     var costRows = [
       ['Parts & Materials:', fmtMoney(partsTotal)],
-      ['Labor ('+laborHours.toFixed(1)+' hrs @ '+fmtMoney(laborRate)+'/hr):', fmtMoney(laborTotal)],
+      ['Labor ('+(Math.round(laborHours * 100) / 100)+' hrs @ '+fmtMoney(laborRate)+'/hr):', fmtMoney(laborTotal)],
       ['Mileage ('+mileage+' mi @ '+fmtMoney(mileageRate)+'/mi):', fmtMoney(mileageTotal)],
     ];
     for (var ci=0; ci<costRows.length; ci++) {
