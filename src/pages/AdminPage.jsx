@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken } from '../lib/submissions'
+import { supabase } from '../lib/supabase'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -1003,6 +1004,33 @@ export default function AdminPage() {
       .finally(() => setLoading(false))
   }, [isAdmin, authLoading])
 
+  // Realtime: any insert/update/delete on submissions re-fetches the list so
+  // the admin sees new submissions appear without refreshing. Falls back
+  // silently if the realtime channel can't be established — initial fetch
+  // above still works either way.
+  const [realtimeStatus, setRealtimeStatus] = useState('connecting')
+  useEffect(() => {
+    if (authLoading) return
+    if (!isAdmin) return
+    if (!supabase) return
+    let cancelled = false
+    const channel = supabase
+      .channel('admin-submissions-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, () => {
+        if (cancelled) return
+        fetchAllSubmissions().then(rows => { if (!cancelled) setSubmissions(rows) }).catch(() => {})
+      })
+      .subscribe(status => {
+        if (cancelled) return
+        if (status === 'SUBSCRIBED') setRealtimeStatus('live')
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setRealtimeStatus('offline')
+      })
+    return () => {
+      cancelled = true
+      try { supabase.removeChannel(channel) } catch {}
+    }
+  }, [isAdmin, authLoading])
+
   if (authLoading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading...</div>
   if (!isAdmin) return <Navigate to="/submissions" replace />
 
@@ -1242,6 +1270,10 @@ export default function AdminPage() {
             {!loading && !error && (
               <div style={{ fontSize: 12, color: '#888', marginBottom: 8, paddingLeft: 4 }}>
                 {filtered.length === submissions.length ? submissions.length + ' submissions' : filtered.length + ' of ' + submissions.length + ' submissions'}
+                <span title={realtimeStatus === 'live' ? 'New submissions appear automatically' : 'Auto-refresh unavailable — reload to see latest'} style={{ marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: realtimeStatus === 'live' ? '#16a34a' : '#9ca3af' }}>
+                  <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: realtimeStatus === 'live' ? '#16a34a' : '#9ca3af', boxShadow: realtimeStatus === 'live' ? '0 0 0 2px rgba(22,163,74,0.25)' : 'none' }}></span>
+                  {realtimeStatus === 'live' ? 'LIVE' : realtimeStatus === 'connecting' ? 'CONNECTING…' : 'OFFLINE'}
+                </span>
               </div>
             )}
 
