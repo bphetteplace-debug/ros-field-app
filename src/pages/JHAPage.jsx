@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
+import { saveDraft as saveDraftToStore, loadDraft as loadDraftFromStore, clearDraft as clearDraftFromStore } from '../lib/draftStore'
 
 const PPE_ITEMS = [
   'Hard Hat', 'Safety Glasses / Goggles', 'Face Shield', 'High-Vis Vest / Coveralls',
@@ -82,24 +83,26 @@ export default function JHAPage() {
        supervisor, crewMembers, steps, selectedPPE, emergencyContact,
        nearestHospital, meetingPoint, additionalHazards])
 
-  const saveDraft = useCallback(() => {
+  const saveDraft = useCallback(async () => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...getDraftData(), savedAt: new Date().toISOString() }))
+      await saveDraftToStore('jha', { ...getDraftData(), savedAt: new Date().toISOString() }, photos)
       setDraftSaved(true)
       setTimeout(() => setDraftSaved(false), 2000)
-    } catch(e) {}
-  }, [getDraftData])
+    } catch(e) { console.warn('[JHA] saveDraft failed:', e?.message || e) }
+  }, [getDraftData, photos])
 
-  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY) } catch(e) {} }
+  const clearDraft = async () => { try { await clearDraftFromStore('jha') } catch(e) {} }
 
-  // Auto-save every 2s on changes
+  // Auto-save every 2s on changes (photos included — they're stored as
+  // Blobs in IDB and persist across reloads, unlike the old localStorage
+  // pattern which lost them).
   useEffect(() => {
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
     draftTimerRef.current = setTimeout(saveDraft, 2000)
     return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current) }
   }, [techName, truckNumber, date, jobLocation, workOrder, jobDescription,
       supervisor, crewMembers, steps, selectedPPE, emergencyContact,
-      nearestHospital, meetingPoint, additionalHazards, saveDraft])
+      nearestHospital, meetingPoint, additionalHazards, photos, saveDraft])
 
   useEffect(() => {
     fetchSettings().then(s => {
@@ -112,10 +115,14 @@ export default function JHAPage() {
   useEffect(() => {
     if (profile?.full_name) setTechName(profile.full_name)
     if (profile?.truck_number) setTruckNumber(profile.truck_number)
-    // Load draft
-    try {
-      const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
-      if (saved) {
+    // Load draft from IDB (falls back to legacy localStorage if a tech
+    // is mid-shift across the deploy — see draftStore.loadDraft).
+    let cancelled = false
+    ;(async () => {
+      try {
+        const draft = await loadDraftFromStore('jha')
+        if (cancelled || !draft) return
+        const saved = draft.fields || {}
         if (saved.techName) setTechName(saved.techName)
         if (saved.truckNumber) setTruckNumber(saved.truckNumber)
         if (saved.date) setDate(saved.date)
@@ -130,8 +137,14 @@ export default function JHAPage() {
         if (saved.nearestHospital) setNearestHospital(saved.nearestHospital)
         if (saved.meetingPoint) setMeetingPoint(saved.meetingPoint)
         if (saved.additionalHazards) setAdditionalHazards(saved.additionalHazards)
+        if (Array.isArray(draft.photos) && draft.photos.length > 0) {
+          setPhotos(draft.photos)
+        }
+      } catch (e) {
+        console.warn('[JHA] loadDraft failed:', e?.message || e)
       }
-    } catch(e) {}
+    })()
+    return () => { cancelled = true }
   }, [profile?.full_name, profile?.truck_number])
 
   const updStep = (i, k, v) => setSteps(ss => ss.map((s, idx) => idx === i ? { ...s, [k]: v } : s))
@@ -209,7 +222,7 @@ export default function JHAPage() {
         const token = getAuthToken()
         fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: submission.id, userToken: token }) }).then(async r => { if (!r.ok) { const t = await r.text().catch(() => r.statusText || ''); throw new Error('HTTP ' + r.status + ' — ' + (t || '').slice(0, 240)); } }).catch(err => { console.error('Email send failed:', err); alert('Email failed for JHA #' + (submission.pm_number || submission.id) + '\n\n' + (err.message || err) + '\n\nThe JHA was saved. Open it from the list and use "Send Report" to retry.'); })
       } catch(_) {}
-      clearDraft()
+      await clearDraft()
       navigate('/submissions')
     } catch(e) {
       setSaveError(e.message || 'Save failed')
