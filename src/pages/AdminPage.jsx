@@ -544,33 +544,42 @@ function AssignJobAdmin() {
   const [errMsg, setErrMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const token = getAuthToken()
-        const profRes = await fetch(SUPA_URL_P + '/rest/v1/profiles?select=*&order=created_at.asc', {
-          headers: { apikey: SUPA_KEY_P, Authorization: 'Bearer ' + (token || SUPA_KEY_P) }
-        })
-        if (!profRes.ok) throw new Error('Failed to load techs (' + profRes.status + ')')
-        const allProfiles = await profRes.json()
-        const techs = (allProfiles || [])
-          .filter(p => p.email && p.role !== 'read-only')
-          .sort((a, b) => (a.full_name || a.email || '').localeCompare(b.full_name || b.email || ''))
-        const all = await fetchSettings()
-        if (cancelled) return
-        setProfiles(techs)
-        const c = (all && Array.isArray(all.customers) && all.customers.length) ? all.customers : ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS']
-        setCustomers(c)
-      } catch (e) {
-        if (!cancelled) setLoadError(e.message || String(e))
-      } finally {
-        if (!cancelled) setLoading(false)
+  const reloadProfiles = useCallback(async () => {
+    setLoadError(null)
+    setLoading(true)
+    try {
+      const token = getAuthToken()
+      const profRes = await fetch(SUPA_URL_P + '/rest/v1/profiles?select=*&order=created_at.asc', {
+        cache: 'no-store',
+        headers: {
+          apikey: SUPA_KEY_P,
+          Authorization: 'Bearer ' + (token || SUPA_KEY_P),
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      })
+      if (!profRes.ok) {
+        const txt = await profRes.text().catch(() => '')
+        throw new Error('Failed to load techs (HTTP ' + profRes.status + (txt ? ' — ' + txt.slice(0, 120) : '') + ')')
       }
+      const allProfiles = await profRes.json()
+      console.log('[AssignJobAdmin] profiles fetched:', allProfiles)
+      const techs = (allProfiles || [])
+        .filter(p => p && p.role !== 'read-only')
+        .sort((a, b) => (a.full_name || a.email || '').localeCompare(b.full_name || b.email || ''))
+      const all = await fetchSettings()
+      setProfiles(techs)
+      const c = (all && Array.isArray(all.customers) && all.customers.length) ? all.customers : ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS']
+      setCustomers(c)
+    } catch (e) {
+      console.error('[AssignJobAdmin] load failed:', e)
+      setLoadError(e.message || String(e))
+    } finally {
+      setLoading(false)
     }
-    load()
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => { reloadProfiles() }, [reloadProfiles])
 
   const resetForm = () => {
     setAssignedToId('')
@@ -591,6 +600,7 @@ function AssignJobAdmin() {
     if (!customerWorkOrder.trim()) { setErrMsg('Customer WO/PO# is required.'); return }
     const tech = profiles.find(p => p.id === assignedToId)
     if (!tech) { setErrMsg('Selected tech not found — reload the page.'); return }
+    if (!tech.email) { setErrMsg('This tech has no email on file — fix it in the Users tab first, then come back.'); return }
 
     setSubmitting(true)
     try {
@@ -673,11 +683,25 @@ function AssignJobAdmin() {
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 14 }}>
           <div>
-            <label style={lbl}>Assign To {req}</label>
+            <label style={lbl}>
+              Assign To {req}
+              <button
+                type='button'
+                onClick={reloadProfiles}
+                disabled={loading}
+                title='Re-fetch the list of techs from the database'
+                style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#0891b2', background: 'transparent', border: '1px solid #0891b2', borderRadius: 12, padding: '1px 8px', cursor: loading ? 'wait' : 'pointer', textTransform: 'none', letterSpacing: 0 }}
+              >
+                {loading ? 'Loading…' : '↻ Refresh'}
+              </button>
+              <span style={{ marginLeft: 8, fontSize: 10, color: '#888', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
+                {profiles.length} found
+              </span>
+            </label>
             <select value={assignedToId} onChange={e => setAssignedToId(e.target.value)} style={inp} required>
               <option value=''>— Pick a tech —</option>
               {profiles.map(p => (
-                <option key={p.id} value={p.id}>{p.full_name || p.email}{p.email ? ' (' + p.email + ')' : ''}</option>
+                <option key={p.id} value={p.id}>{p.full_name || p.email || p.id}{p.email ? ' (' + p.email + ')' : ' — NO EMAIL'}</option>
               ))}
             </select>
           </div>
