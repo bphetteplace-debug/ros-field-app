@@ -33,7 +33,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 const DEFAULT_TAGS = ['Before', 'After', 'Damage', 'Repair', 'Site'];
 
-function SortableItem({ item, onRemove, onCaption, onItemTap, quickTags, T }) {
+function SortableItem({ item, index, total, onRemove, onCaption, onItemTap, onMove, quickTags, T }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -45,10 +45,8 @@ function SortableItem({ item, onRemove, onCaption, onItemTap, quickTags, T }) {
   return (
     <div ref={setNodeRef} style={{ ...style, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', border: '1px solid ' + T.border, boxShadow: '0 2px 6px rgba(15,23,42,0.06)', background: '#f1f5f9' }}>
-        {/* The image itself opens the lightbox on tap. It deliberately does
-            NOT receive the drag listeners — on iOS Safari long-press on an
-            <img> triggers the OS "Save Image" sheet, which preempts dnd-kit
-            and is the reason drag-to-reorder was failing on phones. */}
+        {/* Tap image to open lightbox. WebkitTouchCallout:none suppresses
+            the iOS "Save Image" action sheet so it doesn't preempt drag. */}
         <img
           src={src}
           alt={item.caption || ''}
@@ -56,43 +54,67 @@ function SortableItem({ item, onRemove, onCaption, onItemTap, quickTags, T }) {
           draggable={false}
           style={{
             width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in',
-            // Suppress the iOS image action sheet and selection halo.
             WebkitTouchCallout: 'none',
             WebkitUserSelect: 'none',
             userSelect: 'none',
-            // Don't let the browser interpret touches on the image as scroll
-            // or zoom gestures — they're either a tap (lightbox) or pass
-            // through to the drag handle.
             touchAction: 'manipulation',
             pointerEvents: 'auto',
           }}
         />
-        {/* Drag handle — explicit, discoverable target for reordering.
-            This is the element wired to dnd-kit's listeners + attributes,
-            so a tap on the rest of the tile stays "open lightbox" / "remove". */}
-        <button
-          type="button"
+        {/* Position badge — shows "3 / 12" so the tech knows where each
+            photo sits in the order. */}
+        <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(15,31,56,0.82)', color: '#fff', borderRadius: 6, padding: '2px 6px', fontSize: 10, fontWeight: 800, letterSpacing: 0.3, zIndex: 2 }} className="id-mono">
+          {index + 1}<span style={{opacity:0.55}}>/{total}</span>
+        </div>
+        {/* Drag handle — dnd-kit activator for desktop / capable touch
+            devices. Not the primary reorder UX; the up/down arrows below
+            the photo are the always-works fallback. */}
+        <div
           {...listeners}
           {...attributes}
           aria-label="Drag to reorder"
           title="Drag to reorder"
+          role="button"
           style={{
-            position: 'absolute', top: 6, left: 6,
+            position: 'absolute', bottom: 6, left: 6,
             background: 'rgba(15,31,56,0.82)', color: '#fff',
-            border: 'none', borderRadius: 6,
-            width: 28, height: 28, fontSize: 14, fontWeight: 700,
+            borderRadius: 6,
+            width: 26, height: 26, fontSize: 13, fontWeight: 700,
             cursor: isDragging ? 'grabbing' : 'grab',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-            touchAction: 'none', // dnd-kit needs touch-action:none on the activator
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            touchAction: 'none',
             zIndex: 2,
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
-        >⋮⋮</button>
+        >⋮⋮</div>
         <button
           type="button"
           onClick={() => onRemove(item.id)}
           aria-label="Remove photo"
-          style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(15,31,56,0.82)', color: '#fff', border: 'none', borderRadius: '50%', width: 24, height: 24, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontWeight: 700, zIndex: 2 }}
+          style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(15,31,56,0.82)', color: '#fff', border: 'none', borderRadius: '50%', width: 26, height: 26, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontWeight: 700, zIndex: 2 }}
         >×</button>
+        {/* Up / Down arrow row — pinned to the bottom-right of the tile.
+            Always-works reorder fallback. Tap to step the photo's position
+            one slot earlier or later in the list. Disabled at the ends. */}
+        <div style={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', gap: 4, zIndex: 2 }}>
+          <button
+            type="button"
+            onClick={() => onMove && onMove(item.id, -1)}
+            disabled={index === 0}
+            aria-label="Move earlier"
+            title="Move earlier"
+            style={{ background: 'rgba(15,31,56,0.82)', color: '#fff', border: 'none', borderRadius: 6, width: 26, height: 26, fontSize: 14, cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontWeight: 700 }}
+          >◂</button>
+          <button
+            type="button"
+            onClick={() => onMove && onMove(item.id, 1)}
+            disabled={index === total - 1}
+            aria-label="Move later"
+            title="Move later"
+            style={{ background: 'rgba(15,31,56,0.82)', color: '#fff', border: 'none', borderRadius: 6, width: 26, height: 26, fontSize: 14, cursor: index === total - 1 ? 'not-allowed' : 'pointer', opacity: index === total - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontWeight: 700 }}
+          >▸</button>
+        </div>
       </div>
       {quickTags && quickTags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
@@ -150,17 +172,30 @@ export default function SortablePhotoGrid({ items, onReorder, onRemove, onCaptio
     onReorder(arrayMove(items, oldIdx, newIdx));
   };
 
+  // Step one slot earlier (-1) or later (+1). Used by the always-works
+  // arrow buttons that complement drag-to-reorder.
+  const handleMove = (id, delta) => {
+    const oldIdx = items.findIndex(i => i.id === id);
+    if (oldIdx === -1) return;
+    const newIdx = Math.max(0, Math.min(items.length - 1, oldIdx + delta));
+    if (newIdx === oldIdx) return;
+    onReorder(arrayMove(items, oldIdx, newIdx));
+  };
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
-          {items.map(item => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+          {items.map((item, index) => (
             <SortableItem
               key={item.id}
               item={item}
+              index={index}
+              total={items.length}
               onRemove={onRemove}
               onCaption={onCaption}
               onItemTap={onItemTap}
+              onMove={handleMove}
               quickTags={quickTags}
               T={T}
             />
