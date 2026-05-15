@@ -181,6 +181,7 @@ export async function createAssignedSubmission({
   const effectiveJobType = jobType === 'PM' ? 'PM' : 'Service Call';
   const template = effectiveJobType === 'PM' ? 'pm_flare_combustor' : 'service_call';
   const wo = String(await getNextWoNumber());
+  const today = new Date().toISOString().slice(0, 10);
   const payload = {
     created_by: assignedToUserId,
     pm_number: parseInt(wo, 10),
@@ -191,6 +192,13 @@ export async function createAssignedSubmission({
     work_order: wo,
     work_type: workType || '',
     summary: description || '',
+    date: dueDate || today,
+    start_time: null,
+    departure_time: null,
+    miles: 0,
+    cost_per_mile: 0,
+    labor_hours: 0,
+    labor_rate: 0,
     data: {
       jobType: effectiveJobType,
       customerWorkOrder,
