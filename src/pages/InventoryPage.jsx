@@ -7,9 +7,17 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 async function supaRest(path, opts) {
-  var res = await fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }
-  }, opts))
+  opts = opts || {}
+  var tokenKey = Object.keys(localStorage).find(function(k) { return k.startsWith('sb-') && k.endsWith('-auth-token') })
+  var token = null
+  try { token = tokenKey ? JSON.parse(localStorage.getItem(tokenKey))?.access_token : null } catch { token = null }
+  var headers = Object.assign({
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': 'Bearer ' + (token || SUPABASE_ANON_KEY),
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  }, opts.headers || {})
+  var res = await fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, opts, { headers: headers }))
   if (!res.ok) { var e = await res.json(); throw new Error(e.message || res.statusText) }
   return res.status === 204 ? null : res.json()
 }
@@ -100,6 +108,9 @@ export default function InventoryPage() {
   var [loggingOut, setLoggingOut] = useState(false)
   var [allInventories, setAllInventories] = useState([])
   var [selectedTech, setSelectedTech] = useState(null)
+  var [techProfiles, setTechProfiles] = useState([])
+  var [techsLoading, setTechsLoading] = useState(false)
+  var [techsError, setTechsError] = useState(null)
   var [catalog, setCatalog] = useState([])
 
   var handleLogout = useCallback(async function() {
@@ -152,6 +163,19 @@ export default function InventoryPage() {
       .catch(function(e) { console.error(e) })
   }, [isAdmin])
 
+  // Load tech profiles for admin's tech-selector dropdown
+  useEffect(function() {
+    if (!isAdmin) return
+    setTechsLoading(true); setTechsError(null)
+    supaRest('profiles?select=id,full_name,role&order=full_name.asc', {})
+      .then(function(rows) { setTechProfiles(rows || []); setTechsLoading(false) })
+      .catch(function(e) {
+        console.warn('Load tech profiles error:', e)
+        setTechsError(e.message || 'Failed to load technicians')
+        setTechsLoading(false)
+      })
+  }, [isAdmin])
+
   async function saveParts() {
     setSaving(true)
     try {
@@ -160,7 +184,7 @@ export default function InventoryPage() {
       if (tab === 'truck' && isAdmin && selectedTech) ownerId = selectedTech
       await supaRest('inventory', {
         method: 'POST',
-        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' },
+        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
         body: JSON.stringify({ owner_id: ownerId, inventory_type: invType, parts: parts, updated_at: new Date().toISOString() })
       })
       setSaved(true)
@@ -222,12 +246,50 @@ export default function InventoryPage() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <button onClick={function() { setTab('truck') }} style={{ padding: '8px 20px', borderRadius: 6, border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer', background: tab === 'truck' ? '#1a56db' : '#e5e7eb', color: tab === 'truck' ? '#fff' : '#374151' }}>My Truck</button>
           {isAdmin && (
             <button onClick={function() { setTab('shop') }} style={{ padding: '8px 20px', borderRadius: 6, border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer', background: tab === 'shop' ? '#7c3aed' : '#e5e7eb', color: tab === 'shop' ? '#fff' : '#374151' }}>Shop Inventory</button>
           )}
         </div>
+
+        {/* ADMIN TECH SELECTOR */}
+        {isAdmin && tab === 'truck' && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: selectedTech ? '#fef3c7' : '#fff', border: '1px solid ' + (selectedTech ? '#fcd34d' : '#e5e7eb'), borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>👤 Viewing truck:</span>
+            <select
+              value={selectedTech || ''}
+              onChange={function(e) { setSelectedTech(e.target.value || null) }}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, fontWeight: 600, minWidth: 220, background: '#fff', cursor: 'pointer' }}
+            >
+              <option value="">My Truck (self)</option>
+              {techProfiles
+                .filter(function(p) { return p.id !== (user && user.id) })
+                .map(function(p) {
+                  return <option key={p.id} value={p.id}>{p.full_name || ('Tech ' + String(p.id).slice(0, 8))}</option>
+                })}
+            </select>
+            {selectedTech && (
+              <button
+                onClick={function() { setSelectedTech(null) }}
+                style={{ background: 'none', border: '1px solid #92400e', color: '#92400e', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+              >
+                ← Back to my truck
+              </button>
+            )}
+            {selectedTech && (
+              <span style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>
+                ⚠ Editing another tech's inventory — changes save to their truck.
+              </span>
+            )}
+            {techsLoading && (
+              <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>(loading techs…)</span>
+            )}
+            {!techsLoading && techsError && (
+              <span style={{ fontSize: 12, color: '#b91c1c' }} title={techsError}>⚠ Couldn't load tech list</span>
+            )}
+          </div>
+        )}
 
         {catalog.length > 0 && (
           <div style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 8, padding: '8px 14px', marginBottom: 14, fontSize: 13, color: '#0369a1', fontWeight: 600 }}>
