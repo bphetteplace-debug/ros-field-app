@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken, createAssignedSubmission } from '../lib/submissions'
 import { supabase } from '../lib/supabase'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -517,6 +517,244 @@ function SettingsAdmin() {
       <ListSection title='Customers' icon='🏢' list={customers} setter={setCustomers} newVal={newCustomer} setNew={setNewCustomer} listKey='customers' />
       <ListSection title='Trucks' icon='🚛' list={trucks} setter={setTrucks} newVal={newTruck} setNew={setNewTruck} listKey='trucks' />
       <ListSection title='Technicians' icon='👷' list={techs} setter={setTechs} newVal={newTech} setNew={setNewTech} listKey='techs' />
+    </div>
+  )
+}
+
+// ─── ASSIGN JOB ADMIN ────────────────────────────────────────────────────────
+// Admin creates a draft PM/SC pre-assigned to a tech. The tech gets an email
+// with a deep link to /edit/:id, fills in remaining details, and submits.
+function AssignJobAdmin() {
+  const { user, profile } = useAuth()
+  const [profiles, setProfiles] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+
+  const [assignedToId, setAssignedToId] = useState('')
+  const [jobType, setJobType] = useState('Service Call')
+  const [customerName, setCustomerName] = useState('')
+  const [locationName, setLocationName] = useState('')
+  const [customerWorkOrder, setCustomerWorkOrder] = useState('')
+  const [workType, setWorkType] = useState('')
+  const [description, setDescription] = useState('')
+  const [dueDate, setDueDate] = useState('')
+
+  const [submitting, setSubmitting] = useState(false)
+  const [errMsg, setErrMsg] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const token = getAuthToken()
+        const profRes = await fetch(SUPA_URL_P + '/rest/v1/profiles?select=*&order=created_at.asc', {
+          headers: { apikey: SUPA_KEY_P, Authorization: 'Bearer ' + (token || SUPA_KEY_P) }
+        })
+        if (!profRes.ok) throw new Error('Failed to load techs (' + profRes.status + ')')
+        const allProfiles = await profRes.json()
+        const techs = (allProfiles || [])
+          .filter(p => p.email && p.role !== 'read-only')
+          .sort((a, b) => (a.full_name || a.email || '').localeCompare(b.full_name || b.email || ''))
+        const all = await fetchSettings()
+        if (cancelled) return
+        setProfiles(techs)
+        const c = (all && Array.isArray(all.customers) && all.customers.length) ? all.customers : ['Diamondback','High Peak Energy','ExTex','A8 Oilfield Services','Pristine Alliance','KOS']
+        setCustomers(c)
+      } catch (e) {
+        if (!cancelled) setLoadError(e.message || String(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  const resetForm = () => {
+    setAssignedToId('')
+    setJobType('Service Call')
+    setCustomerName('')
+    setLocationName('')
+    setCustomerWorkOrder('')
+    setWorkType('')
+    setDescription('')
+    setDueDate('')
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setErrMsg(''); setSuccessMsg('')
+    if (!assignedToId) { setErrMsg('Pick a tech to assign this job to.'); return }
+    if (!customerName) { setErrMsg('Customer is required.'); return }
+    if (!customerWorkOrder.trim()) { setErrMsg('Customer WO/PO# is required.'); return }
+    const tech = profiles.find(p => p.id === assignedToId)
+    if (!tech) { setErrMsg('Selected tech not found — reload the page.'); return }
+
+    setSubmitting(true)
+    try {
+      const sub = await createAssignedSubmission({
+        assignedToUserId: tech.id,
+        assignedByUserId: user?.id,
+        assignedByName: profile?.full_name || user?.email || 'Office',
+        customerName,
+        locationName,
+        customerWorkOrder: customerWorkOrder.trim(),
+        workType,
+        description,
+        dueDate: dueDate || null,
+        jobType,
+      })
+
+      // Audit + email are fire-and-forget after the DB row is in place — even
+      // if the email fails, the tech can still find the assignment in their list.
+      logAudit({
+        userId: user?.id,
+        userName: profile?.full_name || user?.email,
+        action: 'submission_assigned',
+        targetType: 'submission',
+        targetId: sub.id,
+        details: { assignedTo: tech.full_name || tech.email, jobType, customerName, woNumber: sub.work_order },
+      })
+
+      let emailOk = false
+      let emailErr = ''
+      try {
+        const emailRes = await fetch('/api/notify-assigned', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            submissionId: sub.id,
+            recipientEmail: tech.email,
+            recipientName: tech.full_name,
+            assignedByName: profile?.full_name || user?.email || 'Office',
+          }),
+        })
+        if (emailRes.ok) {
+          emailOk = true
+        } else {
+          const txt = await emailRes.text().catch(() => '')
+          emailErr = 'HTTP ' + emailRes.status + (txt ? ' — ' + txt.slice(0, 200) : '')
+        }
+      } catch (e) {
+        emailErr = e.message || String(e)
+      }
+
+      const techLabel = tech.full_name || tech.email
+      const woLabel = '#' + sub.work_order
+      if (emailOk) {
+        setSuccessMsg('✓ Assigned ' + woLabel + ' to ' + techLabel + ' — email sent to ' + tech.email)
+      } else {
+        setSuccessMsg('✓ Assigned ' + woLabel + ' to ' + techLabel + ' — but EMAIL FAILED: ' + emailErr + '. They\'ll still see it in their list.')
+      }
+      resetForm()
+    } catch (e) {
+      setErrMsg('Assignment failed: ' + (e.message || String(e)))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Loading…</div>
+  if (loadError) return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Error: {loadError}</div>
+
+  const inp = { border: '1px solid #ddd', borderRadius: 6, padding: '9px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none' }
+  const lbl = { fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' }
+  const req = <span style={{ color: '#dc2626' }}>*</span>
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>📤 Assign Job to Tech</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 20 }}>
+        Creates a draft job pre-assigned to a tech. They get an email with a link to open the job in the app, complete it, and submit.
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 14 }}>
+          <div>
+            <label style={lbl}>Assign To {req}</label>
+            <select value={assignedToId} onChange={e => setAssignedToId(e.target.value)} style={inp} required>
+              <option value=''>— Pick a tech —</option>
+              {profiles.map(p => (
+                <option key={p.id} value={p.id}>{p.full_name || p.email}{p.email ? ' (' + p.email + ')' : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={lbl}>Job Type {req}</label>
+            <select value={jobType} onChange={e => setJobType(e.target.value)} style={inp}>
+              <option value='Service Call'>Service Call</option>
+              <option value='PM'>PM</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={lbl}>Customer {req}</label>
+            <select value={customerName} onChange={e => setCustomerName(e.target.value)} style={inp} required>
+              <option value=''>— Pick a customer —</option>
+              {customers.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={lbl}>Customer WO/PO # {req}</label>
+            <input type='text' value={customerWorkOrder} onChange={e => setCustomerWorkOrder(e.target.value)} style={inp} placeholder='e.g. 4521-A' required />
+          </div>
+
+          <div>
+            <label style={lbl}>Location</label>
+            <input type='text' value={locationName} onChange={e => setLocationName(e.target.value)} style={inp} placeholder='Site / pad / lease' />
+          </div>
+
+          <div>
+            <label style={lbl}>Type of Work</label>
+            <input type='text' value={workType} onChange={e => setWorkType(e.target.value)} style={inp} placeholder='e.g. Quarterly PM, Pilot relight' />
+          </div>
+
+          <div>
+            <label style={lbl}>Due Date</label>
+            <input type='date' value={dueDate} onChange={e => setDueDate(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={lbl}>Description / Instructions</label>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={4}
+            style={{ ...inp, fontFamily: 'inherit', resize: 'vertical', minHeight: 80 }}
+            placeholder='What does the tech need to know before they get on site?'
+          />
+        </div>
+
+        {errMsg && (
+          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', borderRadius: 6, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{errMsg}</div>
+        )}
+        {successMsg && (
+          <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#166534', borderRadius: 6, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 600 }}>{successMsg}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            type='submit'
+            disabled={submitting}
+            style={{ background: '#ea580c', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 24px', fontWeight: 800, fontSize: 14, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1 }}
+          >
+            {submitting ? 'Assigning…' : '📤 Assign & Send Email'}
+          </button>
+          <button
+            type='button'
+            onClick={() => { resetForm(); setErrMsg(''); setSuccessMsg('') }}
+            disabled={submitting}
+            style={{ background: 'transparent', color: '#666', border: '1px solid #ddd', borderRadius: 8, padding: '12px 18px', fontWeight: 700, fontSize: 13, cursor: submitting ? 'not-allowed' : 'pointer' }}
+          >
+            Clear
+          </button>
+        </div>
+      </form>
     </div>
   )
 }
@@ -1309,6 +1547,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('submissions')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'submissions' ? '#1a2332' : '#fff', color: activeTab === 'submissions' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             📋 Submissions
           </button>
+          <button onClick={() => setActiveTab('assign')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'assign' ? '#ea580c' : '#fff', color: activeTab === 'assign' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            📤 Assign Job
+          </button>
           <button onClick={() => setActiveTab('expenses')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'expenses' ? '#7c3aed' : '#fff', color: activeTab === 'expenses' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             💜 Expense Analytics
           </button>
@@ -1370,6 +1611,9 @@ export default function AdminPage() {
 
         {/* AUDIT LOG TAB */}
         {activeTab === 'audit' && <AuditLogAdmin />}
+
+        {/* ASSIGN JOB TAB */}
+        {activeTab === 'assign' && <AssignJobAdmin />}
         {/* SUBMISSIONS TAB */}
         {activeTab === 'submissions' && (
           <>

@@ -286,6 +286,7 @@ export default function SubmissionsListPage() {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <span className="id-mono" style={{ fontSize: 11, fontWeight: 800, color, letterSpacing: '0.02em' }}>{jobLabel}</span>
+                        {s.data?.assignedBy && s.status === 'draft' && <span className="status-pill" style={{ background: '#ffedd5', color: '#9a3412' }}>📤 Assigned</span>}
                         {isWarranty && <span className="status-pill" style={{ background: '#fef3c7', color: '#92400e' }}>Warranty</span>}
                       </div>
                       <div style={{ fontWeight: 800, fontSize: 17, color: '#1a2332', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{primaryTitle}</div>

@@ -158,6 +158,54 @@ export async function fetchAuditLog(limit = 200) {
   }
 }
 
+// ── JOB ASSIGNMENT ───────────────────────────────────────────────────────────────
+// Admin creates a draft submission pre-assigned to a tech. The tech then opens
+// /edit/:id, fills in remaining details, and submits via the normal flow.
+// created_by is set to the tech's user id so EditSubmissionPage's
+// canEdit = isAdmin || sub.created_by === user.id check lets the tech edit it.
+export async function createAssignedSubmission({
+  assignedToUserId,
+  assignedByUserId,
+  assignedByName,
+  customerName,
+  locationName,
+  customerWorkOrder,
+  workType,
+  description,
+  dueDate,
+  jobType,
+}) {
+  if (!assignedToUserId) throw new Error('assignedToUserId required');
+  if (!customerName) throw new Error('customerName required');
+  if (!customerWorkOrder) throw new Error('customerWorkOrder required');
+  const effectiveJobType = jobType === 'PM' ? 'PM' : 'Service Call';
+  const template = effectiveJobType === 'PM' ? 'pm_flare_combustor' : 'service_call';
+  const wo = String(await getNextWoNumber());
+  const payload = {
+    created_by: assignedToUserId,
+    pm_number: parseInt(wo, 10),
+    status: 'draft',
+    template,
+    customer_name: customerName,
+    location_name: locationName || '',
+    work_order: wo,
+    work_type: workType || '',
+    summary: description || '',
+    data: {
+      jobType: effectiveJobType,
+      customerWorkOrder,
+      assignedBy: assignedByUserId || null,
+      assignedByName: assignedByName || null,
+      assignedAt: new Date().toISOString(),
+      dueDate: dueDate || null,
+      description: description || '',
+    },
+  };
+  const result = await supaRest('POST', 'submissions', payload);
+  if (Array.isArray(result) && result.length === 0) throw new Error('Assignment insert returned no row');
+  return Array.isArray(result) ? result[0] : result;
+}
+
 // ── SUBMISSIONS ────────────────────────────────────────────────────────────────────
 // templateOverride: pass 'expense_report' or 'daily_inspection' to override automatic template detection
 export async function saveSubmission(formData, userId, templateOverride) {
