@@ -11,6 +11,7 @@ import {
   queueOfflineSubmission,
   fetchPartsCatalog,
   fetchSubmission,
+  fetchSubmissions,
 } from '../lib/submissions'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
@@ -324,6 +325,11 @@ export default function FormPage() {
   // techs see "Uploading 5/21 photos…" instead of a silent 30-second spinner
   // and don't double-tap thinking the page is frozen.
   const [saveStatus, setSaveStatus] = useState('')
+  // Most-recent matching submission, fetched once on mount. Used to offer a
+  // one-tap "Start from last job" template that pre-fills customer/location/
+  // truck/equipment/parts/permits — the tech only adjusts the deltas.
+  const [lastSubmission, setLastSubmission] = useState(null)
+  const [templateApplied, setTemplateApplied] = useState(false)
   const [draftSaved, setDraftSaved]= useState(false)
   const [hasDraft,   setHasDraft]  = useState(false)
   // Partial-failure retry state. When some photos fail to upload, we keep the
@@ -448,6 +454,69 @@ export default function FormPage() {
 
   useEffect(()=>{ try{if(localStorage.getItem(draftKey))setHasDraft(true)}catch(e){} },[draftKey])
   useEffect(()=>{ draftTimerRef.current=setInterval(saveDraft,30000); return()=>clearInterval(draftTimerRef.current) },[saveDraft])
+
+  // Fetch the user's most recent matching submission once, so we can offer
+  // a "Start from last job" template. Filtered to the SAME template as the
+  // current form (PM techs see their last PM, SC techs see their last SC, etc).
+  // The chip auto-hides once a template has been applied or the user has
+  // started typing a customer.
+  useEffect(() => {
+    if (!user?.id) return
+    let active = true
+    fetchSubmissions(user.id)
+      .then(rows => {
+        if (!active || !Array.isArray(rows) || rows.length === 0) return
+        // jtConfig.template is the canonical template name (e.g. 'pm_flare_combustor');
+        // match on either it OR the looser jobType label.
+        const wanted = (jtConfig && jtConfig.template) || null
+        const match = rows.find(r =>
+          (wanted && r.template === wanted) ||
+          (r.data && r.data.jobType === jobType)
+        )
+        if (match) setLastSubmission(match)
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [user?.id, jobType]) // eslint-disable-line
+
+  // Convert a submission row (snake_case top-level + JSONB data) into the
+  // loadDraft-shaped object that already knows how to populate form state.
+  // Deliberately omits: photos, signatures, GPS, date/time, pm_number,
+  // work_order — those are specific to each visit and must be filled fresh.
+  function applyTemplateFromSubmission(s) {
+    const d = s.data || {}
+    const num = v => (v == null || v === '' ? undefined : String(v))
+    const draft = {
+      jobType: d.jobType,
+      warrantyWork: d.warrantyWork,
+      customerName: s.customer_name,
+      truckNumber: s.truck_number,
+      locationName: s.location_name,
+      customerContact: s.contact,
+      customerWorkOrder: d.customerWorkOrder,
+      typeOfWork: s.work_type,
+      glCode: s.gl_code,
+      assetTag: s.asset_tag,
+      workArea: s.work_area,
+      description: s.summary,
+      reportedIssue: d.reportedIssue,
+      rootCause: d.rootCause,
+      lastServiceDate: d.lastServiceDate,
+      techs: d.techs,
+      equipment: d.equipment,
+      permitsRequired: d.permitsRequired,
+      parts: d.parts,
+      scEquipment: d.scEquipment,
+      miles: num(s.miles),
+      costPerMile: num(s.cost_per_mile),
+      laborHours: num(s.labor_hours),
+      hourlyRate: num(s.labor_rate),
+      billableTechs: num(d.billableTechs),
+    }
+    loadDraft(draft)
+    setTemplateApplied(true)
+    setHasDraft(false)
+  }
 
   const toDataUrl = file=>new Promise((res,rej)=>{ const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file) })
 
@@ -648,6 +717,31 @@ export default function FormPage() {
               style={{fontSize:12,padding:'5px 14px',background:T.orange,color:'#fff',border:'none',borderRadius:6,cursor:'pointer',fontWeight:700}}>
               Restore
             </button>
+          </div>
+        )}
+
+        {/* ── Start-from-last-job chip ───
+           Shows when the user has at least one prior submission of this template
+           type AND the form is still fresh (no customer typed yet, no template
+           already applied). One tap pre-fills customer/location/truck/equipment/
+           parts/permits/etc. from that submission — visit-specific fields like
+           photos, signatures, GPS, date are left fresh. Big time-saver for
+           repeat jobs at the same site. */}
+        {lastSubmission && !templateApplied && !customerName && !hasDraft && (
+          <div style={{background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',borderRadius:11,padding:'12px 16px',marginBottom:16,boxShadow:'0 4px 14px rgba(15,23,42,0.18)',display:'flex',alignItems:'center',gap:12,color:'#fff'}}>
+            <span style={{fontSize:24,lineHeight:1}}>⚡</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:11,fontWeight:700,opacity:0.65,letterSpacing:1,textTransform:'uppercase'}}>Quick start</div>
+              <div style={{fontSize:13,fontWeight:600,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                Use last {jtConfig.short} ({lastSubmission.customer_name || 'previous job'}) as template
+              </div>
+            </div>
+            <button type="button" onClick={()=>applyTemplateFromSubmission(lastSubmission)}
+              style={{fontSize:12,padding:'7px 14px',background:T.orange,color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontWeight:800,letterSpacing:0.3,flexShrink:0,boxShadow:'0 2px 8px rgba(230,92,0,0.4)'}}>
+              Use It
+            </button>
+            <button type="button" onClick={()=>setLastSubmission(null)} aria-label="Dismiss"
+              style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.4)',cursor:'pointer',padding:4,fontSize:18,lineHeight:1,flexShrink:0}}>×</button>
           </div>
         )}
 
