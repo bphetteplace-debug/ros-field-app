@@ -579,7 +579,7 @@ function AnalyticsAdmin({ submissions }) {
 
   const techMap = {}
   subs.forEach(s => {
-    const t = s.technician || s.tech || 'Unknown'
+    const t = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.profiles?.full_name || 'Unknown'
     if (!techMap[t]) techMap[t] = 0
     techMap[t]++
   })
@@ -587,7 +587,7 @@ function AnalyticsAdmin({ submissions }) {
 
   const custMap = {}
   subs.forEach(s => {
-    const c = s.customer || 'Unknown'
+    const c = s.customer_name || 'Unknown'
     if (!custMap[c]) custMap[c] = 0
     custMap[c]++
   })
@@ -991,9 +991,9 @@ export default function AdminPage() {
   )
   const hasFilters = search || filterType !== 'ALL' || filterStatus !== 'ALL' || filterTech !== 'ALL' || dateFrom || dateTo
   const clearFilters = () => { setSearch(''); setFilterType('ALL'); setFilterStatus('ALL'); setFilterTech('ALL'); setDateFrom(''); setDateTo('') }
-  // Tech performance (all submissions)
+  // Tech performance (respects the user's current search/filter/date range)
   const byTech = {}
-  for (const s of submissions) {
+  for (const s of filtered) {
     const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
     if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
     const lbl2 = getTypeLabel(s)
