@@ -488,6 +488,8 @@ export async function updateSubmission(id, formData) {
             reportedIssue, rootCause, permitsRequired,
   } = formData
   const effBill = parseInt(billableTechs)||(techs||[]).length
+  const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0)
+  const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50)
   const laborTotal = warrantyWork ? 0 : parseFloat(laborHours||0)*parseFloat(hourlyRate||115)*effBill
   const grandTotal = warrantyWork ? 0 : partsTotal+mileageTotal+laborTotal
   return supaRest('PATCH', 'submissions?id=eq.' + id, {
