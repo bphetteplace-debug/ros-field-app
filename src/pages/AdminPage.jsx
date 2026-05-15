@@ -32,6 +32,53 @@ function getTypeColor(s) {
   return '#888'
 }
 
+// Build a CSV from a list of submission rows and trigger a browser download.
+// Uses CRLF line endings so Excel on Windows opens it cleanly. Numbers stay
+// unformatted so the spreadsheet treats them as numbers, not strings.
+function downloadSubmissionsCSV(rows) {
+  const csvCell = v => {
+    if (v == null) return ''
+    const s = String(v)
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
+  const header = ['WO#','Date','Type','Customer','Location','Customer PO/WO#','Truck','Tech(s)','Status','Labor Hours','Labor Rate','Labor Total','Parts Total','Mileage Miles','Mileage Total','Grand Total','Submitted At']
+  const lines = [header.map(csvCell).join(',')]
+  for (const s of rows) {
+    const d = s.data || {}
+    const techs = Array.isArray(d.techs) ? d.techs.join('; ') : (d.techs || '')
+    const lbl = getTypeLabel(s)
+    const total = lbl === 'EXP' ? d.expenseTotal : (lbl === 'INSP' || lbl === 'JHA' ? '' : d.grandTotal)
+    lines.push([
+      s.pm_number || '',
+      s.date || '',
+      lbl,
+      s.customer_name || '',
+      s.location_name || '',
+      d.customerWorkOrder || '',
+      s.truck_number || '',
+      techs,
+      s.status || 'submitted',
+      d.laborHours || '',
+      d.hourlyRate || '',
+      d.laborTotal || '',
+      d.partsTotal || '',
+      d.miles || '',
+      d.mileageTotal || '',
+      total || '',
+      s.created_at || ''
+    ].map(csvCell).join(','))
+  }
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ros-submissions-${new Date().toISOString().slice(0,10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 // ── EXPENSE ANALYTICS ──────────────────────────────────────────────────────────
 function getWeekRange() {
   const now = new Date()
@@ -1181,6 +1228,14 @@ export default function AdminPage() {
                 <label style={{ fontSize: 12, color: '#666', fontWeight: 600, whiteSpace: 'nowrap' }}>to</label>
                 <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', fontSize: 13 }} />
                 {hasFilters && <button onClick={clearFilters} style={{ color: '#e65c00', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}>Clear all</button>}
+                <button
+                  onClick={() => downloadSubmissionsCSV(filtered)}
+                  disabled={!filtered || filtered.length === 0}
+                  title={hasFilters ? 'Export the filtered submissions to CSV' : 'Export all submissions to CSV'}
+                  style={{ marginLeft: 'auto', background: filtered && filtered.length > 0 ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: filtered && filtered.length > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📥 Export CSV{hasFilters ? ' (filtered)' : ''} <span style={{ opacity: 0.8, fontSize: 11, fontWeight: 600 }}>{filtered ? filtered.length : 0}</span>
+                </button>
               </div>
             </div>
 
