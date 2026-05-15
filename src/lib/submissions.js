@@ -259,7 +259,14 @@ export async function removeFromOfflineQueue(id) {
 }
 
 // — PHOTOS ————————————————————————————————————————————————————————————
-export async function uploadPhotos(submissionId, photosOrObj, section) {
+export async function uploadPhotos(submissionId, photosOrObj, sectionOrOpts, maybeOpts) {
+    // Optional progress callback: pass either as the `section` slot (for the
+    // object/entries forms where section param isn't used) or as a 4th arg.
+    // Called after each photo with { uploaded, failed, total } so the UI can
+    // show "Uploading 5 of 21…" instead of a silent 30-second spinner.
+    var section = (typeof sectionOrOpts === 'string') ? sectionOrOpts : undefined;
+    var opts = (sectionOrOpts && typeof sectionOrOpts === 'object') ? sectionOrOpts : (maybeOpts || {});
+    var onProgress = (opts && typeof opts.onProgress === 'function') ? opts.onProgress : null;
     if (!submissionId) return { rows: [], uploaded: 0, failed: 0, total: 0, failedEntries: [] };
 
     // Normalize input. Accepts:
@@ -415,6 +422,7 @@ export async function uploadPhotos(submissionId, photosOrObj, section) {
                   if (r && r.ok) { uploaded++; if (r.row) rows.push(r.row); }
                   else { failed++; failedEntries.push(batch[j]); }
           }
+          if (onProgress) { try { onProgress({ uploaded, failed, total: entries.length }); } catch (_e) {} }
     }
 
     return { rows, uploaded, failed, total: entries.length, failedEntries };

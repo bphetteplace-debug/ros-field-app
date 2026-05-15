@@ -317,6 +317,10 @@ export default function FormPage() {
 
   const [saving,     setSaving]    = useState(false)
   const [saveError,  setSaveError] = useState(null)
+  // Human-readable phase label shown on the submit button while saving — so
+  // techs see "Uploading 5/21 photos…" instead of a silent 30-second spinner
+  // and don't double-tap thinking the page is frozen.
+  const [saveStatus, setSaveStatus] = useState('')
   const [draftSaved, setDraftSaved]= useState(false)
   const [hasDraft,   setHasDraft]  = useState(false)
   // Partial-failure retry state. When some photos fail to upload, we keep the
@@ -450,6 +454,7 @@ export default function FormPage() {
   const finalizeSubmission = async (submission) => {
     let pdfBase64 = null;
     try {
+      setSaveStatus('Generating PDF…');
       const full = await fetchSubmission(submission.id);
       const { getPhotoUrl } = await import('../lib/submissions');
       const pdfData = await buildPDFData(full, (path) => getPhotoUrl(path));
@@ -478,6 +483,7 @@ export default function FormPage() {
     } catch (e) {
       console.warn('PDF gen failed:', e);
     }
+    setSaveStatus('Sending email…');
     fetch('/api/send-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -494,6 +500,7 @@ export default function FormPage() {
     try { localStorage.removeItem(draftKey) } catch(e) {}
     setPendingSubmission(null);
     setFailedEntries([]);
+    setSaveStatus('');
     navigate('/submissions');
   };
 
@@ -503,12 +510,16 @@ export default function FormPage() {
   const handleRetry = async () => {
     if (!pendingSubmission || failedEntries.length === 0) return;
     setSaving(true); setSaveError(null);
+    setSaveStatus(`Retrying 0 of ${failedEntries.length} photos…`);
     try {
-      const upRes = await uploadPhotos(pendingSubmission.id, failedEntries);
+      const upRes = await uploadPhotos(pendingSubmission.id, failedEntries, {
+        onProgress: ({ uploaded, total }) => setSaveStatus(`Retrying ${uploaded} of ${total} photos…`),
+      });
       if (upRes && upRes.failed > 0) {
         setFailedEntries(upRes.failedEntries || []);
         setSaveError(`Still ${upRes.failed} of ${upRes.total} failed. Tap retry again, or move to better signal first. The submission (PM #${pendingSubmission.pm_number || ''}) is already saved.`);
         setSaving(false);
+        setSaveStatus('');
         return;
       }
       await finalizeSubmission(pendingSubmission);
@@ -516,13 +527,17 @@ export default function FormPage() {
       console.error('Retry error:', err);
       setSaveError(err?.message || 'Retry failed.');
       setSaving(false);
+      setSaveStatus('');
     }
   };
 
   const handleSubmit = async () => {
     if (isDemo) { setSaveError('Demo mode — read only'); return }
-    if(!customerName||!locationName){setSaveError('Customer and location are required');return}
-    setSaving(true);setSaveError(null)
+    const missing = [];
+    if (!customerName)  missing.push('Customer');
+    if (!locationName)  missing.push('Location / Well Name');
+    if (missing.length) { setSaveError('Missing required field' + (missing.length>1?'s':'') + ': ' + missing.join(', ')); return; }
+    setSaving(true);setSaveError(null);setSaveStatus('Preparing photos…')
     try{
       const photoDataUrls={}
       if(siteSignPhoto){const u=await toDataUrl(siteSignPhoto);if(u)photoDataUrls['site']=[{dataUrl:u,caption:'Site Sign'}]}
@@ -560,9 +575,17 @@ export default function FormPage() {
         heaters:showPMEquipment?heaters.map(h=>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length,firetubes:h.firetubes.map(ft=>({condition:ft.condition}))})):[],
         scEquipment:showSCEquip?scEquipment:[],
       }
+      setSaveStatus('Saving submission…')
       const submission=await saveSubmission(formData,user.id,template)
       if(submission?.id&&Object.keys(photoDataUrls).length>0){
-        const upRes=await uploadPhotos(submission.id,photoDataUrls)
+        // Count total photos so we can show "Uploading X of Y…" before the
+        // first batch completes — total isn't known to uploadPhotos until
+        // it normalizes entries, so we pre-count here for the initial label.
+        const totalPhotos = Object.values(photoDataUrls).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+        setSaveStatus(`Uploading 0 of ${totalPhotos} photos…`)
+        const upRes=await uploadPhotos(submission.id,photoDataUrls,{
+          onProgress: ({ uploaded, total }) => setSaveStatus(`Uploading ${uploaded} of ${total} photos…`),
+        })
         if(upRes&&upRes.failed>0){
           // Stash submission + the specific failed entries so the tech can retry
           // ONLY the failed ones via the "Retry photo upload" button — preserving
@@ -572,6 +595,7 @@ export default function FormPage() {
           setFailedEntries(upRes.failedEntries || [])
           setSaveError(`${upRes.failed} of ${upRes.total} photos failed to upload. Submission saved as PM #${submission.pm_number||''}. Tap "Retry photo upload" below — only the failed photos will re-upload.`)
           setSaving(false)
+          setSaveStatus('')
           return
         }
       }
@@ -581,6 +605,7 @@ export default function FormPage() {
       }
     }catch(err){
       console.error('Submit error:',err)
+      setSaveStatus('')
       if(!navigator.onLine){ try{queueOfflineSubmission({jobType,customerName,locationName,date,description});navigate('/submissions');return}catch(e){} }
       setSaveError(err?.message||'Submission failed. Please try again.')
     }finally{ setSaving(false) }
@@ -683,7 +708,7 @@ export default function FormPage() {
         <Section icon="📋" title="Job Information" accent={accent}>
           <div style={row}>
             <div style={fld}>
-              <label style={lbl}>Customer *</label>
+              <label style={lbl}>Customer <span style={{color:T.red}}>*</span></label>
               <select style={inp} value={customerName} onChange={e=>setCustomerName(e.target.value)}>
                 {CUSTOMERS.map(c=><option key={c}>{c}</option>)}
               </select>
@@ -697,7 +722,7 @@ export default function FormPage() {
           </div>
 
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Location / Well Name *</label>
+            <label style={lbl}>Location / Well Name <span style={{color:T.red}}>*</span></label>
             <input style={inp} value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="e.g. Pad A — Well 12" />
           </div>
 
@@ -1204,12 +1229,12 @@ export default function FormPage() {
           {pendingSubmission ? (
             <button type="button" onClick={handleRetry} disabled={saving}
               style={{width:'100%',padding:18,background:saving?'#9ca3af':'#dc2626',color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(220,38,38,0.32)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
-              {saving?'⏳ Retrying…':`🔄 Retry photo upload (${failedEntries.length} ${failedEntries.length===1?'photo':'photos'})`}
+              {saving?`⏳ ${saveStatus||'Retrying…'}`:`🔄 Retry photo upload (${failedEntries.length} ${failedEntries.length===1?'photo':'photos'})`}
             </button>
           ) : (
             <button type="button" onClick={handleSubmit} disabled={saving}
               style={{width:'100%',padding:18,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:17,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 18px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
-              {saving?'⏳ Saving…':`Submit ${jtConfig.short} — ${jtConfig.icon} ${jobType}`}
+              {saving?`⏳ ${saveStatus||'Saving…'}`:`Submit ${jtConfig.short} — ${jtConfig.icon} ${jobType}`}
             </button>
           )}
         </div>
