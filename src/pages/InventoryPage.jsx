@@ -299,8 +299,8 @@ export default function InventoryPage() {
         )}
 
         {/* Table */}
-        <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'visible' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
             <thead>
               <tr>
                 <th style={thStyle}>Part Code</th>

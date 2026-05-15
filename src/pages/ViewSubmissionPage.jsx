@@ -306,7 +306,7 @@ export default function ViewSubmissionPage() {
                   {flares.map((f, i) => (
                     <div key={i} style={{ marginBottom: i < flares.length - 1 ? 14 : 0, paddingBottom: i < flares.length - 1 ? 14 : 0, borderBottom: i < flares.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: '#e65c00', marginBottom: 8 }}>Flare #{i + 1}{f.flareId ? ' — ' + f.flareId : ''}</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 24px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px 24px' }}>
                         <Field label='Condition' value={f.condition} />
                         <Field label='Pilot Lit' value={f.pilotLit ? 'Yes' : 'No'} />
                         <Field label='Last Ignition' value={f.lastIgnition} />

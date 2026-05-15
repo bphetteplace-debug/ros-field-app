@@ -365,7 +365,7 @@ function BrandingAdmin() {
       <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>🎨 Company Branding</div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 20 }}>Customize how your company appears across the app, emails, and PDFs.</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <div style={row}>
           <span style={label}>Company Name</span>
           <input style={inp} value={branding.company_name} onChange={e => setBranding(b => ({ ...b, company_name: e.target.value }))} />
@@ -912,7 +912,7 @@ function AnalyticsAdmin({ submissions }) {
             {card('Fail', failCount, '#ef4444')}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
             <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>🏆 Most Active Technicians</div>
               {topTechs.length === 0 ? <div style={{ color: '#aaa', fontSize: 13 }}>No technician data on these submissions.</div> : topTechs.map(([name, count], i) => (
@@ -1513,7 +1513,7 @@ export default function AdminPage() {
   const inspCount = filtered.filter(s => getTypeLabel(s) === 'INSP').length
 
   const statCard = (label, value, color) => (
-    <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flex: 1, minWidth: 0 }}>
+    <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flex: '1 1 130px', minWidth: 130 }}>
       <div style={{ fontSize: 11, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 800, color: color || '#1a2332', marginTop: 4 }}>{value}</div>
     </div>
@@ -1746,8 +1746,8 @@ export default function AdminPage() {
 
             {/* TABLE */}
             {!loading && !error && filtered.length > 0 && (
-              <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px', alignItems: 'center' }}>
+              <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto', overflowY: 'visible' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px', alignItems: 'center', minWidth: 720 }}>
                   <div>
                     {!isDemo && (
                       <input
@@ -1782,7 +1782,7 @@ export default function AdminPage() {
                   const displayName = lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || '-') : (s.customer_name || '-')
                   const displaySub = lbl === 'EXP' ? 'Expense Report' : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || '?') : (s.location_name || '')
                   return (
-                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: selectedIds.has(s.id) ? '#eff6ff' : (isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa')), alignItems: 'center', borderLeft: '3px solid ' + color }}>
+                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: selectedIds.has(s.id) ? '#eff6ff' : (isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa')), alignItems: 'center', borderLeft: '3px solid ' + color, minWidth: 720 }}>
                       <div onClick={e => e.stopPropagation()}>
                         {!isDemo && (
                           <input
