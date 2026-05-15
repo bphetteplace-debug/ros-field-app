@@ -21,6 +21,7 @@ import MicButton from '../components/MicButton'
 import CameraOcrButton from '../components/CameraOcrButton'
 import PolishButton from '../components/PolishButton'
 import SortablePhotoGrid from '../components/SortablePhotoGrid'
+import ReviewSheet from '../components/ReviewSheet'
 
 // Photos straight off a phone camera are 3-5MB. compressImage shrinks them
 // to ~500KB, which is the difference between uploads succeeding and silently
@@ -337,6 +338,10 @@ export default function FormPage() {
   // truck/equipment/parts/permits — the tech only adjusts the deltas.
   const [lastSubmission, setLastSubmission] = useState(null)
   const [templateApplied, setTemplateApplied] = useState(false)
+  // Pre-submit review sheet. Tapping Submit on the form opens this full-page
+  // confirmation overlay; the actual save/upload/email pipeline only runs
+  // after the tech taps "Send Report" from inside the sheet.
+  const [showReview, setShowReview] = useState(false)
   const [draftSaved, setDraftSaved]= useState(false)
   const [hasDraft,   setHasDraft]  = useState(false)
   // Partial-failure retry state. When some photos fail to upload, we keep the
@@ -1431,14 +1436,46 @@ export default function FormPage() {
                 {saving?`⏳ ${saveStatus||'Retrying…'}`:`🔄 Retry (${failedEntries.length})`}
               </button>
             ) : (
-              <button type="button" onClick={handleSubmit} disabled={saving}
+              <button type="button" onClick={() => { setSaveError(null); setShowReview(true); }} disabled={saving}
                 style={{flex:1,padding:14,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:15,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 14px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                {saving?`⏳ ${saveStatus||'Saving…'}`:`Submit ${jtConfig.icon}`}
+                {saving?`⏳ ${saveStatus||'Saving…'}`:`Review & Send ${jtConfig.icon}`}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* PRE-SUBMIT REVIEW SHEET — appears when the tech taps "Review & Send"
+         on the form. Pure presentation; reads current form state and shows
+         everything that's about to upload + email. Tapping "Edit" closes it
+         (state is preserved in FormPage). Tapping "Send Report" calls the
+         existing handleSubmit and lets the sticky bottom bar show progress. */}
+      {showReview && (
+        <ReviewSheet
+          data={{
+            woNumber, pmNumber, jobType, jtConfig, accent,
+            warrantyWork,
+            customerName, locationName, customerContact, customerWorkOrder,
+            truckNumber, typeOfWork, glCode, assetTag, workArea, lastServiceDate,
+            date, startTime, departureTime,
+            description, reportedIssue, rootCause, showIssueFields,
+            techs, equipment, permitsRequired,
+            parts, partsTotal,
+            miles, costPerMile, mileageTotal,
+            laborHours, hourlyRate, billableTechs, laborTotal,
+            grandTotal,
+            arrestors, flares, heaters, scEquipment, showPMEquipment, showSCEquip,
+            gpsLat, gpsLng, gpsAccuracy,
+            photos, customerSig, techSignatures, siteSignPhoto,
+            arrivalVideo, departureVideo, showVideos,
+          }}
+          saving={saving}
+          saveStatus={saveStatus}
+          saveError={saveError}
+          onEdit={() => { if (!saving) setShowReview(false); }}
+          onConfirm={() => handleSubmit()}
+        />
+      )}
     </div>
   )
 }
