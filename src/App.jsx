@@ -46,7 +46,8 @@ export default function App() {
             <Route path="/quote" element={user ? <QuotePage /> : <Navigate to="/login" replace />} />
         <Route path="/preview" element={<PreviewPage />} />
         <Route path="/view/:id" element={<ViewSubmissionPage />} />
-        <Route path="/edit/:id" element={isAdmin ? <EditSubmissionPage /> : <Navigate to="/submissions" replace />} />
+        {/* Techs can edit their own submissions; admins can edit any. Access is enforced inside EditSubmissionPage. */}
+        <Route path="/edit/:id" element={<EditSubmissionPage />} />
         <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/submissions" replace />} />
         <Route path="/settings" element={<Navigate to="/admin" replace />} />
         <Route path="/login" element={<Navigate to="/submissions" replace />} />
