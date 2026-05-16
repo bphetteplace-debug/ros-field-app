@@ -46,7 +46,19 @@ async function supaRest(method, path, body) {
     });
     clearTimeout(timeoutId);
     const text = await res.text();
-    if (!res.ok) throw new Error(text || 'Request failed: ' + res.status);
+    if (!res.ok) {
+      // Don't surface raw PostgREST error bodies in toasts — they leak
+      // column names, constraint names, and hints. Log for debug, but
+      // throw a clean caller-friendly message. Preserve the Postgres
+      // SQLSTATE so saveSubmission's 23505 retry check still works.
+      console.warn('[supaRest] ' + method + ' ' + path.split('?')[0] + ' failed:', res.status, (text || '').slice(0, 400));
+      let code = '';
+      try { const j = JSON.parse(text || '{}'); code = j.code || j.error_code || ''; } catch (_e) {}
+      if (code === '23505' || /23505|duplicate key/i.test(text || '')) {
+        throw new Error('23505 — duplicate key');
+      }
+      throw new Error('Request failed (HTTP ' + res.status + ')');
+    }
     return text ? JSON.parse(text) : null;
   } catch (err) {
     clearTimeout(timeoutId);
@@ -290,7 +302,7 @@ export async function ensureShareToken(submission) {
   const token = (window.crypto && typeof window.crypto.randomUUID === 'function')
     ? window.crypto.randomUUID()
     : Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const updated = await supaRest('PATCH', 'submissions?id=eq.' + submission.id, { share_token: token });
+  const updated = await supaRest('PATCH', 'submissions?id=eq.' + encodeURIComponent(submission.id), { share_token: token });
   const row = Array.isArray(updated) ? updated[0] : updated;
   return row?.share_token || token;
 }
@@ -742,7 +754,7 @@ export async function fetchSubmissions(userId) {
 
 export async function fetchSubmissionById(id) {
   try {
-    const data = await supaRest('GET', 'submissions?id=eq.' + id + '&select=*,photos(*)');
+    const data = await supaRest('GET', 'submissions?id=eq.' + encodeURIComponent(id) + '&select=*,photos(*)');
     return data && data.length > 0 ? data[0] : null;
   } catch (e) {
     console.error('Fetch submission error:', e);
@@ -771,13 +783,13 @@ export async function fetchAllSubmissions() {
 
 // ── STATUS UPDATE ────────────────────────────────────────────────────────────────
 export async function updateSubmissionStatus(id, status) {
-  return supaRest('PATCH', 'submissions?id=eq.' + id, { status, updated_at: new Date().toISOString() })
+  return supaRest('PATCH', 'submissions?id=eq.' + encodeURIComponent(id), { status, updated_at: new Date().toISOString() })
 }
 
 // ── DELETE SUBMISSION ────────────────────────────────────────────────────────────
 export async function deleteSubmission(id) {
-  try { await supaRest('DELETE', 'photos?submission_id=eq.' + id) } catch(e) {}
-  return supaRest('DELETE', 'submissions?id=eq.' + id)
+  try { await supaRest('DELETE', 'photos?submission_id=eq.' + encodeURIComponent(id)) } catch(e) {}
+  return supaRest('DELETE', 'submissions?id=eq.' + encodeURIComponent(id))
 }
 
 // ── UPDATE (EDIT) SUBMISSION ─────────────────────────────────────────────────────
@@ -805,14 +817,14 @@ export async function updateSubmission(id, formData) {
   // it controls but never clobbers what it doesn't.
   let existingData = {}
   try {
-    const rows = await supaRest('GET', 'submissions?id=eq.' + id + '&select=data')
+    const rows = await supaRest('GET', 'submissions?id=eq.' + encodeURIComponent(id) + '&select=data')
     if (Array.isArray(rows) && rows[0] && rows[0].data) existingData = rows[0].data
   } catch {
     // If the read fails we still want the write to succeed — at worst
     // we lose the billing-side preservation for this edit.
   }
 
-  return supaRest('PATCH', 'submissions?id=eq.' + id, {
+  return supaRest('PATCH', 'submissions?id=eq.' + encodeURIComponent(id), {
     customer_name: customerName,
     truck_number: truckNumber,
     location_name: locationName,

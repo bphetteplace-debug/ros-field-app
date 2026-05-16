@@ -147,6 +147,7 @@ export default function DailyInspectionPage() {
 
   const handleSubmit = async () => {
     if (isDemo) { setSaveError('Demo mode — read only'); return }
+    if (!user?.id) { setSaveError('Not signed in — please log in again'); return }
     if (!techName) { setSaveError('Tech name is required'); return }
     if (!truckNumber) { setSaveError('Truck number is required'); return }
     setSaving(true); setSaveError(null)

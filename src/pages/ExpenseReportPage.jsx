@@ -230,6 +230,7 @@ export default function ExpenseReportPage() {
 
   const handleSubmit = async () => {
     if (isDemo) { setSaveError('Demo mode — read only'); return }
+    if (!user?.id) { setSaveError('Not signed in — please log in again'); return }
     if (!techName) { setSaveError('Tech name is required'); return }
     if (expenses.length === 0) { setSaveError('Add at least one expense'); return }
     setSaving(true); setSaveError(null)

@@ -168,6 +168,7 @@ export default function JHAPage() {
 
   const handleSubmit = async () => {
     if (isDemo) { setSaveError('Demo mode — read only'); return }
+    if (!user?.id) { setSaveError('Not signed in — please log in again'); return }
     if (!techName) { setSaveError('Tech name is required'); return }
     if (!jobLocation) { setSaveError('Job location is required'); return }
     if (steps.some(s => !s.taskStep || !s.hazard || !s.controls)) {
