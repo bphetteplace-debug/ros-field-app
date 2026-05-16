@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import { toast } from '../lib/toast'
+import { getAuthToken } from '../lib/submissions'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -135,7 +136,7 @@ export default function QuotePage() {
       // Send email with PDF
       var res = await fetch('/api/send-quote', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') },
         body: JSON.stringify({
           quoteId: quoteId,
           customerName: cn,

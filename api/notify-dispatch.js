@@ -4,6 +4,8 @@
 // this lambda with the customer email + token. We intentionally do NOT
 // expose any DB writes here; this lambda only sends the email.
 
+const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://idddbbvotykfairirmwn.supabase.co';
+const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 const APP_URL = process.env.APP_URL || 'https://pm.reliable-oilfield-services.com';
@@ -15,12 +17,61 @@ function escapeHtml(s) {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { token, customerEmail, customerName, techName, destinationLabel } = req.body || {};
   if (!token) return res.status(400).json({ error: 'token required' });
   if (!customerEmail) return res.status(400).json({ error: 'customerEmail required' });
   if (!RESEND_KEY) return res.status(500).json({ error: 'Missing RESEND_API_KEY' });
+  if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
+
+  // Auth: admin-only. Lambda emits "your tech is on the way" emails from
+  // the company domain — wide open it's a perfect phishing relay.
+  const authHeader = req.headers.authorization || req.headers.Authorization || '';
+  const userToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!userToken) return res.status(401).json({ error: 'Missing auth token' });
+  let userId = null;
+  try {
+    const userRes = await fetch(SUPA_URL + '/auth/v1/user', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + userToken },
+    });
+    if (!userRes.ok) return res.status(401).json({ error: 'Invalid or expired session' });
+    const userBody = await userRes.json();
+    userId = userBody && userBody.id;
+    if (!userId) return res.status(401).json({ error: 'Invalid session' });
+  } catch (_e) {
+    return res.status(500).json({ error: 'Auth check failed' });
+  }
+  try {
+    const profRes = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + encodeURIComponent(userId) + '&select=role', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
+    });
+    if (!profRes.ok) return res.status(403).json({ error: 'Forbidden' });
+    const profs = await profRes.json();
+    if (!profs || profs[0]?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  } catch (_e) {
+    return res.status(500).json({ error: 'Role check failed' });
+  }
+
+  // Verify the dispatch token actually exists, so attackers can't fake
+  // tracking URLs in the email.
+  try {
+    const dispRes = await fetch(
+      SUPA_URL + '/rest/v1/active_dispatch?share_token=eq.' + encodeURIComponent(token) + '&select=id&limit=1',
+      { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } },
+    );
+    if (!dispRes.ok) return res.status(500).json({ error: 'Dispatch lookup failed' });
+    const dispRows = await dispRes.json();
+    if (!Array.isArray(dispRows) || dispRows.length === 0) {
+      return res.status(404).json({ error: 'Dispatch token not found' });
+    }
+  } catch (_e) {
+    return res.status(500).json({ error: 'Dispatch verify failed' });
+  }
 
   const trackingUrl = APP_URL + '/track/' + encodeURIComponent(token);
   const safeName = escapeHtml((customerName || '').split(/\s+/)[0] || 'there');

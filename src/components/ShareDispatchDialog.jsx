@@ -5,7 +5,7 @@
 // send is audit-logged separately.
 import { useState } from 'react'
 import { toast } from '../lib/toast'
-import { logAudit } from '../lib/submissions'
+import { logAudit, getAuthToken } from '../lib/submissions'
 import CustomerContactCombobox from './CustomerContactCombobox'
 
 const overlay = {
@@ -52,7 +52,7 @@ export default function ShareDispatchDialog({ dispatch, currentUser, onClose }) 
     try {
       const res = await fetch('/api/notify-dispatch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') },
         body: JSON.stringify({
           token: dispatch.share_token,
           customerEmail: trimmed,
