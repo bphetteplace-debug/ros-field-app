@@ -796,6 +796,22 @@ export async function updateSubmission(id, formData) {
   const roundedLaborHours = roundQuarter(laborHours)
   const laborTotal = warrantyWork ? 0 : roundedLaborHours*parseFloat(hourlyRate||115)*effBill
   const grandTotal = warrantyWork ? 0 : partsTotal+mileageTotal+laborTotal
+
+  // Preserve office-side fields on data JSONB that aren't form-controlled
+  // (billing fields: dbWoNumber, foreman, approvedDate, paidDate,
+  // paidReference, paymentTerms, billable, nonBillableReason; import
+  // tags: importedFrom; any future office-only key). Read existing
+  // first then merge form fields on top so the form wins for anything
+  // it controls but never clobbers what it doesn't.
+  let existingData = {}
+  try {
+    const rows = await supaRest('GET', 'submissions?id=eq.' + id + '&select=data')
+    if (Array.isArray(rows) && rows[0] && rows[0].data) existingData = rows[0].data
+  } catch {
+    // If the read fails we still want the write to succeed — at worst
+    // we lose the billing-side preservation for this edit.
+  }
+
   return supaRest('PATCH', 'submissions?id=eq.' + id, {
     customer_name: customerName,
     truck_number: truckNumber,
@@ -815,6 +831,7 @@ export async function updateSubmission(id, formData) {
     labor_rate: parseFloat(hourlyRate||115),
     updated_at: new Date().toISOString(),
     data: {
+      ...existingData,
       jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
       laborHours: roundedLaborHours, hourlyRate, billableTechs: effBill, description,
       glCode, assetTag, workArea, startTime, departureTime, typeOfWork, lastServiceDate,
