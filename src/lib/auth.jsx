@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import * as Sentry from '@sentry/react';
 import { supabase, isCloudMode } from './supabase.js';
 
 const AuthContext = createContext(null);
@@ -49,6 +50,7 @@ export function AuthProvider({ children }) {
       } else {
         setUser(null);
         setProfile(null);
+        Sentry.setUser(null);
       }
       setLoading(false);
     });
@@ -69,7 +71,16 @@ export function AuthProvider({ children }) {
         headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + (token || SUPA_KEY) }
       });
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
+      if (Array.isArray(data) && data.length > 0) {
+        setProfile(data[0]);
+        // Attribute Sentry issues + replays to this tech. Safe to call even
+        // if Sentry init was a no-op (no DSN set) — setUser is a noop too.
+        Sentry.setUser({
+          id: userId,
+          email: data[0].email || undefined,
+          username: data[0].full_name || undefined,
+        });
+      }
     } catch (e) {
       console.warn('loadProfile error:', e);
     }
