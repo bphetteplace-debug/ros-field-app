@@ -30,7 +30,7 @@ export default function DispatchTrackingBar() {
     let timer = null
 
     async function poll() {
-      const rows = await fetchMyActiveDispatches()
+      const rows = await fetchMyActiveDispatches(user.id)
       if (cancelled) return
       const open = (rows || []).find(
         (r) => r.status === 'en_route' || r.status === 'arrived',

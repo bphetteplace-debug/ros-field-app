@@ -125,12 +125,18 @@ export async function setDispatchStatus(dispatchId, status) {
   return true;
 }
 
-// Tech-side: fetch active dispatches belonging to the current tech.
-// RLS limits results to tech_id = auth.uid(). Empty array if none.
-export async function fetchMyActiveDispatches() {
+// Tech-side: fetch active dispatches belonging to the given user.
+// We filter by tech_id explicitly rather than leaning on RLS because the
+// "admin_all_active_dispatch" policy on this table is FOR ALL, which would
+// otherwise let admins see (and worse, PATCH location into) every tech's
+// open dispatch. Defense-in-depth: even if RLS gets relaxed, only the
+// assigned tech's dispatches surface here.
+export async function fetchMyActiveDispatches(userId) {
+  if (!userId) return [];
   const url =
     SUPA_URL +
-    '/rest/v1/active_dispatch?ended_at=is.null&select=*&order=started_at.desc';
+    '/rest/v1/active_dispatch?ended_at=is.null&tech_id=eq.' + encodeURIComponent(userId) +
+    '&select=*&order=started_at.desc';
   try {
     const res = await fetch(url, { headers: authHeaders(false) });
     if (!res.ok) return [];
@@ -138,6 +144,22 @@ export async function fetchMyActiveDispatches() {
   } catch (e) {
     console.warn('[dispatch] fetchMyActiveDispatches failed:', e);
     return [];
+  }
+}
+
+// Admin: fetch a single dispatch row by id. Used by the admin map modal
+// to refresh tech_lat/lng/eta_seconds every poll.
+export async function fetchDispatchById(id) {
+  if (!id) return null;
+  const url = SUPA_URL + '/rest/v1/active_dispatch?id=eq.' + encodeURIComponent(id) + '&select=*';
+  try {
+    const res = await fetch(url, { headers: authHeaders(false) });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? (rows[0] || null) : null;
+  } catch (e) {
+    console.warn('[dispatch] fetchDispatchById failed:', e);
+    return null;
   }
 }
 

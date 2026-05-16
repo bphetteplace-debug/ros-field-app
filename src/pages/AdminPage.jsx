@@ -7,6 +7,8 @@ import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import TechMap from '../components/TechMap'
 import StartDispatchDialog from '../components/StartDispatchDialog'
+import ShareDispatchDialog from '../components/ShareDispatchDialog'
+import DispatchMapModal from '../components/DispatchMapModal'
 import { fetchOpenDispatches, setDispatchStatus, formatRelativeTime, formatEta } from '../lib/dispatch'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -718,6 +720,8 @@ function DispatchesAdmin() {
   const [loading, setLoading] = useState(true)
   const [endingId, setEndingId] = useState(null)
   const [tick, setTick] = useState(0) // forces re-render so relative times refresh
+  const [mapDispatch, setMapDispatch] = useState(null)
+  const [shareDispatch, setShareDispatch] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -826,6 +830,20 @@ function DispatchesAdmin() {
         </div>
       </div>
 
+      {mapDispatch && (
+        <DispatchMapModal
+          dispatch={mapDispatch}
+          onClose={() => setMapDispatch(null)}
+        />
+      )}
+      {shareDispatch && (
+        <ShareDispatchDialog
+          dispatch={shareDispatch}
+          currentUser={{ id: user?.id, email: user?.email, full_name: profile?.full_name }}
+          onClose={() => setShareDispatch(null)}
+        />
+      )}
+
       {dispatches.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
@@ -849,7 +867,7 @@ function DispatchesAdmin() {
             </thead>
             <tbody>
               {dispatches.map(d => (
-                <tr key={d.id}>
+                <tr key={d.id} onClick={() => setMapDispatch(d)} style={{ cursor: 'pointer' }} title='Click row to view live map'>
                   <td style={cell}>{statusPill(d.status)}</td>
                   <td style={cell}>
                     <div style={{ fontWeight: 700, color: '#1a2332' }}>{d.customer_name || '—'}</div>
@@ -868,13 +886,20 @@ function DispatchesAdmin() {
                     <div style={{ color: '#475569', fontSize: 12 }}>{formatEta(d.eta_seconds) || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>}</div>
                   </td>
                   <td style={cell}>{gpsCell(d)}</td>
-                  <td style={{ ...cell, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <td style={{ ...cell, textAlign: 'right', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setShareDispatch(d)}
+                      title='Email this tracking link to a customer or supervisor'
+                      style={{ background: '#ecfeff', border: '1px solid #67e8f9', color: '#0e7490', borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 6 }}
+                    >
+                      ✉️ Share
+                    </button>
                     <button
                       onClick={() => handleCopy(d.share_token)}
                       title='Copy public tracking link to clipboard'
                       style={{ background: '#f0f9ff', border: '1px solid #7dd3fc', color: '#0369a1', borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 6 }}
                     >
-                      🔗 Copy link
+                      🔗 Copy
                     </button>
                     <button
                       onClick={() => handleEnd(d)}
@@ -882,7 +907,7 @@ function DispatchesAdmin() {
                       title='Mark this dispatch as completed and stop sharing location'
                       style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: endingId === d.id ? 'wait' : 'pointer' }}
                     >
-                      {endingId === d.id ? 'Ending…' : '🛑 End now'}
+                      {endingId === d.id ? 'Ending…' : '🛑 End'}
                     </button>
                   </td>
                 </tr>
@@ -2301,7 +2326,7 @@ export default function AdminPage() {
                           <button onClick={() => handleShare(s)} title={s.share_token ? 'Copy existing share link' : 'Generate share link for customer'} style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#16a34a', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🔗</button>
                         )}
                         {!isDemo && (
-                          <button onClick={() => setDispatchSub(s)} title="Email customer a live tracking link" style={{ background: '#fff7ed', border: '1px solid #fdba74', color: '#ea580c', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📍</button>
+                          <button onClick={() => setDispatchSub(s)} title="Start a customer-tracking dispatch (email step is separate — use 🔗 Share on the Dispatches tab)" style={{ background: '#fff7ed', border: '1px solid #fdba74', color: '#ea580c', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📍</button>
                         )}
                         {!isDemo && <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
                           {isBeingDeleted ? '...' : '🗑 Del'}
