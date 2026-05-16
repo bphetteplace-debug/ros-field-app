@@ -6,6 +6,7 @@ import { saveDraft as saveDraftToStore, loadDraft as loadDraftFromStore, clearDr
 import { toast } from '../lib/toast'
 import { compressImage } from '../lib/imageCompress'
 import { parseReceiptText } from '../lib/receiptParser'
+import { captionPhoto } from '../lib/captionPhoto'
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
@@ -126,6 +127,8 @@ export default function ExpenseReportPage() {
   // Per-row "scanning receipt" state. null = no scan in progress;
   // otherwise the index of the row currently being OCR'd.
   const [scanningIdx, setScanningIdx] = useState(null)
+  // Same idea for the AI caption on an item photo.
+  const [captioningIdx, setCaptioningIdx] = useState(null)
 
   // Run Tesseract OCR on a receipt photo, parse the text, and fill
   // any empty fields on the row. Never overwrites user input — a row
@@ -173,6 +176,31 @@ export default function ExpenseReportPage() {
     }
   }
 
+  // AI-caption an item photo via the /api/caption-photo lambda. Only
+  // fills the row's description field if it's empty — never overwrites
+  // existing user input or values previously set by the receipt OCR.
+  async function captionItemPhotoAndFill(rowIndex, file) {
+    if (!file) return
+    setCaptioningIdx(rowIndex)
+    try {
+      const caption = await captionPhoto(file, 'expense_item')
+      if (caption) {
+        setExpenses(prev => prev.map((e, idx) => {
+          if (idx !== rowIndex) return e
+          // Only fill if description is empty — respect anything already
+          // populated by the receipt OCR or typed by the tech.
+          if (e.description && e.description.trim()) return e
+          return { ...e, description: caption }
+        }))
+        toast.success('Item caption: ' + caption)
+      }
+    } catch (e) {
+      console.warn('Item photo caption failed:', e)
+    } finally {
+      setCaptioningIdx(prev => (prev === rowIndex ? null : prev))
+    }
+  }
+
   const updExp = (i, k, v) => {
     const next = expenses.map((e, idx) => idx === i ? { ...e, [k]: v } : e)
     setExpenses(next)
@@ -187,6 +215,13 @@ export default function ExpenseReportPage() {
     // synchronously above, so OCR happening async after is safe.
     if (k === 'receipt' && v) {
       scanReceiptAndFill(i, v)
+    }
+    // When an item / purchase photo is added, ask Claude to caption it
+    // and fill the description if still empty. Independent of receipt
+    // OCR — they can run concurrently and both honor the "don't
+    // overwrite" rule.
+    if (k === 'itemPhoto' && v) {
+      captionItemPhotoAndFill(i, v)
     }
   }
   const removeExp = (i) => setExpenses(es => es.filter((_, idx) => idx !== i))
@@ -338,9 +373,15 @@ export default function ExpenseReportPage() {
                   Reading receipt — vendor, amount &amp; category will auto-fill in a moment…
                 </div>
               )}
+              {captioningIdx === i && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 6, fontSize: 12, color: '#5b21b6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid #c4b5fd', borderTopColor: '#5b21b6', borderRadius: '50%', animation: 'ocrSpin 0.9s linear infinite' }}></span>
+                  ✨ AI is describing this item — will auto-fill the description if empty…
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
                 <PhotoPicker label="📷 Receipt (auto-scans)" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} />
-                <PhotoPicker label="Item / Purchase Photo" value={exp.itemPhoto} onChange={v => updExp(i, 'itemPhoto', v)} />
+                <PhotoPicker label="✨ Item Photo (AI captions)" value={exp.itemPhoto} onChange={v => updExp(i, 'itemPhoto', v)} />
               </div>
             </div>
           ))}
