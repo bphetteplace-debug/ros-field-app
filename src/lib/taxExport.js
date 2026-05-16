@@ -24,6 +24,19 @@ import { isWorkOrder, isNonBillable, billedAmount } from './billing'
 
 const IRS_MILEAGE_RATE_2026 = 0.70  // $/mile — adjust if IRS changes annually
 
+// Sum dollar-floats by promoting to integer cents first, then dividing.
+// Across ~1100 rows the naive `arr.reduce((s,x)=>s+x.foo, 0)` drifts a
+// few cents which shows up on the CPA's net P&L line.
+function sumMoney(list, getter) {
+  let cents = 0
+  for (const item of list) {
+    const v = getter ? getter(item) : item
+    if (typeof v === 'number' && Number.isFinite(v)) cents += Math.round(v * 100)
+  }
+  return cents / 100
+}
+const roundMoney = (n) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100
+
 // ── Date range helpers ─────────────────────────────────────────────
 
 export function periodRange(year, period, customStart, customEnd) {
@@ -128,7 +141,12 @@ export function buildTaxExportRows(submissions, monthlyExpenses, range) {
     entry.Records++
     customerMap.set(c, entry)
   }
-  const customers = Array.from(customerMap.values()).sort((a, b) => b.Billed - a.Billed)
+  // Round each customer's accumulated totals to clean cents — the running
+  // `+=` of float dollars drifts otherwise, and any CPA spot-check that
+  // sums the column won't match the summary line.
+  const customers = Array.from(customerMap.values())
+    .map(c => ({ ...c, Billed: roundMoney(c.Billed), Collected: roundMoney(c.Collected), Open: roundMoney(c.Open) }))
+    .sort((a, b) => b.Billed - a.Billed)
 
   // Vendor summary across BOTH office expenses AND tech-side expenses
   // (when those have a vendor field). Flag anyone we paid >$600 in
@@ -143,23 +161,24 @@ export function buildTaxExportRows(submissions, monthlyExpenses, range) {
     vendorMap.set(v, entry)
   }
   const vendors = Array.from(vendorMap.values())
-    .map(v => ({ ...v, '1099 Threshold': v.Total >= 600 ? 'YES — file 1099-NEC' : '' }))
+    .map(v => ({ ...v, Total: roundMoney(v.Total), '1099 Threshold': v.Total >= 600 ? 'YES — file 1099-NEC' : '' }))
     .sort((a, b) => b.Total - a.Total)
 
-  // Tax-relevant aggregates
-  const revenueTotal = revenue.reduce((s, r) => s + r.Cost, 0)
-  const techExpTotal = techExpenses.reduce((s, r) => s + r.Total, 0)
-  const officeFixed = office.filter(r => r.Category === 'Fixed').reduce((s, r) => s + r.Amount, 0)
-  const officePayroll = office.filter(r => r.Category === 'Payroll').reduce((s, r) => s + r.Amount, 0)
-  const officeOther = office.filter(r => r.Category === 'Other').reduce((s, r) => s + r.Amount, 0)
+  // Tax-relevant aggregates — every sum runs through sumMoney so cents
+  // drift can't leak into the CPA's P&L.
+  const revenueTotal = sumMoney(revenue, r => r.Cost)
+  const techExpTotal = sumMoney(techExpenses, r => r.Total)
+  const officeFixed = sumMoney(office.filter(r => r.Category === 'Fixed'), r => r.Amount)
+  const officePayroll = sumMoney(office.filter(r => r.Category === 'Payroll'), r => r.Amount)
+  const officeOther = sumMoney(office.filter(r => r.Category === 'Other'), r => r.Amount)
   // Debt Service (credit-card payoffs, loan principal) — non-deductible, tracked
   // separately and excluded from officeTotal so it never flows into Net P&L.
-  const officeDebtService = office.filter(r => r.Category === 'Debt Service').reduce((s, r) => s + r.Amount, 0)
-  const officeTotal = officeFixed + officePayroll + officeOther
-  const totalExpenses = techExpTotal + officeTotal
-  const netProfit = revenueTotal - totalExpenses
-  const totalMiles = revenue.reduce((s, r) => s + r.Miles, 0)
-  const mileageDeduction = totalMiles * IRS_MILEAGE_RATE_2026
+  const officeDebtService = sumMoney(office.filter(r => r.Category === 'Debt Service'), r => r.Amount)
+  const officeTotal = roundMoney(officeFixed + officePayroll + officeOther)
+  const totalExpenses = roundMoney(techExpTotal + officeTotal)
+  const netProfit = roundMoney(revenueTotal - totalExpenses)
+  const totalMiles = revenue.reduce((s, r) => s + (Number.isFinite(r.Miles) ? r.Miles : 0), 0)
+  const mileageDeduction = roundMoney(totalMiles * IRS_MILEAGE_RATE_2026)
 
   return {
     range,

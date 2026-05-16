@@ -57,31 +57,36 @@ export function buildCpaReportData(submissions, monthlyExpenses, year) {
   const subs = (submissions || []).filter(s => inRangeYear(s.date || s.created_at, String(y)))
   const me = (monthlyExpenses || []).filter(r => inRangeYear(r.date, String(y)))
 
-  let revenue = 0
+  // Sum dollar-floats in integer cents so the CPA report's totals match
+  // the tax-export totals to the penny (no .reduce drift across ~1100 rows).
+  let revenueCents = 0
   let revRecords = 0
   for (const s of subs) {
     const d = s.data || {}
     if (!isWorkOrder(s)) continue
     if (isNonBillable(s)) continue
     if (d.warrantyWork) continue
-    revenue += parseFloat(d.grandTotal || 0) || 0
+    revenueCents += Math.round((parseFloat(d.grandTotal || 0) || 0) * 100)
     revRecords++
   }
+  const revenue = revenueCents / 100
 
-  let techExp = 0
+  let techExpCents = 0
   let techExpRecords = 0
   for (const s of subs) {
     if (s.template === 'expense_report') {
-      techExp += parseFloat((s.data || {}).expenseTotal || 0) || 0
+      techExpCents += Math.round((parseFloat((s.data || {}).expenseTotal || 0) || 0) * 100)
       techExpRecords++
     }
   }
+  const techExp = techExpCents / 100
 
-  const catTotals = { Fixed: 0, Payroll: 0, Other: 0, 'Debt Service': 0 }
+  const catCents = { Fixed: 0, Payroll: 0, Other: 0, 'Debt Service': 0 }
   for (const r of me) {
     const c = r.category || 'Other'
-    catTotals[c] = (catTotals[c] || 0) + (parseFloat(r.amount) || 0)
+    catCents[c] = (catCents[c] || 0) + Math.round((parseFloat(r.amount) || 0) * 100)
   }
+  const catTotals = Object.fromEntries(Object.entries(catCents).map(([k, v]) => [k, v / 100]))
 
   const debtBuckets = {}
   for (const r of me) {

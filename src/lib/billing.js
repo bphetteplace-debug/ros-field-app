@@ -50,7 +50,14 @@ function parseTermDays(terms) {
 
 function parseDate(s) {
   if (!s) return null
-  const d = new Date(s)
+  // Parse plain `YYYY-MM-DD` strings as local noon, not UTC midnight. The
+  // JS spec parses bare date-only strings as UTC, so for a customer in
+  // Central time a Net 30 invoice approved 2026-03-08 lands its computed
+  // due date at 2026-04-07 00:00 UTC. Comparing that against `asOf =
+  // new Date()` (a local Date) flipped past-due a calendar day early
+  // anytime the user looked between 6pm-midnight local. Coerce to noon
+  // local so the comparison is day-vs-day on the user's clock.
+  const d = new Date(/T/.test(s) ? s : s + 'T12:00:00')
   return Number.isNaN(d.getTime()) ? null : d
 }
 
