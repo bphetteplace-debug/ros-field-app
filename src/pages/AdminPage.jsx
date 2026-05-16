@@ -10,6 +10,7 @@ import StartDispatchDialog from '../components/StartDispatchDialog'
 import ShareDispatchDialog from '../components/ShareDispatchDialog'
 import DispatchMapModal from '../components/DispatchMapModal'
 import PmScheduleAdmin from '../components/PmScheduleAdmin'
+import BillingAdmin from '../components/BillingAdmin'
 import { fetchOpenDispatches, setDispatchStatus, formatRelativeTime, formatEta } from '../lib/dispatch'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -2354,6 +2355,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab("users")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "users" ? "#dc2626" : "#fff", color: activeTab === "users" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Users
           </button>
+          <button onClick={() => setActiveTab('billing')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'billing' ? '#16a34a' : '#fff', color: activeTab === 'billing' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            💵 Billing
+          </button>
           <button onClick={() => setActiveTab('customers')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'customers' ? '#9a3412' : '#fff', color: activeTab === 'customers' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             🏢 Customers
           </button>
@@ -2396,6 +2400,8 @@ export default function AdminPage() {
 
 
         {/* ANALYTICS TAB */}
+        {activeTab === 'billing' && <BillingAdmin submissions={submissions} />}
+
         {activeTab === 'customers' && <CustomersAdmin submissions={submissions} />}
 
         {activeTab === 'analytics' && <AnalyticsAdmin submissions={submissions} />}
