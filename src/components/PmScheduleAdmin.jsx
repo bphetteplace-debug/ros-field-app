@@ -128,7 +128,7 @@ function EditEntryModal({ entry, customerOptions, onClose, onSave, onDelete }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 14 }}>
             <div>
               <label style={lbl}>Well Type</label>
               <select value={form.well_type || ''} onChange={e => set('well_type', e.target.value)} style={{ ...inp, width: '100%' }}>
@@ -147,7 +147,7 @@ function EditEntryModal({ entry, customerOptions, onClose, onSave, onDelete }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 14 }}>
             <div>
               <label style={lbl}>Shut-In Date</label>
               <input type='date' value={form.shut_in_date || ''} onChange={e => set('shut_in_date', e.target.value || null)} style={{ ...inp, width: '100%' }} />
@@ -421,7 +421,7 @@ export default function PmScheduleAdmin() {
       </div>
 
       {/* Filter bar */}
-      <div style={{ background: '#fff', borderRadius: 12, padding: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 12, display: 'grid', gridTemplateColumns: 'minmax(160px, 200px) minmax(140px, 180px) 1fr', gap: 10, alignItems: 'end' }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, alignItems: 'end' }}>
         <div>
           <label style={lbl}>Customer</label>
           <select value={customer} onChange={e => setCustomer(e.target.value)} style={{ ...inp, width: '100%' }}>

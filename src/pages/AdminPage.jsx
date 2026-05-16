@@ -1424,9 +1424,9 @@ function CustomersAdmin({ submissions }) {
         Pick a customer to see their lifetime activity, sites you've serviced, monthly revenue trend, and full job history.
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 280px) 1fr', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
         {/* Customer picker */}
-        <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden', maxWidth: 320 }}>
           <div style={{ padding: 12, borderBottom: '1px solid #e5e7eb' }}>
             <input
               value={search}
@@ -1435,7 +1435,7 @@ function CustomersAdmin({ submissions }) {
               style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit' }}
             />
           </div>
-          <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 'min(460px, 45vh)', overflowY: 'auto' }}>
             {filteredCustomers.length === 0 ? (
               <div style={{ padding: 16, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>No customer matches.</div>
             ) : filteredCustomers.map(c => {
@@ -1465,7 +1465,7 @@ function CustomersAdmin({ submissions }) {
         {/* Detail pane */}
         {!data ? (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center', color: '#94a3b8' }}>
-            Pick a customer on the left to see their history.
+            Pick a customer to see their history.
           </div>
         ) : (
           <div>
