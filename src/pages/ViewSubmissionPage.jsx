@@ -126,7 +126,43 @@ export default function ViewSubmissionPage() {
     fetchSubmission(id).then(data => { setSub(data); setLoading(false) }).catch(err => { setError(err.message); setLoading(false) })
   }, [id])
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#888', fontFamily: 'system-ui,sans-serif' }}>Loading...</div>
+  if (loading) return (
+    <div style={{ fontFamily: 'system-ui, sans-serif', background: '#f0f2f5', minHeight: '100vh' }}>
+      <NavBar user={user} isAdmin={isAdmin} isDemo={isDemo} onLogout={handleLogout} loggingOut={loggingOut} />
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 16px 60px' }}>
+        {/* Hero placeholder — mimics the WO header that renders after load */}
+        <div style={{ background: '#fff', borderRadius: 10, padding: 20, marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderTop: '3px solid #cbd5e1' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div className="shimmer" style={{ height: 22, width: 60 }}></div>
+            <div className="shimmer" style={{ height: 22, width: 80 }}></div>
+          </div>
+          <div className="shimmer" style={{ height: 26, width: 180, marginBottom: 8 }}></div>
+          <div className="shimmer" style={{ height: 16, width: '70%', maxWidth: 320, marginBottom: 4 }}></div>
+          <div className="shimmer" style={{ height: 14, width: '50%', maxWidth: 220 }}></div>
+        </div>
+        {/* Info-card skeletons */}
+        {[0, 1, 2].map(function(i) {
+          return (
+            <div key={i} style={{ background: '#fff', borderRadius: 10, marginBottom: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderTop: '3px solid #cbd5e1', overflow: 'hidden' }}>
+              <div style={{ padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                <div className="shimmer" style={{ height: 14, width: 140 }}></div>
+              </div>
+              <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px 24px' }}>
+                {[0, 1, 2, 3, 4, 5].map(function(j) {
+                  return (
+                    <div key={j}>
+                      <div className="shimmer" style={{ height: 10, width: 70, marginBottom: 6 }}></div>
+                      <div className="shimmer" style={{ height: 16, width: 110 }}></div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
   if (error) return <div style={{ padding: 40, color: '#c00', fontFamily: 'system-ui,sans-serif' }}>Error: {error}</div>
   if (!sub) return null
 
