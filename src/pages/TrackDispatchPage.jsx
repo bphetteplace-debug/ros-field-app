@@ -105,8 +105,13 @@ export default function TrackDispatchPage() {
     }
   }, [token])
 
-  // Init Leaflet map once
+  // Init Leaflet map once the container div is mounted. The map div is
+  // conditionally rendered (only when !loading && dispatch is set), so we
+  // can't init on plain [] — we'd run before the div exists. Depend on
+  // loading instead: as soon as loading flips to false the effect re-runs,
+  // containerRef.current is non-null, and we init.
   useEffect(() => {
+    if (loading) return
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
       center: [39.5, -98.3],
@@ -125,7 +130,7 @@ export default function TrackDispatchPage() {
       mapRef.current = null
       markersRef.current = { tech: null, dest: null, line: null }
     }
-  }, [])
+  }, [loading])
 
   // Sync markers with dispatch updates
   useEffect(() => {
