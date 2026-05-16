@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import TechMap from '../components/TechMap'
 import StartDispatchDialog from '../components/StartDispatchDialog'
+import { fetchOpenDispatches, setDispatchStatus, formatRelativeTime, formatEta } from '../lib/dispatch'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -703,6 +704,193 @@ function CustomerContactsSection({ customerList }) {
           </div>
         </div>
       </details>
+    </div>
+  )
+}
+
+// ─── ACTIVE DISPATCHES ADMIN ─────────────────────────────────────────────────
+// Glance-view of every dispatch currently sharing live location with a
+// customer. Polls every 20s. Lets admin copy the public tracking link or
+// force-end a dispatch (e.g. tech forgot to mark done).
+function DispatchesAdmin() {
+  const { user, profile } = useAuth()
+  const [dispatches, setDispatches] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [endingId, setEndingId] = useState(null)
+  const [tick, setTick] = useState(0) // forces re-render so relative times refresh
+
+  const load = useCallback(async () => {
+    try {
+      const list = await fetchOpenDispatches()
+      setDispatches(Array.isArray(list) ? list : [])
+    } catch (e) {
+      console.warn('[DispatchesAdmin] load failed:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+    const i = setInterval(load, 20000)
+    const t = setInterval(() => setTick(x => x + 1), 30000)
+    return () => { clearInterval(i); clearInterval(t) }
+  }, [load])
+
+  const handleCopy = async (token) => {
+    const url = window.location.origin + '/track/' + token
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Tracking link copied to clipboard')
+    } catch {
+      toast.warning('Copy failed — link: ' + url, 8000)
+    }
+  }
+
+  const handleEnd = async (d) => {
+    const who = d.customer_name || 'this customer'
+    if (!window.confirm('End dispatch for ' + who + '?\nThe customer will no longer see live updates.')) return
+    setEndingId(d.id)
+    try {
+      await setDispatchStatus(d.id, 'completed')
+      logAudit({
+        userId: user?.id, userName: profile?.full_name || user?.email,
+        action: 'dispatch_ended', targetType: 'dispatch', targetId: d.id,
+        details: { customer: d.customer_name, tech: d.tech_name, share_token: d.share_token },
+      })
+      toast.success('Dispatch ended')
+      setDispatches(prev => prev.filter(x => x.id !== d.id))
+    } catch (e) {
+      toast.error('End failed: ' + (e.message || String(e)))
+    } finally {
+      setEndingId(null)
+    }
+  }
+
+  const statusPill = (status) => {
+    const map = {
+      en_route:  { bg: '#fff7ed', fg: '#c2410c', border: '#fed7aa', label: '🚐 En route' },
+      arrived:   { bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0', label: '📍 Arrived' },
+      completed: { bg: '#f1f5f9', fg: '#475569', border: '#cbd5e1', label: '✓ Completed' },
+      cancelled: { bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca', label: '✕ Cancelled' },
+    }
+    const s = map[status] || map.en_route
+    return (
+      <span style={{ background: s.bg, color: s.fg, border: '1px solid ' + s.border, padding: '2px 9px', borderRadius: 12, fontSize: 11, fontWeight: 800, letterSpacing: 0.3, whiteSpace: 'nowrap' }}>
+        {s.label}
+      </span>
+    )
+  }
+
+  const gpsCell = (d) => {
+    if (!d.tech_updated_at) {
+      return <span style={{ color: '#94a3b8', fontSize: 12, fontStyle: 'italic' }}>Waiting for tech to start sharing</span>
+    }
+    const ageMs = Date.now() - new Date(d.tech_updated_at).getTime()
+    const fresh = ageMs < 90 * 1000 // <1.5 min = green
+    const stale = ageMs > 8 * 60 * 1000 // >8 min = red
+    const color = stale ? '#dc2626' : fresh ? '#16a34a' : '#ca8a04'
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: fresh ? '0 0 0 2px rgba(22,163,74,0.25)' : 'none' }}></span>
+        {formatRelativeTime(d.tech_updated_at)}
+      </span>
+    )
+  }
+
+  const cell = { padding: '10px 12px', borderTop: '1px solid #f1f5f9', verticalAlign: 'top' }
+  const th = { padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6, background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }
+
+  if (loading) {
+    return (
+      <div style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>📍 Active Dispatches</div>
+        {[1,2,3].map(i => (
+          <div key={i} style={{ height: 42, background: 'linear-gradient(90deg,#f1f5f9 25%,#e5e7eb 50%,#f1f5f9 75%)', borderRadius: 6, marginBottom: 8, backgroundSize: '200% 100%', animation: 'pulse 1.6s ease-in-out infinite' }}></div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }} data-tick={tick}>
+      <div style={{ padding: '16px 18px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332' }}>📍 Active Dispatches</div>
+          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+            Customers being notified with a live tracking link right now. Auto-refreshes every 20 seconds.
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700 }}>
+          {dispatches.length} active
+        </div>
+      </div>
+
+      {dispatches.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#475569', marginBottom: 4 }}>No active dispatches.</div>
+          <div style={{ fontSize: 12 }}>Click the 📍 button on any submission row to start one.</div>
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th style={th}>Status</th>
+                <th style={th}>Customer</th>
+                <th style={th}>Tech</th>
+                <th style={th}>Destination</th>
+                <th style={th}>Started</th>
+                <th style={th}>ETA</th>
+                <th style={th}>Last GPS</th>
+                <th style={th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {dispatches.map(d => (
+                <tr key={d.id}>
+                  <td style={cell}>{statusPill(d.status)}</td>
+                  <td style={cell}>
+                    <div style={{ fontWeight: 700, color: '#1a2332' }}>{d.customer_name || '—'}</div>
+                    {d.customer_email && <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'ui-monospace, Menlo, monospace', marginTop: 2 }}>{d.customer_email}</div>}
+                  </td>
+                  <td style={cell}>
+                    <div style={{ color: '#1a2332', fontWeight: 600 }}>{d.tech_name || '—'}</div>
+                  </td>
+                  <td style={cell}>
+                    <div style={{ color: '#475569' }}>{d.destination_label || '—'}</div>
+                  </td>
+                  <td style={cell}>
+                    <div style={{ color: '#475569', fontSize: 12 }}>{formatRelativeTime(d.started_at) || '—'}</div>
+                  </td>
+                  <td style={cell}>
+                    <div style={{ color: '#475569', fontSize: 12 }}>{formatEta(d.eta_seconds) || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>}</div>
+                  </td>
+                  <td style={cell}>{gpsCell(d)}</td>
+                  <td style={{ ...cell, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button
+                      onClick={() => handleCopy(d.share_token)}
+                      title='Copy public tracking link to clipboard'
+                      style={{ background: '#f0f9ff', border: '1px solid #7dd3fc', color: '#0369a1', borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 6 }}
+                    >
+                      🔗 Copy link
+                    </button>
+                    <button
+                      onClick={() => handleEnd(d)}
+                      disabled={endingId === d.id}
+                      title='Mark this dispatch as completed and stop sharing location'
+                      style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: endingId === d.id ? 'wait' : 'pointer' }}
+                    >
+                      {endingId === d.id ? 'Ending…' : '🛑 End now'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -1529,7 +1717,8 @@ export default function AdminPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [deleting, setDeleting] = useState(null)
-  const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses' | 'parts'
+  const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses' | 'parts' | 'dispatches' | ...
+  const [openDispatchCount, setOpenDispatchCount] = useState(0)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   // Customer-tracking dispatch dialog state (null = closed, set to a
@@ -1666,6 +1855,22 @@ export default function AdminPage() {
       .finally(() => setLoading(false))
   }, [isAdmin, authLoading])
 
+  // Poll the open-dispatch count for the tab badge. Cheap query (one row
+  // per tracked customer; usually 0-3 rows) and DispatchesAdmin re-polls
+  // independently when its tab is active.
+  useEffect(() => {
+    if (authLoading || !isAdmin) return
+    let cancelled = false
+    const refresh = () => {
+      fetchOpenDispatches().then(list => {
+        if (!cancelled) setOpenDispatchCount(Array.isArray(list) ? list.length : 0)
+      }).catch(() => {})
+    }
+    refresh()
+    const i = setInterval(refresh, 20000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [isAdmin, authLoading])
+
   // Realtime: any insert/update/delete on submissions re-fetches the list so
   // the admin sees new submissions appear without refreshing. Falls back
   // silently if the realtime channel can't be established — initial fetch
@@ -1795,6 +2000,14 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('live')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'live' ? '#16a34a' : '#fff', color: activeTab === 'live' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeTab === 'live' ? '#fff' : '#16a34a', boxShadow: '0 0 0 2px #16a34a', animation: 'pulse 2s infinite' }}></span> Live
           </button>
+          <button onClick={() => setActiveTab('dispatches')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'dispatches' ? '#ea580c' : '#fff', color: activeTab === 'dispatches' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            📍 Dispatches
+            {openDispatchCount > 0 && (
+              <span style={{ background: activeTab === 'dispatches' ? 'rgba(255,255,255,0.22)' : '#ea580c', color: '#fff', fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 10, minWidth: 18, textAlign: 'center' }}>
+                {openDispatchCount}
+              </span>
+            )}
+          </button>
           <button onClick={() => setActiveTab("settings")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "settings" ? "#7c3aed" : "#fff", color: activeTab === "settings" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Settings
           </button>
@@ -1853,6 +2066,8 @@ export default function AdminPage() {
 
         {/* ASSIGN JOB TAB */}
         {activeTab === 'assign' && <AssignJobAdmin />}
+
+        {activeTab === 'dispatches' && <DispatchesAdmin />}
         {/* SUBMISSIONS TAB */}
         {activeTab === 'submissions' && (
           <>
