@@ -2288,11 +2288,14 @@ export default function AdminPage() {
     if (s?.data?.billable === false) return sum
     return sum + parseFloat(s.data?.grandTotal || 0)
   }, 0)
-  // Month-scoped stats (reset each month)
+  // Month-scoped stats (reset each month). Build the YYYY-MM prefix
+  // directly from local-time getters — using `new Date(y, m, 1).toISOString()`
+  // here silently returned the previous day in any TZ west of UTC, so on
+  // day 1 of the month the Revenue card pulled in the last day of the
+  // prior month.
   const nowD = new Date()
-  const monthStart = new Date(nowD.getFullYear(), nowD.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(nowD.getFullYear(), nowD.getMonth() + 1, 0).toISOString().split('T')[0]
-  const thisMonthSubs = submissions.filter(s => s.date >= monthStart && s.date <= monthEnd)
+  const yearMonth = nowD.getFullYear() + '-' + String(nowD.getMonth() + 1).padStart(2, '0')
+  const thisMonthSubs = submissions.filter(s => (s.date || '').startsWith(yearMonth))
   const monthRevenue = thisMonthSubs.reduce((sum, s) => {
     const lbl = getTypeLabel(s)
     if (lbl === 'EXP' || lbl === 'INSP') return sum

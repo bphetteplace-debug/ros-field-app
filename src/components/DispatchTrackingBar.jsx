@@ -57,9 +57,10 @@ export default function DispatchTrackingBar() {
 
   useEffect(() => {
     // If the dispatch goes away (completed by admin / 24h auto-expire),
-    // stop sharing.
+    // stop sharing. Guard navigator.geolocation match the cleanup effect
+    // above — some Android WebViews drop geolocation support mid-session.
     if (!dispatch && watchIdRef.current != null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
+      if (navigator.geolocation) navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
       setSharing(false)
     }

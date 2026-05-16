@@ -167,9 +167,13 @@ export default function ViewSubmissionPage() {
   if (!sub) return null
 
   const d = sub.data || {}
-  const isJHA = (d.jobType === 'JHA/JSA') || (sub.work_type || '').includes('JHA')
-  const isExpense = (d.jobType === 'Expense') || (sub.work_type || '').includes('Expense')
-  const isInspection = (d.jobType === 'Daily Inspection') || (sub.work_type || '').includes('Inspect')
+  // Prefer sub.template (the canonical type) over data.jobType / work_type
+  // — the latter two depend on how each form saved, and ExpenseReportPage
+  // in particular saves jobType:'Expense Report' (not 'Expense'), which
+  // used to fall through and render expenses as zeroed-out PMs.
+  const isJHA = sub.template === 'jha' || d.jobType === 'JHA/JSA' || (sub.work_type || '').includes('JHA')
+  const isExpense = sub.template === 'expense_report' || d.jobType === 'Expense Report' || d.jobType === 'Expense' || (sub.work_type || '').includes('Expense')
+  const isInspection = sub.template === 'daily_inspection' || d.jobType === 'Daily Inspection' || (sub.work_type || '').includes('Inspect')
   const parts = d.parts || []
   const techs = d.techs || []
   const isWarranty = d.warrantyWork || false
@@ -548,12 +552,23 @@ export default function ViewSubmissionPage() {
               {(d.checkItems || []).length > 0 && (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <tbody>
-                    {(d.checkItems || []).map((item, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', background: item.pass === false ? '#fff5f5' : 'transparent' }}>
-                        <td style={{ padding: '7px 12px', color: '#374151' }}>{item.label || item.name || ('Item ' + (i + 1))}</td>
-                        <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: item.pass === false ? '#dc2626' : '#16a34a' }}>{item.pass === false ? 'FAIL' : 'PASS'}</td>
-                      </tr>
-                    ))}
+                    {(d.checkItems || []).map((item, i) => {
+                      // DailyInspectionPage saves `item.result` ('Pass' | 'Fail' | 'N/A').
+                      // Legacy rows may have `item.pass` (boolean). Coalesce so old
+                      // and new data both render correctly; default to Pass for blanks.
+                      const status = item.result || (item.pass === false ? 'Fail' : item.pass === true ? 'Pass' : 'Pass')
+                      const isFail = status === 'Fail'
+                      const isNA = status === 'N/A'
+                      const color = isFail ? '#dc2626' : isNA ? '#92400e' : '#16a34a'
+                      const bg = isFail ? '#fff5f5' : isNA ? '#fffbeb' : 'transparent'
+                      const label = isFail ? 'FAIL' : isNA ? 'N/A' : 'PASS'
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', background: bg }}>
+                          <td style={{ padding: '7px 12px', color: '#374151' }}>{item.label || item.name || ('Item ' + (i + 1))}</td>
+                          <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color }}>{label}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )}
