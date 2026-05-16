@@ -344,13 +344,28 @@ export default function FormPage() {
   const [heaters,   setHeaters]   = useState([mkHT()])
   const [scEquipment,setScEquipment]=useState([])
 
-  // Live job clock — re-renders every 60s so the pill stays fresh.
-  // Drives auto-fill of Labor Hours at submit if the tech leaves it blank.
-  const [, setLiveTick] = useState(0)
+  // Live job clock — re-renders every 60s so the pill stays fresh and the
+  // Labor Hours field auto-populates from elapsed time. Stops driving the
+  // field once the tech manually types a value (laborHoursTouched=true).
+  const [liveTick, setLiveTick] = useState(0)
+  const [laborHoursTouched, setLaborHoursTouched] = useState(false)
   useEffect(() => {
     const id = setInterval(() => setLiveTick(t => t + 1), 60_000)
     return () => clearInterval(id)
   }, [])
+  useEffect(() => {
+    if (laborHoursTouched) return
+    if (!startTime || !/^\d{1,2}:\d{2}$/.test(startTime)) return
+    const [hh, mm] = startTime.split(':').map(Number)
+    const now = new Date()
+    let elapsedMin = (now.getHours()*60 + now.getMinutes()) - (hh*60 + mm)
+    if (elapsedMin < 0) elapsedMin += 24*60
+    const autoHours = Math.round(elapsedMin / 15) * 15 / 60
+    if (autoHours > 0) {
+      const next = String(autoHours)
+      setLaborHours(prev => prev === next ? prev : next)
+    }
+  }, [startTime, liveTick, laborHoursTouched])
 
   const [gpsLat,      setGpsLat]      = useState(null)
   const [gpsLng,      setGpsLng]      = useState(null)
@@ -544,6 +559,11 @@ export default function FormPage() {
     if(d.jobType)handleJobTypeChange(d.jobType)
     const sets=[['warrantyWork',setWarrantyWork],['customerName',setCustomerName],['truckNumber',setTruckNumber],['locationName',setLocationName],['customerContact',setCustomerContact],['customerWorkOrder',setCustomerWorkOrder],['typeOfWork',setTypeOfWork],['glCode',setGlCode],['assetTag',setAssetTag],['workArea',setWorkArea],['date',setDate],['startTime',setStartTime],['departureTime',setDepartureTime],['lastServiceDate',setLastServiceDate],['description',setDescription],['reportedIssue',setReportedIssue],['rootCause',setRootCause],['equipment',setEquipment],['miles',setMiles],['costPerMile',setCostPerMile],['laborHours',setLaborHours],['hourlyRate',setHourlyRate],['billableTechs',setBillableTechs]]
     sets.forEach(([k,fn])=>{ if(d[k]!==undefined)fn(d[k]) })
+    // If the saved draft already had a Labor Hours value, mark as touched
+    // so the live job-clock effect doesn't overwrite the tech's earlier entry.
+    if (d.laborHours !== undefined && d.laborHours !== '' && d.laborHours !== null) {
+      setLaborHoursTouched(true)
+    }
     if(d.techs?.length)setTechs(d.techs)
     if(d.permitsRequired?.length)setPermitsRequired(d.permitsRequired)
     if(d.parts?.length)setParts(d.parts)
@@ -1587,7 +1607,7 @@ export default function FormPage() {
             <div style={fld}><label style={lbl}>Rate ($/mile)</label><input style={inp} type="number" min="0" step="0.01" value={costPerMile} onChange={e=>setCostPerMile(e.target.value)} /></div>
           </div>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Labor Hours</label><input style={inp} type="number" min="0" step="0.25" value={laborHours} onChange={e=>setLaborHours(e.target.value)} placeholder="0.0" /></div>
+            <div style={fld}><label style={lbl}>Labor Hours</label><input style={inp} type="number" min="0" step="0.25" value={laborHours} onChange={e=>{setLaborHours(e.target.value); setLaborHoursTouched(true)}} placeholder="0.0" /></div>
             <div style={fld}><label style={lbl}>Rate ($/hour)</label><input style={inp} type="number" min="0" value={hourlyRate} onChange={e=>setHourlyRate(e.target.value)} /></div>
           </div>
 
