@@ -863,7 +863,7 @@ export async function fetchPartsCatalog() {
 export async function addPart({ code, description, price, category }) {
   const r = await fetch('/api/parts-catalog', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') },
     body: JSON.stringify({ code: code||'', description, price: parseFloat(price)||0, category: category||'' })
   });
   const data = await r.json();
@@ -874,7 +874,7 @@ export async function addPart({ code, description, price, category }) {
 export async function deletePart(id) {
   const r = await fetch('/api/parts-catalog', {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') },
     body: JSON.stringify({ id })
   });
   if (!r.ok) {
@@ -886,7 +886,7 @@ export async function deletePart(id) {
 export async function updatePart(id, { code, description, price, category }) {
   const r = await fetch('/api/parts-catalog', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') },
     body: JSON.stringify({ id, code: code||'', description, price: parseFloat(price)||0, category: category||'' })
   });
   const data = await r.json();
