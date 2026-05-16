@@ -134,28 +134,32 @@ def parse_workbook(path):
             # Skip rows where everything is null
             if col_a is None and col_b is None and col_c is None and col_e is None:
                 continue
-            # Skip rows where description is missing AND amount is missing
-            description = col_b
-            if not description and col_a and not iso_date(col_a):
-                # If column A has a non-date string and column B is empty,
-                # treat A as the description (we see this in May's sheet)
+
+            # Workbook is inconsistent: some sheets have Date in column A
+            # and Description in B (Jan-April); others have Description
+            # in A and Date in B (May+). Auto-detect by looking at which
+            # column parses as a date.
+            iso_a = iso_date(col_a)
+            iso_b = iso_date(col_b)
+            if iso_a and not iso_b:
+                date = iso_a
+                description = col_b
+            elif iso_b and not iso_a:
+                date = iso_b
                 description = col_a
+            elif iso_a and iso_b:
+                # Both look like dates — use A as date, B as description fallback
+                date = iso_a
+                description = col_b
+            else:
+                # Neither is a date — default to 1st of month
+                date = year + '-' + MONTH_NUM.get(month_short, '01') + '-01'
+                description = col_b or col_a
+
             if not description:
                 continue
             if col_c is None or col_c == 0:
                 continue
-
-            # Date: try column A first, then column B (some rows have
-            # description in A and date in B)
-            iso_a = iso_date(col_a)
-            iso_b = iso_date(col_b)
-            date = iso_a or iso_b
-            # If the description came from column A (no date there),
-            # try the original A again as a string with a possible date
-            if not date:
-                # If col_a was the description, there's no usable date —
-                # default to the 1st of the month
-                date = year + '-' + MONTH_NUM.get(month_short, '01') + '-01'
 
             # Category: respect explicit column D, else use current section
             category = col_d if col_d in ('Fixed', 'Payroll', 'Other') else current_category
