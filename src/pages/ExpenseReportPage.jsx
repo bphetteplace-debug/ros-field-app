@@ -4,6 +4,8 @@ import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
 import { saveDraft as saveDraftToStore, loadDraft as loadDraftFromStore, clearDraft as clearDraftFromStore } from '../lib/draftStore'
 import { toast } from '../lib/toast'
+import { compressImage } from '../lib/imageCompress'
+import { parseReceiptText } from '../lib/receiptParser'
 
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
@@ -121,6 +123,56 @@ export default function ExpenseReportPage() {
     return () => { cancelled = true }
   }, [profile?.full_name, profile?.truck_number])
 
+  // Per-row "scanning receipt" state. null = no scan in progress;
+  // otherwise the index of the row currently being OCR'd.
+  const [scanningIdx, setScanningIdx] = useState(null)
+
+  // Run Tesseract OCR on a receipt photo, parse the text, and fill
+  // any empty fields on the row. Never overwrites user input — a row
+  // is treated as "untouched" only if description is empty.
+  async function scanReceiptAndFill(rowIndex, file) {
+    if (!file) return
+    setScanningIdx(rowIndex)
+    try {
+      const compressed = await compressImage(file).catch(() => file)
+      const Tesseract = await import('tesseract.js')
+      const worker = await Tesseract.createWorker('eng')
+      const ret = await worker.recognize(compressed)
+      await worker.terminate()
+      const raw = (ret && ret.data && ret.data.text) ? ret.data.text : ''
+      const text = raw.replace(/\s+/g, ' ').trim()
+      const parsed = parseReceiptText(text)
+      // Apply parsed values, only filling EMPTY fields. Use the freshest
+      // expenses via the functional setExpenses form so we don't clobber
+      // any other in-flight edits.
+      setExpenses(prev => prev.map((e, idx) => {
+        if (idx !== rowIndex) return e
+        // If user has typed a description already, treat row as user-owned
+        // and don't touch any field — they know what they're doing.
+        if (e.description && e.description.trim()) return e
+        const next = { ...e }
+        if (parsed.vendor && !next.description) next.description = parsed.vendor
+        if (parsed.amount != null && (next.amount === '' || next.amount == null)) {
+          next.amount = parsed.amount.toFixed(2)
+        }
+        if (parsed.category) next.category = parsed.category
+        return next
+      }))
+      // Toast a brief summary so the tech knows what landed.
+      const bits = []
+      if (parsed.vendor) bits.push(parsed.vendor)
+      if (parsed.amount != null) bits.push('$' + parsed.amount.toFixed(2))
+      if (parsed.category) bits.push(parsed.category)
+      if (bits.length > 0) toast.success('Scanned receipt: ' + bits.join(' · '))
+      else toast.info("Couldn't auto-read this receipt — please fill the fields manually.")
+    } catch (e) {
+      console.warn('Receipt OCR failed:', e)
+      toast.warning("Couldn't scan receipt — please fill the fields manually.")
+    } finally {
+      setScanningIdx(prev => (prev === rowIndex ? null : prev))
+    }
+  }
+
   const updExp = (i, k, v) => {
     const next = expenses.map((e, idx) => idx === i ? { ...e, [k]: v } : e)
     setExpenses(next)
@@ -128,6 +180,13 @@ export default function ExpenseReportPage() {
     // doesn't drop the receipt within the 2s autosave debounce window.
     if (k === 'receipt' || k === 'itemPhoto') {
       saveDraft(next).catch(() => {})
+    }
+    // When a receipt photo is added, scan it for vendor / amount /
+    // category. Only on the SET path (v truthy) — removing the receipt
+    // shouldn't try to OCR null. saveDraft already saved the photo
+    // synchronously above, so OCR happening async after is safe.
+    if (k === 'receipt' && v) {
+      scanReceiptAndFill(i, v)
     }
   }
   const removeExp = (i) => setExpenses(es => es.filter((_, idx) => idx !== i))
@@ -273,8 +332,14 @@ export default function ExpenseReportPage() {
                 <input style={inp} value={exp.description} onChange={e => updExp(i, 'description', e.target.value)} placeholder="e.g. Shell Station, McDonald's, Hampton Inn..." />
               </div>
               {/* DUAL PHOTO PICKERS */}
+              {scanningIdx === i && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: 6, fontSize: 12, color: '#9a3412', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid #fdba74', borderTopColor: '#9a3412', borderRadius: '50%', animation: 'ocrSpin 0.9s linear infinite' }}></span>
+                  Reading receipt — vendor, amount &amp; category will auto-fill in a moment…
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-                <PhotoPicker label="Receipt Photo" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} />
+                <PhotoPicker label="📷 Receipt (auto-scans)" value={exp.receipt} onChange={v => updExp(i, 'receipt', v)} />
                 <PhotoPicker label="Item / Purchase Photo" value={exp.itemPhoto} onChange={v => updExp(i, 'itemPhoto', v)} />
               </div>
             </div>
