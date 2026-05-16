@@ -15,6 +15,7 @@ import {
   deleteMonthlyExpense,
 } from '../lib/monthlyExpenses'
 import { downloadTaxExportXlsx, downloadTaxExportCsv, computeTaxExportPreview, periodRange } from '../lib/taxExport'
+import { downloadCpaPdf } from '../lib/cpaReport'
 
 const inp = { border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
 const lbl = { fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' }
@@ -153,6 +154,7 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
   const [editing, setEditing] = useState(null)
   const [allMonths, setAllMonths] = useState([])
   const [exporting, setExporting] = useState(false)
+  const [cpaPdfBuilding, setCpaPdfBuilding] = useState(false)
   const [exportYear, setExportYear] = useState(String(new Date().getFullYear()))
   const [exportPeriod, setExportPeriod] = useState('year') // year / q1 / q2 / q3 / q4 / custom
   const [exportCustomStart, setExportCustomStart] = useState('')
@@ -315,6 +317,22 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
     }
   }
 
+  const handleCpaPdf = async () => {
+    setCpaPdfBuilding(true)
+    try {
+      await downloadCpaPdf({
+        submissions,
+        monthlyExpenses: fullExpensesForExport,
+        year: parseInt(exportYear, 10),
+      })
+      toast.success('CPA reconciliation PDF downloaded')
+    } catch (e) {
+      toast.error('CPA PDF failed: ' + (e.message || e))
+    } finally {
+      setCpaPdfBuilding(false)
+    }
+  }
+
   const exportYearOptions = (() => {
     const opts = new Set()
     for (const e of entries) if (e.month_year) opts.add(e.month_year.slice(0, 4))
@@ -406,6 +424,27 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
             }}
           >
             {exporting ? 'Building…' : '📥 Download'}
+          </button>
+        </div>
+
+        {/* CPA PDF button — separate row so it sits below the main XLSX/CSV controls */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: '#94a3b8', textAlign: 'right' }}>
+            One-page reconciliation: Operating P&L + Debt Service + CPA decision items
+          </span>
+          <button
+            onClick={handleCpaPdf}
+            disabled={cpaPdfBuilding}
+            style={{
+              background: cpaPdfBuilding ? '#475569' : '#0891b2',
+              color: '#fff', border: 'none', borderRadius: 8,
+              padding: '8px 16px', fontSize: 12, fontWeight: 800,
+              cursor: cpaPdfBuilding ? 'wait' : 'pointer',
+              boxShadow: '0 4px 12px rgba(8,145,178,0.30)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {cpaPdfBuilding ? 'Building…' : '📄 CPA PDF'}
           </button>
         </div>
 
