@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getQueueCount } from '../lib/offlineSync';
 import DispatchTrackingBar from './DispatchTrackingBar';
+import AssistantDrawer from './AssistantDrawer';
 
 function ConnectionBanner() {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine !== false : true);
@@ -92,6 +93,7 @@ export default function Layout({ children }) {
       <ConnectionBanner />
       <DispatchTrackingBar />
       {children}
+      <AssistantDrawer />
     </div>
   );
 }
