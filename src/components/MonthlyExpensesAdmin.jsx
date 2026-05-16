@@ -15,7 +15,7 @@ import {
   deleteMonthlyExpense,
 } from '../lib/monthlyExpenses'
 import { downloadTaxExportXlsx, downloadTaxExportCsv, computeTaxExportPreview, periodRange } from '../lib/taxExport'
-import { downloadCpaPdf } from '../lib/cpaReport'
+import { downloadCpaPdf, buildCpaReportData } from '../lib/cpaReport'
 
 const inp = { border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
 const lbl = { fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' }
@@ -292,6 +292,15 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
     [submissions, fullExpensesForExport, exportRange]
   )
 
+  // YTD operating P&L + net margin, recomputed any time submissions or
+  // expenses change. Shown as the leftmost summary badge so the owner can
+  // glance at the tab and see margin-of-business-as-a-whole.
+  const ytdPL = useMemo(() => {
+    const d = buildCpaReportData(submissions, fullExpensesForExport, new Date().getFullYear())
+    const margin = d.revenue > 0 ? (d.netPL / d.revenue) * 100 : 0
+    return { netPL: d.netPL, revenue: d.revenue, margin }
+  }, [submissions, fullExpensesForExport])
+
   const handleExport = async () => {
     setExporting(true)
     try {
@@ -366,6 +375,21 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
 
       {/* Summary cards */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+        {!isDemo && (() => {
+          const m = ytdPL.margin
+          // Color thresholds: >=20% healthy / 5-20% OK / 0-5% marginal / <0 losing
+          const c = m >= 20 ? '#16a34a' : m >= 5 ? '#1d4ed8' : m >= 0 ? '#92400e' : '#dc2626'
+          const pct = (m >= 0 ? '+' : '') + m.toFixed(1) + '%'
+          return (
+            <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '2px solid ' + c, flex: '1 1 170px', minWidth: 170 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: c }}>{pct}</div>
+              <div style={{ fontSize: 11, color: '#888', fontWeight: 600, marginTop: 2 }}>P&amp;L Margin (YTD)</div>
+              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                {fmtMoney(ytdPL.netPL)} on {fmtMoney(ytdPL.revenue)}
+              </div>
+            </div>
+          )
+        })()}
         {!isDemo && card('Fixed', fmtMoney(summary.Fixed), '#1d4ed8')}
         {!isDemo && card('Payroll', fmtMoney(summary.Payroll), '#6d28d9')}
         {!isDemo && card('Other', fmtMoney(summary.Other), '#475569')}
