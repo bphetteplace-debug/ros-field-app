@@ -9,6 +9,7 @@ import TechMap from '../components/TechMap'
 import StartDispatchDialog from '../components/StartDispatchDialog'
 import ShareDispatchDialog from '../components/ShareDispatchDialog'
 import DispatchMapModal from '../components/DispatchMapModal'
+import PmScheduleAdmin from '../components/PmScheduleAdmin'
 import { fetchOpenDispatches, setDispatchStatus, formatRelativeTime, formatEta } from '../lib/dispatch'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -2330,6 +2331,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('live')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'live' ? '#16a34a' : '#fff', color: activeTab === 'live' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeTab === 'live' ? '#fff' : '#16a34a', boxShadow: '0 0 0 2px #16a34a', animation: 'pulse 2s infinite' }}></span> Live
           </button>
+          <button onClick={() => setActiveTab('pm-schedule')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'pm-schedule' ? '#1d4ed8' : '#fff', color: activeTab === 'pm-schedule' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            📅 PM Schedule
+          </button>
           <button onClick={() => setActiveTab('dispatches')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'dispatches' ? '#ea580c' : '#fff', color: activeTab === 'dispatches' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             📍 Dispatches
             {openDispatchCount > 0 && (
@@ -2401,6 +2405,8 @@ export default function AdminPage() {
 
         {/* ASSIGN JOB TAB */}
         {activeTab === 'assign' && <AssignJobAdmin />}
+
+        {activeTab === 'pm-schedule' && <PmScheduleAdmin />}
 
         {activeTab === 'dispatches' && <DispatchesAdmin />}
         {/* SUBMISSIONS TAB */}
