@@ -766,6 +766,32 @@ export async function fetchSubmission(id) {
   return fetchSubmissionById(id);
 }
 
+// Lookup the most recent prior PM/SC submission for a (customer, location)
+// pair. Used by FormPage's "Copy from last visit" smart-fill chip — tech
+// enters the same site they've been to before, we offer to pre-fill the
+// service-type, parts, equipment, and foreman from the previous job.
+// Returns { id, date, template, pm_number, data } or null.
+export async function fetchLastVisit(customerName, locationName) {
+  if (!customerName || !locationName) return null;
+  try {
+    const customer = encodeURIComponent(String(customerName).trim());
+    const location = encodeURIComponent(String(locationName).trim());
+    const data = await supaRest(
+      'GET',
+      'submissions?customer_name=eq.' + customer +
+      '&location_name=eq.' + location +
+      '&template=in.(pm_flare_combustor,service_call)' +
+      '&order=date.desc,created_at.desc' +
+      '&limit=1' +
+      '&select=id,date,template,work_type,pm_number,data'
+    );
+    return Array.isArray(data) && data[0] ? data[0] : null;
+  } catch (e) {
+    console.warn('[fetchLastVisit] failed:', e?.message || e);
+    return null;
+  }
+}
+
 export function getPhotoUrl(storagePath) {
   if (!storagePath) return null;
   return SUPA_URL + '/storage/v1/object/public/submission-photos/' + storagePath;

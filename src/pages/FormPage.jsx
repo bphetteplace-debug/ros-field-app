@@ -12,8 +12,10 @@ import {
   fetchPartsCatalog,
   fetchSubmission,
   fetchSubmissions,
+  fetchLastVisit,
   getAuthToken,
 } from '../lib/submissions'
+import { toast } from '../lib/toast'
 import {
   saveDraft as saveDraftToStore,
   loadDraft as loadDraftFromStore,
@@ -348,6 +350,13 @@ export default function FormPage() {
   const [heaters,   setHeaters]   = useState([mkHT()])
   const [scEquipment,setScEquipment]=useState([])
 
+  // Smart "Copy from last visit" — look up the tech's most recent prior
+  // PM/SC at the same customer+location and offer a one-tap copy of the
+  // safe fields (service type, parts, equipment, foreman). Photos /
+  // signatures / dates / GPS are never copied — those are fresh per job.
+  const [lastVisit, setLastVisit] = useState(null)
+  const [lastVisitDismissed, setLastVisitDismissed] = useState(false)
+
   // Live job clock — re-renders every 60s so the pill stays fresh and the
   // Labor Hours field auto-populates from elapsed time. Stops driving the
   // field once the tech manually types a value (laborHoursTouched=true).
@@ -384,6 +393,20 @@ export default function FormPage() {
       setLaborHours(prev => prev === next ? prev : next)
     }
   }, [startTime, departureTime, liveTick, laborHoursTouched])
+
+  // Smart "Copy from last visit" lookup — debounced on customer/location
+  // change so we don't pound the API on every keystroke. Race-safe via
+  // `cancelled` so an older in-flight result can't clobber a newer one.
+  useEffect(() => {
+    if (!customerName || !locationName) { setLastVisit(null); return }
+    if (lastVisitDismissed) return
+    let cancelled = false
+    const t = setTimeout(async () => {
+      const prev = await fetchLastVisit(customerName, locationName)
+      if (!cancelled) setLastVisit(prev)
+    }, 500)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [customerName, locationName, lastVisitDismissed])
 
   const [gpsLat,      setGpsLat]      = useState(null)
   const [gpsLng,      setGpsLng]      = useState(null)
@@ -707,6 +730,62 @@ export default function FormPage() {
     applyLoadedDraft(draft)
     setTemplateApplied(true)
     setHasDraft(false)
+  }
+
+  // Smart "Copy from last visit" — when the tech has entered customer +
+  // location and we found a prior submission at the same site, this fills
+  // ONLY the fields that typically repeat at the same physical site:
+  // service type, asset IDs, parts list, equipment, foreman. Resets
+  // visit-specific stuff (condition, photos, dates, GPS, descriptions,
+  // signatures, money) so the tech inspects fresh.
+  function applyLastVisit(visit) {
+    const d = visit?.data || {}
+    const draft = {
+      typeOfWork: visit.work_type || d.typeOfWork,
+      glCode: d.glCode,
+      assetTag: d.assetTag,
+      workArea: d.workArea,
+      customerContact: d.customerContact,
+      equipment: d.equipment,
+      permitsRequired: d.permitsRequired,
+      parts: Array.isArray(d.parts) ? d.parts : undefined,
+      scEquipment: Array.isArray(d.scEquipment) ? d.scEquipment : undefined,
+      arrestors: Array.isArray(d.arrestors) && d.arrestors.length > 0
+        ? d.arrestors.map(a => ({
+            arrestorId: a.arrestorId || '',
+            condition: 'Good',
+            filterChanged: false,
+            notes: '',
+            before1: null, before2: null, after1: null, after2: null,
+          }))
+        : undefined,
+      flares: Array.isArray(d.flares) && d.flares.length > 0
+        ? d.flares.map(f => ({
+            flareId: f.flareId || '',
+            pilotLit: true,
+            lastIgnition: '',
+            condition: 'Good',
+            notes: '',
+            photo1: null, photo2: null,
+          }))
+        : undefined,
+      heaters: Array.isArray(d.heaters) && d.heaters.length > 0
+        ? d.heaters.map(h => ({
+            heaterId: h.heaterId || '',
+            lastCleanDate: '',
+            condition: 'Good',
+            notes: '',
+            firetubes: Array.isArray(h.firetubes) && h.firetubes.length > 0
+              ? h.firetubes.map(() => ({ condition: 'Good', photo1: null, photo2: null }))
+              : [{ condition: 'Good', photo1: null, photo2: null }],
+          }))
+        : undefined,
+    }
+    applyLoadedDraft(draft)
+    setLastVisit(null)
+    setLastVisitDismissed(true)
+    const when = visit.date ? new Date(visit.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'last visit'
+    toast.success('Copied details from your visit on ' + when)
   }
 
   const toDataUrl = file=>new Promise((res,rej)=>{ const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file) })
@@ -1109,6 +1188,40 @@ export default function FormPage() {
             <label style={lbl}>Location / Well Name <span style={{color:T.red}}>*</span></label>
             <input style={inp} value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="e.g. Pad A — Well 12" />
           </div>
+
+          {/* Smart "Copy from last visit" chip — fires once customer +
+              location are filled and we found a matching prior PM/SC at the
+              same site. Tap copies safe fields (service type, asset IDs,
+              parts, equipment). Photos/conditions/dates/GPS stay fresh. */}
+          {lastVisit && !lastVisitDismissed && (
+            <div style={{
+              background: 'linear-gradient(135deg, #064e3b 0%, #0f766e 100%)',
+              color: '#fff',
+              borderRadius: 11,
+              padding: '12px 16px',
+              marginBottom: 14,
+              boxShadow: '0 4px 14px rgba(6,78,59,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              <span style={{ fontSize: 22, lineHeight: 1 }}>📋</span>
+              <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>Smart copy</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Copy details from your last visit here
+                  {lastVisit.date ? ' (' + new Date(lastVisit.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : ''}
+                  {lastVisit.pm_number ? ' · #' + lastVisit.pm_number : ''}
+                </div>
+              </div>
+              <button type="button" onClick={() => applyLastVisit(lastVisit)}
+                style={{ fontSize: 12, padding: '7px 14px', background: T.orange, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 800, letterSpacing: 0.3, flexShrink: 0, boxShadow: '0 2px 8px rgba(230,92,0,0.4)' }}>
+                Copy
+              </button>
+              <button type="button" onClick={() => setLastVisitDismissed(true)} aria-label="Dismiss"
+                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', padding: 4, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+          )}
 
           {/* GPS capture */}
           <div style={{marginBottom:14,padding:'12px 14px',background:gpsLat?'#f0fdf4':'#f8f9fc',border:`1.5px solid ${gpsLat?T.green:T.border}`,borderRadius:9,transition:'all 0.2s'}}>
