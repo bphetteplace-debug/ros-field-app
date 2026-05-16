@@ -6,6 +6,7 @@ import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPar
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import TechMap from '../components/TechMap'
+import StartDispatchDialog from '../components/StartDispatchDialog'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -1346,6 +1347,9 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('submissions') // 'submissions' | 'expenses' | 'parts'
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
+  // Customer-tracking dispatch dialog state (null = closed, set to a
+  // submission object to open).
+  const [dispatchSub, setDispatchSub] = useState(null)
 
   const handleStatusChange = async (id, newStatus) => {
     const sub = submissions.find(s => s.id === id)
@@ -1896,6 +1900,9 @@ export default function AdminPage() {
                         {!isDemo && (
                           <button onClick={() => handleShare(s)} title={s.share_token ? 'Copy existing share link' : 'Generate share link for customer'} style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#16a34a', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🔗</button>
                         )}
+                        {!isDemo && (
+                          <button onClick={() => setDispatchSub(s)} title="Email customer a live tracking link" style={{ background: '#fff7ed', border: '1px solid #fdba74', color: '#ea580c', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📍</button>
+                        )}
                         {!isDemo && <button onClick={() => handleDelete(s)} disabled={isBeingDeleted} title="Delete submission" style={{ background: '#fff5f5', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: isBeingDeleted ? 'not-allowed' : 'pointer' }}>
                           {isBeingDeleted ? '...' : '🗑 Del'}
                         </button>}
@@ -1908,6 +1915,27 @@ export default function AdminPage() {
           </>
         )}
       </div>
+      {dispatchSub && (
+        <StartDispatchDialog
+          submission={dispatchSub}
+          techName={
+            (Array.isArray(dispatchSub.data?.techs) && dispatchSub.data.techs[0]) ||
+            dispatchSub.profiles?.full_name ||
+            null
+          }
+          onClose={() => setDispatchSub(null)}
+          onSent={({ token }) => {
+            logAudit({
+              userId: user?.id,
+              userName: profile?.full_name || user?.email,
+              action: 'dispatch_started',
+              targetType: 'submission',
+              targetId: dispatchSub.id,
+              details: { pm_number: dispatchSub.pm_number, customer_name: dispatchSub.customer_name, share_token: token },
+            })
+          }}
+        />
+      )}
     </div>
   )
 }

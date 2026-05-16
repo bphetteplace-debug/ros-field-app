@@ -4,6 +4,11 @@ import { useAuth } from './lib/auth.jsx';
 import Layout from './components/Layout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SharePage from './pages/SharePage.jsx';
+// TrackDispatchPage is lazy because it pulls in Leaflet (~155 KB) and we
+// don't want that in the main bundle. It IS rendered from public branches
+// (no user / loading), so each of those branches wraps Routes in a small
+// Suspense boundary.
+const TrackDispatchPage = lazy(() => import('./pages/TrackDispatchPage.jsx'));
 
 // Route-level code splitting: each authenticated page is its own chunk so the
 // main bundle stays small. LoginPage and SharePage are eager because they
@@ -33,25 +38,39 @@ export default function App() {
 
   if (loading) {
     return (
-      <Routes>
-        {/* Share links are public — never gated by auth */}
-        <Route path="/share/:token" element={<SharePage />} />
-        <Route path="*" element={
-          <div className="min-h-screen flex items-center justify-center bg-slate-100">
-            <div className="text-slate-500 text-sm">Loading…</div>
-          </div>
-        } />
-      </Routes>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="text-slate-500 text-sm">Loading…</div>
+        </div>
+      }>
+        <Routes>
+          {/* Share links + tracking links are public — never gated by auth */}
+          <Route path="/share/:token" element={<SharePage />} />
+          <Route path="/track/:token" element={<TrackDispatchPage />} />
+          <Route path="*" element={
+            <div className="min-h-screen flex items-center justify-center bg-slate-100">
+              <div className="text-slate-500 text-sm">Loading…</div>
+            </div>
+          } />
+        </Routes>
+      </Suspense>
     );
   }
 
   if (!user) {
     return (
-      <Routes>
-        <Route path="/share/:token" element={<SharePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-100">
+          <div className="text-slate-500 text-sm">Loading…</div>
+        </div>
+      }>
+        <Routes>
+          <Route path="/share/:token" element={<SharePage />} />
+          <Route path="/track/:token" element={<TrackDispatchPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -59,8 +78,9 @@ export default function App() {
     <Layout>
       <Suspense fallback={<PageFallback />}>
         <Routes>
-          {/* Public share — works whether or not the visitor is logged in */}
+          {/* Public share + tracking — work whether or not the visitor is logged in */}
           <Route path="/share/:token" element={<SharePage />} />
+          <Route path="/track/:token" element={<TrackDispatchPage />} />
           <Route path="/submissions" element={<SubmissionsListPage />} />
           <Route path="/form" element={<FormPage />} />
           <Route path="/expense" element={<ExpenseReportPage />} />
