@@ -22,6 +22,7 @@ import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
 import { compressImage } from '../lib/imageCompress'
+import { captionPhoto } from '../lib/captionPhoto'
 import MicButton from '../components/MicButton'
 import CameraOcrButton from '../components/CameraOcrButton'
 import PolishButton from '../components/PolishButton'
@@ -400,6 +401,17 @@ export default function FormPage() {
       caption: '',
     }));
     setPhotos(p => [...p, ...stamped]);
+    // Kick off AI captioning for each new photo in the background.
+    // Each result writes back to its photo only if its caption is still
+    // empty (don't overwrite anything the tech may have typed in the
+    // meantime). Fire-and-forget — never blocks the add flow or the
+    // submit; failures are silently swallowed by captionPhoto.
+    for (const item of stamped) {
+      captionPhoto(item.file, 'service_work').then(caption => {
+        if (!caption) return;
+        setPhotos(p => p.map(x => x.id === item.id && !x.caption ? { ...x, caption } : x));
+      }).catch(() => {});
+    }
   }
 
   const handleJobTypeChange = newType => {
