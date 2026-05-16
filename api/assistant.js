@@ -36,10 +36,13 @@ async function supaGet(path) {
 }
 
 function escapeSupaValue(v) {
-  // Postgrest filter values can't contain commas / parens without
-  // escaping. For the simple uses below, strip out any chars that
-  // could break the URL or smuggle filters.
-  return String(v).replace(/[(),%]/g, ' ').trim();
+  // URL-encode the value so it can't break out of its filter slot.
+  // The old `.replace(/[(),%]/g, ' ')` left `*`, `&`, and `=` alone, so
+  // a tool argument like `customer_name="foo&status=eq.draft"` could
+  // append a second PostgREST filter and scope the query outside intent.
+  // Tool arguments come from the model, which is in turn driven by
+  // free-text user prompts — assume adversarial input.
+  return encodeURIComponent(String(v));
 }
 
 const TOOLS = [

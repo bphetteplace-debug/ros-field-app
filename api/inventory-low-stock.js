@@ -15,13 +15,17 @@ function escapeHtml(s) {
 }
 
 module.exports = async function handler(req, res) {
-  // Optional auth: if CRON_SECRET is set, require it. Vercel cron requests
-  // include Authorization: Bearer ${CRON_SECRET} automatically when configured.
-  if (process.env.CRON_SECRET) {
-    const auth = req.headers['authorization'] || '';
-    if (auth !== 'Bearer ' + process.env.CRON_SECRET) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
+  // Require CRON_SECRET. Was: check was *optional* — if the env var was
+  // unset, the endpoint was publicly POSTable and could trigger a real
+  // restock-alert email at attacker pace. Vercel cron requests include
+  // `Authorization: Bearer ${CRON_SECRET}` automatically when configured,
+  // so admin just needs the env var set in Vercel (Production scope).
+  if (!process.env.CRON_SECRET) {
+    return res.status(500).json({ error: 'CRON_SECRET not configured' });
+  }
+  const auth = req.headers['authorization'] || '';
+  if (auth !== 'Bearer ' + process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
   }
 
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
