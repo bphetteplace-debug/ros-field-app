@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { buildPDFData } from '../lib/pdfData';
 import { getPhotoUrl, fetchSettings } from '../lib/submissions';
+import { toast } from '../lib/toast';
 
 async function loadHtml2Pdf() {
     const mod = await import('html2pdf.js');
@@ -58,7 +59,7 @@ export function DownloadPDFButton({ sub, style }) {
           container.remove();
         } catch (err) {
                 console.error('PDF generation failed:', err);
-                alert('PDF generation failed: ' + err.message);
+                toast.error('PDF generation failed: ' + err.message);
         } finally {
                                                      setBusy(false);
         }

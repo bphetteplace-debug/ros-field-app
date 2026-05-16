@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
+import { toast } from '../lib/toast'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -107,8 +108,8 @@ export default function QuotePage() {
 
   async function submitQuote() {
     var cn = addingNew ? newCustomer.trim() : customerName
-    if (!cn) { alert('Please select or enter a customer name'); return }
-    if (!customerEmail) { alert('Please enter customer email to send quote'); return }
+    if (!cn) { toast.warning('Please select or enter a customer name'); return }
+    if (!customerEmail) { toast.warning('Please enter customer email to send quote'); return }
     setSending(true)
     try {
       // Save to DB
@@ -151,10 +152,10 @@ export default function QuotePage() {
         })
       })
       if (!res.ok) throw new Error('Failed to send quote')
-      alert('Quote sent to ' + customerEmail + '!')
+      toast.success('Quote sent to ' + customerEmail + '!')
       navigate('/submissions')
     } catch(e) {
-      alert('Error: ' + e.message)
+      toast.error('Error: ' + e.message)
     }
     setSending(false)
   }

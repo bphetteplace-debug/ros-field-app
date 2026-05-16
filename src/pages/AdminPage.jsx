@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken, createAssignedSubmission } from '../lib/submissions'
 import { supabase } from '../lib/supabase'
+import { toast } from '../lib/toast'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -211,9 +212,7 @@ function LivePresence() {
 
   async function fetchPresence() {
     try {
-      const tokenKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
-      let token = null
-      try { token = tokenKey ? JSON.parse(localStorage.getItem(tokenKey))?.access_token : null } catch { token = null }
+      const token = getAuthToken()
       const res = await fetch(SUPA_URL_P + '/rest/v1/user_presence?select=*&order=updated_at.desc', {
         headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + (token || SUPA_KEY_P) }
       })
@@ -823,7 +822,7 @@ function UsersAdmin() {
       if (!res.ok) throw new Error('Failed to update role')
       setProfiles(ps => ps.map(p => p.id === userId ? { ...p, role } : p))
     } catch (e) {
-      alert('Error updating role: ' + e.message)
+      toast.error('Error updating role: ' + e.message)
     } finally { setSaving(null) }
   }
 
@@ -1363,7 +1362,7 @@ export default function AdminPage() {
       })
     } catch(e) {
       console.error('Status update failed:', e)
-      alert('Status update failed: ' + (e.message || e) + '\nReverting to "' + prevStatus.toUpperCase() + '".')
+      toast.error('Status update failed: ' + (e.message || e) + '\nReverting to "' + prevStatus.toUpperCase() + '".')
       setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: prevStatus } : s))
     }
   }
@@ -1379,9 +1378,9 @@ export default function AdminPage() {
         action: 'submission_shared', targetType: 'submission', targetId: s.id,
         details: { pm_number: s.pm_number, customer_name: s.customer_name },
       })
-      alert('Share link copied to clipboard:\n\n' + url + '\n\nAnyone with this link can view this submission read-only. Send it to the customer.')
+      toast.success('Share link copied. Anyone with the link can view this submission read-only.', 5000)
     } catch (e) {
-      alert('Couldn\'t generate share link: ' + (e.message || e))
+      toast.error('Couldn\'t generate share link: ' + (e.message || e))
     }
   }
 
@@ -1462,7 +1461,7 @@ export default function AdminPage() {
         details: { pm_number: s.pm_number, customer_name: s.customer_name, type: lbl, date: s.date },
       })
     } catch(e) {
-      alert('Delete failed: ' + e.message)
+      toast.error('Delete failed: ' + e.message)
     } finally {
       setDeleting(null)
     }

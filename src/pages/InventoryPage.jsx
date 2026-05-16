@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import { fetchPartsCatalog, getAuthToken } from '../lib/submissions'
+import { toast } from '../lib/toast'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -188,7 +189,7 @@ export default function InventoryPage() {
       setSaved(true)
       setTimeout(function() { setSaved(false) }, 2000)
     } catch(e) {
-      alert('Save error: ' + e.message)
+      toast.error('Save error: ' + e.message)
     }
     setSaving(false)
   }
