@@ -94,17 +94,17 @@ const showsVideos      = jt => ['Service Call','Repair','Other'].includes(jt)
 const showsPMEquipment = jt => jt === 'PM'
 const showsSCEquipment = jt => ['Service Call','Repair','Other'].includes(jt)
 const showsIssueFields = jt => ['Service Call','Repair'].includes(jt)
-// Returns current time as "HH:MM" 24-hr, snapped to nearest quarter hour
-// (so the auto-set Arrival/Departure times land on clean :00 / :15 / :30 / :45
-// marks instead of whatever odd minute the form happens to open at).
-const nowStr = () => {
-  const d = new Date()
-  const totalMin = (d.getHours() * 60 + d.getMinutes())
-  const rounded = (Math.round(totalMin / 15) * 15) % (24 * 60)
-  const hh = String(Math.floor(rounded / 60)).padStart(2, '0')
-  const mm = String(rounded % 60).padStart(2, '0')
-  return `${hh}:${mm}`
+// Snap any "HH:MM" 24-hr time string to the nearest quarter hour
+// (:00 / :15 / :30 / :45) — e.g. 3:25 → 3:30, 6:47 → 6:45, 6:55 → 7:00.
+// Used by both the time-input change handlers and nowStr() so every
+// time value on the form lands on a clean quarter.
+const roundQuarter = (hhmm) => {
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return hhmm
+  const [h, m] = hhmm.split(':').map(Number)
+  const rounded = (Math.round((h * 60 + m) / 15) * 15) % (24 * 60)
+  return String(Math.floor(rounded / 60)).padStart(2, '0') + ':' + String(rounded % 60).padStart(2, '0')
 }
+const nowStr = () => roundQuarter(new Date().toTimeString().slice(0, 5))
 
 // ─── Shared style helpers ──────────────────────────────────────────────────────
 const cardStyle = {
@@ -356,16 +356,30 @@ export default function FormPage() {
   useEffect(() => {
     if (laborHoursTouched) return
     if (!startTime || !/^\d{1,2}:\d{2}$/.test(startTime)) return
-    const [hh, mm] = startTime.split(':').map(Number)
+    const [sh, sm] = startTime.split(':').map(Number)
+    const startMin = sh * 60 + sm
+    // Prefer Departure Time when the tech has set it later than Arrival;
+    // otherwise the job is still in progress — track wall-clock so the
+    // value keeps climbing as the tech works.
+    let endMin
+    if (departureTime && /^\d{1,2}:\d{2}$/.test(departureTime)) {
+      const [dh, dm] = departureTime.split(':').map(Number)
+      endMin = dh * 60 + dm
+    } else {
+      endMin = -1
+    }
     const now = new Date()
-    let elapsedMin = (now.getHours()*60 + now.getMinutes()) - (hh*60 + mm)
-    if (elapsedMin < 0) elapsedMin += 24*60
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    // If departureTime isn't a real value > startTime, fall back to now.
+    let depDelta = endMin - startMin; if (depDelta < 0) depDelta += 24 * 60
+    let nowDelta = nowMin   - startMin; if (nowDelta < 0) nowDelta += 24 * 60
+    const elapsedMin = endMin >= 0 && depDelta > 0 ? depDelta : nowDelta
     const autoHours = Math.round(elapsedMin / 15) * 15 / 60
     if (autoHours > 0) {
       const next = String(autoHours)
       setLaborHours(prev => prev === next ? prev : next)
     }
-  }, [startTime, liveTick, laborHoursTouched])
+  }, [startTime, departureTime, liveTick, laborHoursTouched])
 
   const [gpsLat,      setGpsLat]      = useState(null)
   const [gpsLng,      setGpsLng]      = useState(null)
@@ -525,13 +539,13 @@ export default function FormPage() {
     jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,
     customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,
     departureTime,lastServiceDate,description,reportedIssue,rootCause,
-    techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,
+    techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,laborHoursTouched,hourlyRate,billableTechs,
     arrestors, // FULL (includes before1/before2/after1/after2 photo Blobs)
     flares,    // FULL (includes photo1/photo2 Blobs)
     heaters,   // FULL (firetubes include photo1/photo2 Blobs)
     scEquipment,
     customerSig, // data URL string
-  }),[jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,customerSig])
+  }),[jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,laborHoursTouched,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,customerSig])
 
   // Photo bundle — the loose photo state slots that aren't embedded in
   // structured objects. Kept separate from `fields` for clarity but IDB
@@ -559,9 +573,13 @@ export default function FormPage() {
     if(d.jobType)handleJobTypeChange(d.jobType)
     const sets=[['warrantyWork',setWarrantyWork],['customerName',setCustomerName],['truckNumber',setTruckNumber],['locationName',setLocationName],['customerContact',setCustomerContact],['customerWorkOrder',setCustomerWorkOrder],['typeOfWork',setTypeOfWork],['glCode',setGlCode],['assetTag',setAssetTag],['workArea',setWorkArea],['date',setDate],['startTime',setStartTime],['departureTime',setDepartureTime],['lastServiceDate',setLastServiceDate],['description',setDescription],['reportedIssue',setReportedIssue],['rootCause',setRootCause],['equipment',setEquipment],['miles',setMiles],['costPerMile',setCostPerMile],['laborHours',setLaborHours],['hourlyRate',setHourlyRate],['billableTechs',setBillableTechs]]
     sets.forEach(([k,fn])=>{ if(d[k]!==undefined)fn(d[k]) })
-    // If the saved draft already had a Labor Hours value, mark as touched
-    // so the live job-clock effect doesn't overwrite the tech's earlier entry.
-    if (d.laborHours !== undefined && d.laborHours !== '' && d.laborHours !== null) {
+    // Restore the touched flag from the draft so an auto-filled labor value
+    // from a prior session doesn't get treated as user-entered (which would
+    // lock out further auto-tracking). Falls back to inferring touched=true
+    // for legacy drafts saved before the flag was persisted.
+    if (typeof d.laborHoursTouched === 'boolean') {
+      setLaborHoursTouched(d.laborHoursTouched)
+    } else if (d.laborHours !== undefined && d.laborHours !== '' && d.laborHours !== null) {
       setLaborHoursTouched(true)
     }
     if(d.techs?.length)setTechs(d.techs)
@@ -984,11 +1002,19 @@ export default function FormPage() {
         {(() => {
           if (!startTime || !/^\d{1,2}:\d{2}$/.test(startTime)) return null
           const [hh, mm] = startTime.split(':').map(Number)
-          const now = new Date()
           const startMin = hh * 60 + mm
+          // Match the labor-hours effect: prefer Departure when later than
+          // Arrival; otherwise live wall-clock so the pill keeps counting up.
+          let endMin = -1
+          if (departureTime && /^\d{1,2}:\d{2}$/.test(departureTime)) {
+            const [dh, dm] = departureTime.split(':').map(Number)
+            endMin = dh * 60 + dm
+          }
+          const now = new Date()
           const nowMin = now.getHours() * 60 + now.getMinutes()
-          let elapsedMin = nowMin - startMin
-          if (elapsedMin < 0) elapsedMin += 24 * 60  // crossed midnight
+          let depDelta = endMin - startMin; if (depDelta < 0) depDelta += 24 * 60
+          let nowDelta = nowMin   - startMin; if (nowDelta < 0) nowDelta += 24 * 60
+          const elapsedMin = endMin >= 0 && depDelta > 0 ? depDelta : nowDelta
           if (elapsedMin < 1) return null
           const h = Math.floor(elapsedMin / 60)
           const m = elapsedMin % 60
@@ -999,7 +1025,7 @@ export default function FormPage() {
           const ap = hh >= 12 ? 'PM' : 'AM'
           const h12 = (hh % 12) || 12
           const startLabel = `${h12}:${String(mm).padStart(2,'0')} ${ap}`
-          const willAutoFill = !laborHours && autoHours > 0
+          const willAutoFill = !laborHoursTouched && autoHours > 0
           return (
             <div style={{
               background: willAutoFill ? 'linear-gradient(135deg, #0f1f38, #1a2e4a)' : '#f1f5f9',
@@ -1029,9 +1055,9 @@ export default function FormPage() {
                 </div>
                 {willAutoFill ? (
                   <div style={{ fontSize: 11, opacity: 0.75, marginTop: 3 }}>
-                    ⚡ Auto-fills Labor Hours to <b style={{ color: '#fbbf24' }}>{autoHours}</b> at submit
+                    ⚡ Auto-tracking · Labor Hours <b style={{ color: '#fbbf24' }}>{autoHours}</b>
                   </div>
-                ) : laborHours ? (
+                ) : laborHoursTouched && laborHours ? (
                   <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
                     Labor Hours manually set to {laborHours}
                   </div>
@@ -1210,8 +1236,8 @@ export default function FormPage() {
         <Section icon="🕐" title="Date & Time" accent={accent}>
           <div style={row}>
             <div style={fld}><label style={lbl}>Date</label><input type="date" style={inp} value={date} onChange={e=>setDate(e.target.value)} /></div>
-            <div style={fld}><label style={lbl}>Arrival Time</label><input type="time" style={inp} value={startTime} onChange={e=>setStartTime(e.target.value)} /></div>
-            <div style={fld}><label style={lbl}>Departure Time</label><input type="time" style={inp} value={departureTime} onChange={e=>setDepartureTime(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>Arrival Time</label><input type="time" style={inp} value={startTime} onChange={e=>setStartTime(roundQuarter(e.target.value))} /></div>
+            <div style={fld}><label style={lbl}>Departure Time</label><input type="time" style={inp} value={departureTime} onChange={e=>setDepartureTime(roundQuarter(e.target.value))} /></div>
           </div>
         </Section>
 
