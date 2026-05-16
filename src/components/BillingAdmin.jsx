@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { toast } from '../lib/toast'
 import { logAudit, getAuthToken } from '../lib/submissions'
+import { canonicalTech } from '../lib/techs'
 import {
   PAYMENT_TERMS,
   BILLING_STATUSES,
@@ -487,7 +488,8 @@ export default function BillingAdmin({ submissions }) {
               </thead>
               <tbody>
                 {filtered.map(r => {
-                  const tech = (Array.isArray(r.data?.techs) && r.data.techs[0]) || r.profiles?.full_name || '—'
+                  const rawTech = (Array.isArray(r.data?.techs) && r.data.techs[0]) || r.profiles?.full_name || ''
+                  const tech = canonicalTech(rawTech) || '—'
                   const nonBillable = isNonBillable(r)
                   const rawCost = parseFloat(r.data?.grandTotal || r.total_revenue || 0) || 0
                   return (

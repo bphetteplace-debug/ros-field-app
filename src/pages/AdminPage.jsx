@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken, createAssignedSubmission, getCustomerContacts, saveCustomerContacts, parseContactsCsv } from '../lib/submissions'
+import { canonicalTech } from '../lib/techs'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import TechMap from '../components/TechMap'
@@ -11,6 +12,7 @@ import ShareDispatchDialog from '../components/ShareDispatchDialog'
 import DispatchMapModal from '../components/DispatchMapModal'
 import PmScheduleAdmin from '../components/PmScheduleAdmin'
 import BillingAdmin from '../components/BillingAdmin'
+import MonthlyExpensesAdmin from '../components/MonthlyExpensesAdmin'
 import { fetchOpenDispatches, setDispatchStatus, formatRelativeTime, formatEta } from '../lib/dispatch'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -130,7 +132,8 @@ function ExpenseAnalytics({ submissions }) {
   // Group by tech — non-billable WOs contribute hours but NOT revenue
   const byTech = {}
   for (const s of filtered) {
-    const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
+    const rawTech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
+    const tech = canonicalTech(rawTech) || 'Unknown'
     if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
     const lbl2 = getTypeLabel(s)
     const isExpOrInsp = lbl2 === 'EXP' || lbl2 === 'INSP'
@@ -1540,7 +1543,8 @@ function CustomersAdmin({ submissions }) {
               <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 10 }}>📋 Full history ({data.sorted.length})</div>
               <div style={{ maxHeight: 480, overflowY: 'auto' }}>
                 {data.sorted.slice(0, 100).map(s => {
-                  const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.profiles?.full_name || '—'
+                  const rawTech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.profiles?.full_name || ''
+                  const tech = canonicalTech(rawTech) || '—'
                   const num = s.work_order || s.pm_number || ''
                   return (
                     <button
@@ -1601,7 +1605,8 @@ function AnalyticsAdmin({ submissions }) {
 
   const techMap = {}
   subs.forEach(s => {
-    const t = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.profiles?.full_name || 'Unknown'
+    const rawT = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.profiles?.full_name || ''
+    const t = canonicalTech(rawT) || 'Unknown'
     if (!techMap[t]) techMap[t] = 0
     techMap[t]++
   })
@@ -2299,7 +2304,8 @@ export default function AdminPage() {
   // Tech performance (respects the user's current search/filter/date range)
   const byTech = {}
   for (const s of filtered) {
-    const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
+    const rawTech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
+    const tech = canonicalTech(rawTech) || 'Unknown'
     if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
     const lbl2 = getTypeLabel(s)
     const isNonBillable = s.data?.billable === false
@@ -2369,6 +2375,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab('billing')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'billing' ? '#16a34a' : '#fff', color: activeTab === 'billing' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             💵 Billing
           </button>
+          <button onClick={() => setActiveTab('monthly-expenses')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'monthly-expenses' ? '#dc2626' : '#fff', color: activeTab === 'monthly-expenses' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            💸 Monthly Expenses
+          </button>
           <button onClick={() => setActiveTab('customers')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'customers' ? '#9a3412' : '#fff', color: activeTab === 'customers' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             🏢 Customers
           </button>
@@ -2412,6 +2421,8 @@ export default function AdminPage() {
 
         {/* ANALYTICS TAB */}
         {activeTab === 'billing' && <BillingAdmin submissions={submissions} />}
+
+        {activeTab === 'monthly-expenses' && <MonthlyExpensesAdmin />}
 
         {activeTab === 'customers' && <CustomersAdmin submissions={submissions} />}
 
@@ -2608,9 +2619,10 @@ export default function AdminPage() {
                 {filtered.map((s, i) => {
                   const lbl = getTypeLabel(s)
                   const color = getTypeColor(s)
-                  const techs = Array.isArray(s.data?.techs) ? s.data.techs : []
+                  const techs = (Array.isArray(s.data?.techs) ? s.data.techs : []).map(canonicalTech)
                   const isWarranty = s.data?.warrantyWork
-                  const submittedBy = s.profiles?.full_name || (Array.isArray(s.data?.techs) && s.data.techs[0]) || '-'
+                  const rawSubmittedBy = s.profiles?.full_name || (Array.isArray(s.data?.techs) && s.data.techs[0]) || ''
+                  const submittedBy = canonicalTech(rawSubmittedBy) || '-'
                   const isBeingDeleted = deleting === s.id
                   let displayTotal
                   if (lbl === 'EXP') { displayTotal = fmt(s.data?.expenseTotal || 0) }
