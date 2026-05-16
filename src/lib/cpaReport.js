@@ -188,10 +188,19 @@ export async function downloadCpaPdf({ submissions, monthlyExpenses, year }) {
   d.debtBuckets = d.debtRows.reduce((acc, r) => { acc[r.label] = r.amount; return acc }, {})
 
   const html = buildHtml(d)
+  // Render onscreen but positioned off-page-flow at the top-left so html2canvas
+  // has a real layout to capture. Using `left:-9999px` works for visible-flow
+  // elements but can result in 0×0 capture for some setups; keep at top:0
+  // and rely on z-index + opacity to hide visually if needed.
   const container = document.createElement('div')
-  container.style.cssText = 'position:absolute;left:-9999px;top:0;width:8.5in;background:#fff;'
+  container.style.cssText = 'position:fixed;top:0;left:0;width:8.5in;background:#fff;z-index:-1;opacity:0;pointer-events:none;'
   container.innerHTML = html
   document.body.appendChild(container)
+
+  // Force the browser to compute layout, then wait a paint frame so
+  // html2canvas captures actual rendered dimensions.
+  void container.offsetHeight
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
   try {
     const mod = await import('html2pdf.js')
@@ -200,7 +209,7 @@ export async function downloadCpaPdf({ submissions, monthlyExpenses, year }) {
       margin: 0,
       filename: 'ROS_YTD_Reconciliation_' + (d.year) + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
       image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
     }).from(container).save()
   } finally {
