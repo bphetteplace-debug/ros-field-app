@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
-import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken, createAssignedSubmission } from '../lib/submissions'
+import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken, createAssignedSubmission, getCustomerContacts, saveCustomerContacts, parseContactsCsv } from '../lib/submissions'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
 import TechMap from '../components/TechMap'
@@ -518,6 +518,191 @@ function SettingsAdmin() {
       <ListSection title='Customers' icon='🏢' list={customers} setter={setCustomers} newVal={newCustomer} setNew={setNewCustomer} listKey='customers' />
       <ListSection title='Trucks' icon='🚛' list={trucks} setter={setTrucks} newVal={newTruck} setNew={setNewTruck} listKey='trucks' />
       <ListSection title='Technicians' icon='👷' list={techs} setter={setTechs} newVal={newTech} setNew={setNewTech} listKey='techs' />
+      <CustomerContactsSection customerList={customers} />
+    </div>
+  )
+}
+
+// Per-customer address book used by the dispatch dialog's searchable
+// dropdown. Stored in app_settings.customer_contacts as
+// [{customer, name, email}]. Bootstrapped with the Diamondback list
+// when never saved before.
+function CustomerContactsSection({ customerList }) {
+  const [contacts, setContacts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [newCustomer, setNewCustomer] = useState('')
+  const [newName, setNewName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [csvCustomer, setCsvCustomer] = useState('')
+  const [csvText, setCsvText] = useState('')
+
+  useEffect(() => {
+    getCustomerContacts().then(list => {
+      setContacts(list || [])
+    }).finally(() => setLoading(false))
+  }, [])
+
+  const persist = async (next) => {
+    setBusy(true)
+    try {
+      await saveCustomerContacts(next)
+      setContacts(next)
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 2500)
+    } catch (e) {
+      toast.error('Save failed: ' + (e.message || String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAdd = () => {
+    const email = newEmail.trim().toLowerCase()
+    if (!email || !email.includes('@')) { toast.warning('Email is required'); return }
+    if (contacts.some(c => c.email.toLowerCase() === email)) {
+      toast.warning('That email is already in the list'); return
+    }
+    const row = { customer: newCustomer.trim(), name: newName.trim(), email }
+    persist([...contacts, row])
+    setNewCustomer(''); setNewName(''); setNewEmail('')
+  }
+
+  const handleRemove = (email) => {
+    if (!window.confirm('Remove ' + email + '?')) return
+    persist(contacts.filter(c => c.email !== email))
+  }
+
+  const handleImport = () => {
+    if (!csvText.trim()) { toast.warning('Paste some CSV first'); return }
+    const parsed = parseContactsCsv(csvText, csvCustomer)
+    if (!parsed.length) { toast.warning('No valid rows found (need an email per line)'); return }
+    const byEmail = new Map(contacts.map(c => [c.email.toLowerCase(), c]))
+    let added = 0; let updated = 0
+    for (const p of parsed) {
+      if (byEmail.has(p.email)) {
+        byEmail.set(p.email, { ...byEmail.get(p.email), ...p })
+        updated++
+      } else {
+        byEmail.set(p.email, p)
+        added++
+      }
+    }
+    persist([...byEmail.values()])
+    setCsvText('')
+    toast.success('Imported — ' + added + ' added, ' + updated + ' updated')
+  }
+
+  const customersInList = Array.from(new Set(contacts.map(c => c.customer).filter(Boolean))).sort()
+  const customerOptions = Array.from(new Set([...(customerList || []), ...customersInList])).sort()
+
+  const visible = contacts.filter(c => {
+    if (filter !== 'all' && (c.customer || '') !== filter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const inp = { border: '1px solid #ddd', borderRadius: 6, padding: '8px 12px', fontSize: 13, boxSizing: 'border-box', fontFamily: 'inherit' }
+  const addBtn = { background: '#0891b2', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }
+  const delBtn = { background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontWeight: 900, fontSize: 16, lineHeight: 1, padding: '0 6px' }
+
+  if (loading) return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 16 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#1a2332', marginBottom: 12 }}>📇 Customer Contacts</div>
+      <div style={{ color: '#888', fontSize: 13 }}>Loading…</div>
+    </div>
+  )
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#1a2332' }}>📇 Customer Contacts</div>
+        <div style={{ fontSize: 12, color: '#94a3b8' }}>{contacts.length} total</div>
+      </div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>
+        People you might email a tracking link to. Used by the 📍 dispatch dialog's searchable dropdown.
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr auto', gap: 8, marginBottom: 14 }}>
+        <select style={inp} value={newCustomer} onChange={e => setNewCustomer(e.target.value)}>
+          <option value=''>Customer…</option>
+          {customerOptions.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input style={inp} placeholder='Name' value={newName} onChange={e => setNewName(e.target.value)} />
+        <input style={inp} placeholder='email@company.com' value={newEmail} onChange={e => setNewEmail(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleAdd() }} />
+        <button style={addBtn} onClick={handleAdd} disabled={busy}>+ Add</button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        <select style={{ ...inp, flex: '0 0 180px' }} value={filter} onChange={e => setFilter(e.target.value)}>
+          <option value='all'>All customers</option>
+          {customersInList.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <input style={{ ...inp, flex: 1, minWidth: 200 }} placeholder='Search name or email…' value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {savedFlash && <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginBottom: 6 }}>✓ Saved</div>}
+
+      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, maxHeight: 320, overflowY: 'auto', marginBottom: 16 }}>
+        {visible.length === 0 ? (
+          <div style={{ padding: 16, color: '#aaa', fontSize: 13, textAlign: 'center' }}>No contacts match.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Customer</th>
+                <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Name</th>
+                <th style={{ padding: '8px 10px', fontWeight: 700, color: '#475569', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Email</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(c => (
+                <tr key={c.email} style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '7px 10px', color: '#475569' }}>{c.customer || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                  <td style={{ padding: '7px 10px', fontWeight: 600, color: '#1a2332' }}>{c.name || <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                  <td style={{ padding: '7px 10px', color: '#475569', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12 }}>{c.email}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                    <button style={delBtn} onClick={() => handleRemove(c.email)} disabled={busy} title='Remove'>×</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <details>
+        <summary style={{ cursor: 'pointer', fontSize: 13, color: '#0891b2', fontWeight: 700 }}>📥 Paste CSV to bulk-import</summary>
+        <div style={{ marginTop: 10, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+          <div style={{ fontSize: 12, color: '#475569', marginBottom: 8 }}>
+            One contact per line. Columns can be in either order — we'll figure out which one has the email. Header row is fine.
+          </div>
+          <select style={{ ...inp, marginBottom: 8, width: '100%' }} value={csvCustomer} onChange={e => setCsvCustomer(e.target.value)}>
+            <option value=''>Customer for these contacts (optional)…</option>
+            {customerOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <textarea
+            style={{ ...inp, width: '100%', minHeight: 120, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12 }}
+            placeholder={'email,name\njohn@diamondbackenergy.com,John Doe\njane@diamondbackenergy.com,Jane Roe'}
+            value={csvText}
+            onChange={e => setCsvText(e.target.value)}
+          />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button style={addBtn} onClick={handleImport} disabled={busy}>Import</button>
+            <button style={{ background: 'transparent', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 6, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }} onClick={() => setCsvText('')}>
+              Clear
+            </button>
+          </div>
+        </div>
+      </details>
     </div>
   )
 }

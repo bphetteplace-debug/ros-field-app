@@ -1,10 +1,10 @@
 // Modal dialog that admin opens to start a customer-tracking dispatch
 // for an assigned submission. Creates the active_dispatch row, fires the
 // notify-dispatch email lambda, and copies the tracking URL to clipboard.
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createDispatch } from '../lib/dispatch'
 import { toast } from '../lib/toast'
-import { getAuthToken } from '../lib/submissions'
+import { getAuthToken, getCustomerContacts } from '../lib/submissions'
 
 const overlay = {
   position: 'fixed', inset: 0, background: 'rgba(15, 31, 56, 0.65)',
@@ -41,16 +41,72 @@ export default function StartDispatchDialog({ submission, techName, onClose, onS
   const [customerEmail, setCustomerEmail] = useState('')
   const [destinationLabel, setDestinationLabel] = useState('')
   const [sending, setSending] = useState(false)
+  const [contacts, setContacts] = useState([])
+  const [contactQuery, setContactQuery] = useState('')
+  const [showAllCustomers, setShowAllCustomers] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const wrapRef = useRef(null)
 
   useEffect(() => {
     if (!submission) return
     setCustomerEmail('')
+    setContactQuery('')
+    setShowAllCustomers(false)
+    setDropdownOpen(false)
     // Build a friendly destination label from customer + location
     const parts = []
     if (submission.customer_name) parts.push(submission.customer_name)
     if (submission.location_name) parts.push(submission.location_name)
     setDestinationLabel(parts.join(' — '))
   }, [submission?.id])
+
+  useEffect(() => {
+    let alive = true
+    getCustomerContacts().then(list => {
+      if (alive) setContacts(list || [])
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  const submissionCustomer = (submission?.customer_name || '').trim()
+
+  const filteredContacts = useMemo(() => {
+    const q = contactQuery.trim().toLowerCase()
+    let pool = contacts
+    if (!showAllCustomers && submissionCustomer) {
+      const m = submissionCustomer.toLowerCase()
+      const matches = pool.filter(c => (c.customer || '').toLowerCase() === m)
+      if (matches.length) pool = matches
+    }
+    if (q) {
+      pool = pool.filter(c =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.customer || '').toLowerCase().includes(q)
+      )
+    }
+    return pool.slice(0, 12)
+  }, [contacts, contactQuery, showAllCustomers, submissionCustomer])
+
+  const hasCustomerMatches = useMemo(() => {
+    if (!submissionCustomer) return false
+    const m = submissionCustomer.toLowerCase()
+    return contacts.some(c => (c.customer || '').toLowerCase() === m)
+  }, [contacts, submissionCustomer])
+
+  const pickContact = (c) => {
+    setCustomerEmail(c.email)
+    setContactQuery(c.name ? c.name + ' <' + c.email + '>' : c.email)
+    setDropdownOpen(false)
+  }
 
   if (!submission) return null
 
@@ -136,15 +192,80 @@ export default function StartDispatchDialog({ submission, techName, onClose, onS
             They'll see <b>{techName || 'the tech'}</b>'s live location on a map until the job is marked complete.
           </p>
 
-          <label style={label}>Customer email *</label>
-          <input
-            type="email"
-            value={customerEmail}
-            onChange={e => setCustomerEmail(e.target.value)}
-            placeholder="customer@example.com"
-            style={input}
-            autoFocus
-          />
+          <label style={label}>
+            Customer email *
+            {hasCustomerMatches && (
+              <button
+                type='button'
+                onClick={() => setShowAllCustomers(v => !v)}
+                style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#0891b2', background: 'transparent', border: '1px solid #0891b2', borderRadius: 12, padding: '1px 8px', cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}
+              >
+                {showAllCustomers ? 'Filter to ' + submissionCustomer : 'Show all customers'}
+              </button>
+            )}
+          </label>
+          <div ref={wrapRef} style={{ position: 'relative', marginBottom: 14 }}>
+            <input
+              type='text'
+              value={contactQuery}
+              onChange={e => {
+                const val = e.target.value
+                setContactQuery(val)
+                const m = val.match(/<\s*([^>\s]+@[^>\s]+)\s*>/)
+                setCustomerEmail(m ? m[1] : val)
+                setDropdownOpen(true)
+              }}
+              onFocus={() => setDropdownOpen(true)}
+              placeholder={hasCustomerMatches
+                ? 'Search ' + submissionCustomer + ' contacts or type any email…'
+                : 'Search contacts or type any email…'}
+              style={{ ...input, marginBottom: 0 }}
+              autoFocus
+              autoComplete='off'
+            />
+            {dropdownOpen && filteredContacts.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0,
+                background: '#fff', border: '1px solid #cbd5e1', borderTop: 'none',
+                borderRadius: '0 0 8px 8px', maxHeight: 240, overflowY: 'auto',
+                boxShadow: '0 8px 24px rgba(15,31,56,0.12)', zIndex: 10,
+              }}>
+                {filteredContacts.map(c => (
+                  <button
+                    key={c.email}
+                    type='button'
+                    onMouseDown={(e) => { e.preventDefault(); pickContact(c) }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      padding: '9px 12px', borderBottom: '1px solid #f1f5f9',
+                      fontFamily: 'inherit',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>
+                      {c.name || c.email}
+                      {c.customer && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#0891b2', background: '#ecfeff', padding: '1px 6px', borderRadius: 8, letterSpacing: 0.4 }}>{c.customer}</span>}
+                    </div>
+                    {c.name && (
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontFamily: 'ui-monospace, Menlo, monospace' }}>{c.email}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            {dropdownOpen && filteredContacts.length === 0 && contactQuery && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0,
+                background: '#fff', border: '1px solid #cbd5e1', borderTop: 'none',
+                borderRadius: '0 0 8px 8px', padding: '10px 12px',
+                fontSize: 12, color: '#94a3b8', boxShadow: '0 8px 24px rgba(15,31,56,0.12)', zIndex: 10,
+              }}>
+                No saved contact matches — you can still type any email.
+              </div>
+            )}
+          </div>
 
           <label style={label}>Destination label</label>
           <input

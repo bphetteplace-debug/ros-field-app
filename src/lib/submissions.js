@@ -108,6 +108,159 @@ export async function saveSettings(key, value) {
   return text ? JSON.parse(text) : null;
 }
 
+// ── CUSTOMER CONTACTS ──────────────────────────────────────────────────────────
+// Address book of named people at each customer. Used to populate the
+// searchable dropdown when admin starts a customer-tracking dispatch.
+// Seeded with the 83 Diamondback Energy contacts owner imported 2026-05-16;
+// these are the bootstrap defaults shown when app_settings.customer_contacts
+// has not yet been saved. Once the admin edits + saves anything, the
+// stored list takes over completely.
+export const DEFAULT_CUSTOMER_CONTACTS = [
+  { customer: 'Diamondback', name: 'Angel Aguilera', email: 'aaguilera@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Ashley Castaneda', email: 'acastaneda@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Andy Chalker', email: 'achalker@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Adolfo Chavez', email: 'achavez@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Billy Brookshire', email: 'bbrookshire@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Bill Nall', email: 'bnall@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Brandon Thompson', email: 'bthompson2@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Britni Thompson (DeBusk)', email: 'bthompson3@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Brian Watt', email: 'bwatt@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Banny Wiebe', email: 'bwiebe@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Chris Alvarado', email: 'calvarado@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Christopher Cain', email: 'ccain1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Callie Marsh', email: 'cmarsh@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Chris Mendoza', email: 'cmendoza@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Christopher Mercer', email: 'cmercer1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'CMMS System', email: 'CMMS@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Cody Palk', email: 'cpalk@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Cory Sullivan', email: 'csullivan@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Dalton Gray', email: 'dgray@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Delfino Martinez', email: 'dmartinez3@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Daniel Valenzuela', email: 'dvalenzuela@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Darryl Williams', email: 'dwilliams@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Edson Dominguez', email: 'edominguez@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Electrical Dispatch (Group)', email: 'electricaldispatch@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Eduardo Lujan', email: 'elujan@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Eric Smith', email: 'esmith@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Fernando DeHoyos', email: 'fdehoyos@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Fabian Lujan', email: 'flujan@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Gary Cain', email: 'gcain1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Israel De La Cruz', email: 'idelacruz1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'I&E Spanish Trails (Group)', email: 'IESpanishTrails@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Josh Barrera', email: 'jbarrera@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Joshua Carson', email: 'jcarson@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Jason Fletcher', email: 'jfletcher@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Joel Gaona', email: 'jgaona1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Jake Harrison', email: 'jharrison@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Joe Keeler', email: 'jkeeler@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Jimmy Martin', email: 'jmartin3@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Jesse Melendez', email: 'jmelendez1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Joshua Pallanes', email: 'jpallanes@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Jose Villarreal', email: 'jvillarreal@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Kendall Goodwin', email: 'kgoodwin@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Kenneth Hall', email: 'khall@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Kyle Jordan', email: 'kjordan@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Kendall White', email: 'kwhite@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Mark Allcorn', email: 'mallcorn@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Mauro Barraza', email: 'mbarraza@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Michelle Fuller', email: 'mfuller@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Mark Glenn', email: 'mglenn@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Marlon Hale', email: 'mhale@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Mike Hewtty', email: 'mhewtty@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Matt Jackson', email: 'mjackson@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Michael Mitchell', email: 'mmitchell2@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Mark Ramos', email: 'mramos@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Marco Rodriguez', email: 'mrodriguez@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Mark Vasquez', email: 'mvasquez@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Nolan Box', email: 'nbox@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Nathaniel Cody', email: 'ncody@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Noel Quinonez-Ruiz', email: 'nquinonezruiz@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Obed Infante', email: 'oinfante@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Oscar Valverde', email: 'ovalverde@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Patricia Rendon', email: 'prendon@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Robert Flores', email: 'rflores2@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Robert Heater', email: 'rheater@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Rigoberto Hernandez', email: 'rhernandez2@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Robert Gonzalez', email: 'rgonzalez1@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Roy McNutt', email: 'rmcnutt@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Raul Melgoza', email: 'rmelgoza@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Richard Onzures', email: 'ronzures@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Regan Raines', email: 'rraines@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Ryan Ray', email: 'rray@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Robert Salisbury', email: 'rsalisbury@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Raymond Sanchez', email: 'rsanchez2@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Luke Stroud', email: 'rstroud@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Stephen Mitchell', email: 'smitchell@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Steven Salcedo', email: 'ssalcedo@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Timothy Bernal', email: 'tbernal@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Ty Fisher', email: 'tfisher@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Ty Froman', email: 'tfroman@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Taylor Smith', email: 'tsmith@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Veronica Gardea', email: 'vgardea@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Victoria Taylor', email: 'vtaylor@diamondbackenergy.com' },
+  { customer: 'Diamondback', name: 'Will Miller', email: 'wmiller@diamondbackenergy.com' },
+];
+
+function normalizeContacts(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const c of arr) {
+    if (!c || typeof c !== 'object') continue;
+    const email = String(c.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) continue;
+    if (seen.has(email)) continue;
+    seen.add(email);
+    out.push({
+      customer: String(c.customer || '').trim(),
+      name: String(c.name || '').trim(),
+      email,
+    });
+  }
+  return out.sort((a, b) =>
+    (a.customer || '').localeCompare(b.customer || '') ||
+    (a.name || '').localeCompare(b.name || '')
+  );
+}
+
+export async function getCustomerContacts() {
+  const all = await fetchSettings();
+  const stored = all && Array.isArray(all.customer_contacts) ? all.customer_contacts : null;
+  if (stored && stored.length) return normalizeContacts(stored);
+  return normalizeContacts(DEFAULT_CUSTOMER_CONTACTS);
+}
+
+export async function saveCustomerContacts(arr) {
+  return saveSettings('customer_contacts', normalizeContacts(arr));
+}
+
+// Parse a pasted CSV blob into contact entries. Accepts either
+// "email,name" or "name,email" columns; auto-detects which is which by
+// checking which column contains '@'. Header line is skipped if present.
+export function parseContactsCsv(text, customerLabel) {
+  if (!text) return [];
+  const lines = String(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const out = [];
+  for (const line of lines) {
+    // Split on comma or tab, strip surrounding quotes per field
+    const cols = line.split(/[,\t]/).map(s => s.trim().replace(/^["']|["']$/g, ''));
+    if (cols.length < 1) continue;
+    let email = '';
+    let name = '';
+    if (cols.length === 1) {
+      if (cols[0].includes('@')) email = cols[0];
+      else continue;
+    } else {
+      const emailIdx = cols.findIndex(c => c.includes('@'));
+      if (emailIdx === -1) continue; // header or junk row
+      email = cols[emailIdx];
+      name = cols.find((c, i) => i !== emailIdx && c) || '';
+    }
+    out.push({ customer: (customerLabel || '').trim(), name, email });
+  }
+  return normalizeContacts(out);
+}
+
 // ── AUDIT LOG ────────────────────────────────────────────────────────────────────
 // Records sensitive admin actions (status changes, deletes, etc.) to a
 // dedicated audit_log table. Failure is swallowed silently — we never want
