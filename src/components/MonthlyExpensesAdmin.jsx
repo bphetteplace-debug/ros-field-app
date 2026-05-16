@@ -14,6 +14,7 @@ import {
   updateMonthlyExpense,
   deleteMonthlyExpense,
 } from '../lib/monthlyExpenses'
+import { downloadTaxExportCsv } from '../lib/taxExport'
 
 const inp = { border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
 const lbl = { fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' }
@@ -151,6 +152,8 @@ export default function MonthlyExpensesAdmin() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
   const [allMonths, setAllMonths] = useState([])
+  const [exporting, setExporting] = useState(false)
+  const [exportYear, setExportYear] = useState(String(new Date().getFullYear()))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -264,6 +267,28 @@ export default function MonthlyExpensesAdmin() {
     notes: '',
   })
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await downloadTaxExportCsv(parseInt(exportYear, 10))
+      toast.success('Tax export downloaded — ROS_TaxExport_' + exportYear + '.csv')
+    } catch (e) {
+      toast.error('Export failed: ' + (e.message || e))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const exportYearOptions = (() => {
+    const opts = new Set()
+    for (const e of entries) if (e.month_year) opts.add(e.month_year.slice(0, 4))
+    for (const m of allMonths) if (m) opts.add(m.slice(0, 4))
+    const now = new Date().getFullYear()
+    opts.add(String(now - 1))
+    opts.add(String(now))
+    return Array.from(opts).sort().reverse()
+  })()
+
   const card = (label, value, color) => (
     <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '2px solid ' + color, flex: '1 1 140px', minWidth: 140 }}>
       <div style={{ fontSize: 22, fontWeight: 900, color }}>{value}</div>
@@ -288,6 +313,35 @@ export default function MonthlyExpensesAdmin() {
         {!isDemo && card('Other', fmtMoney(summary.Other), '#475569')}
         {!isDemo && card('Total', fmtMoney(summary.total), '#1a2332')}
         {card('Entries', entries.length, '#0891b2')}
+      </div>
+
+      {/* Tax export panel */}
+      <div style={{ background: '#0f1f38', borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, color: '#fff' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 240 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 2 }}>📄 Year-end tax export</div>
+          <div style={{ fontSize: 11, opacity: 0.75, lineHeight: 1.4 }}>
+            One CSV with every revenue line, tech-side expense, and office expense for the year — sectioned + with totals. Hand to your CPA.
+          </div>
+        </div>
+        <select
+          value={exportYear}
+          onChange={e => setExportYear(e.target.value)}
+          style={{ ...inp, width: 110, color: '#1a2332' }}
+        >
+          {exportYearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          style={{
+            background: exporting ? '#475569' : '#e65c00',
+            color: '#fff', border: 'none', borderRadius: 6,
+            padding: '8px 16px', fontSize: 12, fontWeight: 800,
+            cursor: exporting ? 'wait' : 'pointer',
+          }}
+        >
+          {exporting ? 'Building…' : '📥 Download CSV'}
+        </button>
       </div>
 
       {/* Filter bar */}

@@ -13,6 +13,7 @@ import DispatchMapModal from '../components/DispatchMapModal'
 import PmScheduleAdmin from '../components/PmScheduleAdmin'
 import BillingAdmin from '../components/BillingAdmin'
 import MonthlyExpensesAdmin from '../components/MonthlyExpensesAdmin'
+import { fetchMonthlyExpenses } from '../lib/monthlyExpenses'
 import { fetchOpenDispatches, setDispatchStatus, formatRelativeTime, formatEta } from '../lib/dispatch'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -2051,6 +2052,7 @@ export default function AdminPage() {
     setLoggingOut(false)
   }, [signOut])
   const [submissions, setSubmissions] = useState([])
+  const [monthlyExpenses, setMonthlyExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
@@ -2198,6 +2200,17 @@ export default function AdminPage() {
       .finally(() => setLoading(false))
   }, [isAdmin, authLoading])
 
+  // Fetch office-side monthly expenses (separate table). Used by the
+  // header "Expenses (This Month)" + "Net Profit" cards so both
+  // tech-side and office-side outflows are reflected. Also feeds the
+  // year-export-for-taxes function on the Monthly Expenses tab.
+  useEffect(() => {
+    if (authLoading || !isAdmin) return
+    fetchMonthlyExpenses({ limit: 5000 }).then(rows => {
+      setMonthlyExpenses(Array.isArray(rows) ? rows : [])
+    }).catch(() => {})
+  }, [isAdmin, authLoading])
+
   // Poll the open-dispatch count for the tab badge. Cheap query (one row
   // per tracked customer; usually 0-3 rows) and DispatchesAdmin re-polls
   // independently when its tab is active.
@@ -2229,6 +2242,10 @@ export default function AdminPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, () => {
         if (cancelled) return
         fetchAllSubmissions().then(rows => { if (!cancelled) setSubmissions(rows) }).catch(() => {})
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_expenses' }, () => {
+        if (cancelled) return
+        fetchMonthlyExpenses({ limit: 5000 }).then(rows => { if (!cancelled) setMonthlyExpenses(Array.isArray(rows) ? rows : []) }).catch(() => {})
       })
       .subscribe(status => {
         if (cancelled) return
@@ -2282,7 +2299,14 @@ export default function AdminPage() {
     if (s?.data?.billable === false) return sum
     return sum + parseFloat(s.data?.grandTotal || 0)
   }, 0)
-  const monthExpenses = thisMonthSubs.reduce((sum, s) => {
+  // Expenses (This Month) = tech-side expense_report submissions
+  // + office-side monthly_expenses for the current month. Unified so
+  // the header card matches what's in the Monthly Expenses tab.
+  const monthYearKey = nowD.getFullYear() + '-' + String(nowD.getMonth() + 1).padStart(2, '0')
+  const monthOfficeExpenses = monthlyExpenses
+    .filter(e => e.month_year === monthYearKey)
+    .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+  const monthExpenses = monthOfficeExpenses + thisMonthSubs.reduce((sum, s) => {
     if (getTypeLabel(s) === 'EXP') return sum + parseFloat(s.data?.expenseTotal || 0)
     return sum
   }, 0)
