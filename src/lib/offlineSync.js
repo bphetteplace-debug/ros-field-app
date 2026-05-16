@@ -20,7 +20,13 @@ export async function processOfflineQueue(userId) {
     let success = 0, failed = 0;
     for (const item of queue) {
       try {
-        const submission = await saveSubmission(item.formData, userId);
+        // Prefer the queued userId (set when the original tech enqueued the
+        // payload). Falls back to the current online user only if the queue
+        // predates the userId-persistence fix. Without this, two techs
+        // sharing a tablet would flip ownership when one syncs the other's
+        // queued items, breaking RLS edit access for the original author.
+        const submitterId = item.userId || userId;
+        const submission = await saveSubmission(item.formData, submitterId);
         // Re-upload photos stored as { dataUrl, caption } objects keyed by section
         if (item.photoDataUrls && submission) {
           for (const [section, photos] of Object.entries(item.photoDataUrls)) {

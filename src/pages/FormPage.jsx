@@ -875,7 +875,7 @@ export default function FormPage() {
     }catch(err){
       console.error('Submit error:',err)
       setSaveStatus('')
-      if(!navigator.onLine){ try{queueOfflineSubmission({jobType,customerName,locationName,date,description});navigate('/submissions');return}catch(e){} }
+      if(!navigator.onLine){ try{queueOfflineSubmission({userId:user?.id,jobType,customerName,locationName,date,description});navigate('/submissions');return}catch(e){} }
       setSaveError(err?.message||'Submission failed. Please try again.')
     }finally{ setSaving(false) }
   }

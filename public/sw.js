@@ -41,12 +41,19 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
+  // Never intercept non-GET requests. We used to synthesize a 503 on network
+  // failure, but the server may have actually received & committed a POST
+  // before the connection dropped — the synthetic 503 would trigger
+  // saveSubmission's retry loop and create duplicate rows on flaky cell.
+  // Let the browser fail naturally so the caller's AbortController / fetch
+  // error path sees the real error.
+  if (event.request.method !== 'GET') return;
+
   // Always network-first for API calls, Supabase, Resend — never cache these
   if (
     url.pathname.startsWith('/api/') ||
     url.hostname.includes('supabase.co') ||
-    url.hostname.includes('resend.com') ||
-    event.request.method !== 'GET'
+    url.hostname.includes('resend.com')
   ) {
     event.respondWith(fetch(event.request).catch(() => new Response('', { status: 503 })));
     return;

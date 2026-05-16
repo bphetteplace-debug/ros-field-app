@@ -2120,12 +2120,14 @@ export default function AdminPage() {
     if (ids.length === 0) return
     if (!window.confirm('Mark ' + ids.length + ' submission' + (ids.length !== 1 ? 's' : '') + ' as ' + newStatus.toUpperCase() + '?')) return
     setBulkBusy(true)
+    let ok = 0
+    const failedIds = []
     try {
       for (const id of ids) {
         const sub = submissions.find(s => s.id === id)
         if (!sub) continue
         const prevStatus = sub.status || 'submitted'
-        if (prevStatus === newStatus) continue
+        if (prevStatus === newStatus) { ok++; continue }
         try {
           await updateSubmissionStatus(id, newStatus)
           setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
@@ -2134,11 +2136,21 @@ export default function AdminPage() {
             action: 'submission_status_changed', targetType: 'submission', targetId: id,
             details: { from: prevStatus, to: newStatus, pm_number: sub.pm_number, customer_name: sub.customer_name, bulk: true },
           })
+          ok++
         } catch (e) {
           console.warn('Bulk status update failed for ' + id + ':', e)
+          failedIds.push(id)
         }
       }
-      clearSelection()
+      // Toast a real summary instead of silently clearing selection on failure.
+      // Keep failed ids selected so the owner can retry just those.
+      if (failedIds.length === 0) {
+        if (ok > 0) toast.success('Updated ' + ok + ' submission' + (ok !== 1 ? 's' : '') + ' → ' + newStatus)
+        clearSelection()
+      } else {
+        toast.error(failedIds.length + ' of ' + ids.length + ' failed — kept selected for retry')
+        setSelectedIds(new Set(failedIds))
+      }
     } finally {
       setBulkBusy(false)
     }
@@ -2149,6 +2161,8 @@ export default function AdminPage() {
     if (ids.length === 0) return
     if (!window.confirm('Permanently delete ' + ids.length + ' submission' + (ids.length !== 1 ? 's' : '') + '?\nThis cannot be undone.')) return
     setBulkBusy(true)
+    let ok = 0
+    const failedIds = []
     try {
       for (const id of ids) {
         const sub = submissions.find(s => s.id === id)
@@ -2161,11 +2175,19 @@ export default function AdminPage() {
             action: 'submission_deleted', targetType: 'submission', targetId: id,
             details: { pm_number: sub.pm_number, customer_name: sub.customer_name, type: getTypeLabel(sub), date: sub.date, bulk: true },
           })
+          ok++
         } catch (e) {
           console.warn('Bulk delete failed for ' + id + ':', e)
+          failedIds.push(id)
         }
       }
-      clearSelection()
+      if (failedIds.length === 0) {
+        if (ok > 0) toast.success('Deleted ' + ok + ' submission' + (ok !== 1 ? 's' : ''))
+        clearSelection()
+      } else {
+        toast.error(failedIds.length + ' of ' + ids.length + ' failed to delete — kept selected for retry')
+        setSelectedIds(new Set(failedIds))
+      }
     } finally {
       setBulkBusy(false)
     }

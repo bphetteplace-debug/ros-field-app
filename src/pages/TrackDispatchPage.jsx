@@ -89,12 +89,24 @@ export default function TrackDispatchPage() {
     let cancelled = false
     let timer = null
     async function poll() {
-      const d = await fetchActiveDispatch(token)
+      // Wrap the fetch so a transient network error doesn't kill the polling
+      // loop. Previously an unhandled rejection here meant the customer page
+      // went silent for the rest of the session.
+      let d = null, errored = false
+      try {
+        d = await fetchActiveDispatch(token)
+      } catch (e) {
+        console.warn('[track] poll failed:', e?.message || e)
+        errored = true
+      }
       if (cancelled) return
-      setDispatch(d)
-      setLastRefresh(new Date())
+      if (!errored) {
+        setDispatch(d)
+        setLastRefresh(new Date())
+      }
       setLoading(false)
-      if (!cancelled && (!d || d.status === 'en_route' || d.status === 'arrived')) {
+      const shouldContinue = errored || !d || d.status === 'en_route' || d.status === 'arrived'
+      if (!cancelled && shouldContinue) {
         timer = setTimeout(poll, 8000)
       }
     }
