@@ -111,6 +111,7 @@ export default function InventoryPage() {
   var [techsLoading, setTechsLoading] = useState(false)
   var [techsError, setTechsError] = useState(null)
   var [catalog, setCatalog] = useState([])
+  var [loading, setLoading] = useState(true)
 
   var handleLogout = useCallback(async function() {
     setLoggingOut(true)
@@ -130,6 +131,7 @@ export default function InventoryPage() {
   }, [user, tab, selectedTech])
 
   async function loadInventory() {
+    setLoading(true)
     try {
       var targetOwner = (tab === 'truck' && !isAdmin) ? user.id : (selectedTech || user.id)
       if (isAdmin && tab === 'truck' && selectedTech) {
@@ -151,6 +153,8 @@ export default function InventoryPage() {
       }
     } catch(e) {
       console.error('Load inventory error:', e)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -314,10 +318,23 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {parts.length === 0 && (
+              {loading && Array.from({ length: 5 }).map(function(_, i) {
+                return (
+                  <tr key={'skel-' + i}>
+                    <td style={tdStyle}><div className="shimmer" style={{ height: 22, width: '80%' }}></div></td>
+                    <td style={tdStyle}><div className="shimmer" style={{ height: 22, width: '90%' }}></div></td>
+                    <td style={tdStyle}><div className="shimmer" style={{ height: 22, width: 50 }}></div></td>
+                    <td style={tdStyle}><div className="shimmer" style={{ height: 22, width: 50 }}></div></td>
+                    {!isDemo && <td style={tdStyle}><div className="shimmer" style={{ height: 22, width: 70 }}></div></td>}
+                    <td style={tdStyle}><div className="shimmer" style={{ height: 22, width: 80 }}></div></td>
+                    <td style={tdStyle}><div className="shimmer" style={{ height: 18, width: 18, borderRadius: '50%' }}></div></td>
+                  </tr>
+                )
+              })}
+              {!loading && parts.length === 0 && (
                 <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>No parts yet. Click Add Part to get started.</td></tr>
               )}
-              {parts.map(function(p, i) {
+              {!loading && parts.map(function(p, i) {
                 var isLow = p.qty <= p.min_qty && p.min_qty > 0
                 return (
                   <tr key={i} style={{ background: isLow ? '#fef9c3' : '' }}>
