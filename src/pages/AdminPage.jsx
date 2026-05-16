@@ -1586,8 +1586,13 @@ export default function AdminPage() {
 
         {/* TAB BAR */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          <button onClick={() => setActiveTab('submissions')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'submissions' ? '#1a2332' : '#fff', color: activeTab === 'submissions' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <button onClick={() => setActiveTab('submissions')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'submissions' ? '#1a2332' : '#fff', color: activeTab === 'submissions' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             📋 Submissions
+            {submissions.length > 0 && (
+              <span style={{ background: activeTab === 'submissions' ? 'rgba(255,255,255,0.22)' : '#1a2332', color: '#fff', fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 10, minWidth: 18, textAlign: 'center' }}>
+                {submissions.length}
+              </span>
+            )}
           </button>
           <button onClick={() => setActiveTab('assign')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'assign' ? '#ea580c' : '#fff', color: activeTab === 'assign' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             📤 Assign Job
@@ -1599,7 +1604,7 @@ export default function AdminPage() {
             🔧 Parts Catalog
           </button>
           <button onClick={() => setActiveTab('live')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'live' ? '#16a34a' : '#fff', color: activeTab === 'live' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeTab === 'live' ? '#fff' : '#16a34a', boxShadow: '0 0 0 2px #16a34a' }}></span> Live
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeTab === 'live' ? '#fff' : '#16a34a', boxShadow: '0 0 0 2px #16a34a', animation: 'pulse 2s infinite' }}></span> Live
           </button>
           <button onClick={() => setActiveTab("settings")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "settings" ? "#7c3aed" : "#fff", color: activeTab === "settings" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Settings
@@ -1663,6 +1668,16 @@ export default function AdminPage() {
         {activeTab === 'submissions' && (
           <>
             {/* STAT CARDS */}
+            {loading && !error && (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+                {Array.from({ length: isDemo ? 6 : 9 }).map((_, i) => (
+                  <div key={i} style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flex: '1 1 130px', minWidth: 130 }}>
+                    <div className="shimmer" style={{ height: 11, width: '62%' }}></div>
+                    <div className="shimmer" style={{ height: 22, width: '44%', marginTop: 9 }}></div>
+                  </div>
+                ))}
+              </div>
+            )}
             {!loading && !error && (
               <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
                 {statCard('Total Jobs', filtered.length)}
@@ -1765,7 +1780,23 @@ export default function AdminPage() {
               </div>
             )}
 
-            {loading && <p style={{ textAlign: 'center', color: '#888', marginTop: 40 }}>Loading all submissions...</p>}
+            {loading && (
+              <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 12, padding: '12px 14px', borderTop: i === 0 ? 'none' : '1px solid #f1f5f9', alignItems: 'center' }}>
+                    <div className="shimmer" style={{ height: 14, width: 14, borderRadius: 3 }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '70%' }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '85%' }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '60%' }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '70%' }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '50%' }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '60%' }}></div>
+                    <div className="shimmer" style={{ height: 12, width: '70%' }}></div>
+                    <div className="shimmer" style={{ height: 18, width: '80%', borderRadius: 999 }}></div>
+                  </div>
+                ))}
+              </div>
+            )}
             {error && <p style={{ textAlign: 'center', color: '#e65c00', marginTop: 40 }}>Error: {error}</p>}
             {!loading && !error && filtered.length === 0 && (
               <div style={{ textAlign: 'center', marginTop: 60, color: '#aaa' }}>

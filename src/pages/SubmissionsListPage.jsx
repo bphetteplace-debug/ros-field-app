@@ -187,20 +187,9 @@ export default function SubmissionsListPage() {
 
   return (
     <div style={{ background: '#f0f2f5', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' }}>
-      {!isOnline && (
-        <div style={{ background: '#dc2626', color: '#fff', padding: '8px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
-          ⚡ Offline — forms save locally and sync when you reconnect.
-          {queueCount > 0 && <span style={{ marginLeft: 8 }}>({queueCount} pending)</span>}
-        </div>
-      )}
-      {isOnline && queueCount > 0 && (
-        <div style={{ background: '#2563eb', color: '#fff', padding: '8px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          📤 {queueCount} submission{queueCount !== 1 ? 's' : ''} pending sync
-          <button onClick={handleSync} disabled={syncing} style={{ background: '#fff', color: '#2563eb', border: 'none', borderRadius: 4, padding: '2px 10px', fontSize: 12, fontWeight: 700, cursor: syncing ? 'not-allowed' : 'pointer' }}>
-            {syncing ? 'Syncing...' : 'Sync Now'}
-          </button>
-        </div>
-      )}
+      {/* Offline + "syncing pending" banners now live globally in Layout's
+          ConnectionBanner so they show on every page. The one-shot syncMsg
+          (success/fail summary after a manual handleSync) stays here. */}
       {syncMsg && (
         <div style={{ background: '#16a34a', color: '#fff', padding: '6px 16px', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>{syncMsg}</div>
       )}
