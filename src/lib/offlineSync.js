@@ -20,13 +20,25 @@ export async function processOfflineQueue(userId) {
     let success = 0, failed = 0;
     for (const item of queue) {
       try {
+        // Discard legacy queue entries that lack formData — they pre-date
+        // the structural fix and can't actually be replayed (the saveSubmission
+        // call below would throw on undefined). Leaving them in the queue
+        // means the "1 pending" banner never clears.
+        if (!item.formData) {
+          console.warn('[OfflineSync] queue item has no formData; discarding', item.id);
+          await removeFromOfflineQueue(item.id);
+          failed++;
+          continue;
+        }
         // Prefer the queued userId (set when the original tech enqueued the
         // payload). Falls back to the current online user only if the queue
         // predates the userId-persistence fix. Without this, two techs
         // sharing a tablet would flip ownership when one syncs the other's
         // queued items, breaking RLS edit access for the original author.
         const submitterId = item.userId || userId;
-        const submission = await saveSubmission(item.formData, submitterId);
+        // template was missing from older queue entries; saveSubmission has
+        // a default but pass it through when present.
+        const submission = await saveSubmission(item.formData, submitterId, item.template);
         // Re-upload photos stored as { dataUrl, caption } objects keyed by section
         if (item.photoDataUrls && submission) {
           for (const [section, photos] of Object.entries(item.photoDataUrls)) {

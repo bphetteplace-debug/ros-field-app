@@ -102,7 +102,10 @@ const showsIssueFields = jt => ['Service Call','Repair'].includes(jt)
 const roundQuarter = (hhmm) => {
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return hhmm
   const [h, m] = hhmm.split(':').map(Number)
-  const rounded = (Math.round((h * 60 + m) / 15) * 15) % (24 * 60)
+  // Clamp (not mod) at 23:45 so 23:55 stays visually within today instead
+  // of wrapping to "00:00" — that midnight flip confused techs finishing
+  // late-night jobs into re-editing the field.
+  const rounded = Math.min(Math.round((h * 60 + m) / 15) * 15, 24 * 60 - 15)
   return String(Math.floor(rounded / 60)).padStart(2, '0') + ':' + String(rounded % 60).padStart(2, '0')
 }
 const nowStr = () => roundQuarter(new Date().toTimeString().slice(0, 5))
@@ -799,8 +802,14 @@ export default function FormPage() {
     if (!customerWorkOrder || !customerWorkOrder.trim()) missing.push('Customer Work Order / PO #');
     if (missing.length) { setSaveError('Missing required field' + (missing.length>1?'s':'') + ': ' + missing.join(', ')); return; }
     setSaving(true);setSaveError(null);setSaveStatus('Preparing photos…')
+    // Declare outside the try so the offline-fallback catch can queue the
+    // real payload (was queueing only metadata, which made offlineSync
+    // throw on replay and silently lose the tech's work).
+    const photoDataUrls={}
+    let formData=null
+    const jtObj=JOB_TYPES.find(jt=>jt.value===jobType)
+    const template=jtObj?.template||'service_call'
     try{
-      const photoDataUrls={}
       if(siteSignPhoto){const u=await toDataUrl(siteSignPhoto);if(u)photoDataUrls['site']=[{dataUrl:u,caption:'Site Sign'}]}
     if(photos.length>0) photoDataUrls['work']=await Promise.all(photos.map(async(p)=>({dataUrl:await toDataUrl(p.file),caption:p.caption||''})))
       for(const p of parts){ const pf=partPhotos[p.sku]||[]; if(pf.length) photoDataUrls[`part-${p.sku}`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption}))) }
@@ -822,8 +831,6 @@ export default function FormPage() {
       const tse=Object.entries(techSignatures)
             if(tse.length) tse.forEach(([name,dataUrl])=>{ if(dataUrl) photoDataUrls['sig-'+name]=[{dataUrl,caption:name+' Signature'}] })
 
-      const jtObj=JOB_TYPES.find(jt=>jt.value===jobType)
-      const template=jtObj?.template||'service_call'
       const effectiveWoNumber=woNumber||''
       // Auto-fill Labor Hours from elapsed-since-Arrival-Time if tech left
       // it blank. Server-side rounds to 0.25 again; this gives the
@@ -833,7 +840,7 @@ export default function FormPage() {
         const auto = decimalHoursBetween(startTime, nowStr())
         if (auto != null && auto > 0) effectiveLaborHours = String(auto)
       }
-      const formData={
+      formData={
         jobType,pmNumber,woNumber:effectiveWoNumber,warrantyWork,customerName,truckNumber,locationName,
         customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,
         lastServiceDate,description,reportedIssue:showIssueFields?reportedIssue:'',rootCause:showIssueFields?rootCause:'',
@@ -875,7 +882,18 @@ export default function FormPage() {
     }catch(err){
       console.error('Submit error:',err)
       setSaveStatus('')
-      if(!navigator.onLine){ try{queueOfflineSubmission({userId:user?.id,jobType,customerName,locationName,date,description});navigate('/submissions');return}catch(e){} }
+      // Offline fallback: queue the FULL payload (formData + photoDataUrls)
+      // so offlineSync can actually replay saveSubmission + uploadPhotos
+      // when the tech reconnects. Only queue when we made it past
+      // formData assembly — earlier failures (e.g. photo encoding) don't
+      // have a meaningful payload to retry.
+      if(!navigator.onLine && formData){
+        try{
+          queueOfflineSubmission({userId:user?.id, formData, photoDataUrls, template})
+          navigate('/submissions')
+          return
+        }catch(e){}
+      }
       setSaveError(err?.message||'Submission failed. Please try again.')
     }finally{ setSaving(false) }
   }
