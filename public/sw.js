@@ -1,7 +1,14 @@
 // public/sw.js — ReliableTrack Service Worker
-// __SW_VERSION__ is replaced at build time by vite.config.js define()
-// This ensures each deploy gets a unique cache name, auto-busting stale assets
-const CACHE_NAME = 'reliabletrack-' + (typeof __SW_VERSION__ !== 'undefined' ? __SW_VERSION__ : 'dev');
+//
+// __SW_VERSION__ below is replaced at build time by the stampServiceWorkerVersion
+// plugin in vite.config.js. files in public/ skip Vite's define{} substitution,
+// so the plugin rewrites dist/sw.js post-build. Each deploy gets a unique cache
+// name → activate handler clears prior caches → no stale-chunk accumulation.
+//
+// In `vite dev` (no build), the literal token below remains as-is; dev mode
+// caches under `reliabletrack-__SW_VERSION__` and the developer manually
+// unregisters the SW between runs.
+const CACHE_NAME = 'reliabletrack-' + __SW_VERSION__;
 
 // App shell files to cache on install
 const SHELL_URLS = [
