@@ -44,11 +44,13 @@ export default function AssistantDrawer() {
     if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
-  // Focus textarea when drawer opens
+  // Focus textarea when drawer opens. Track the timer so it can be cleared
+  // if the drawer closes within 100ms of opening — without cleanup the
+  // focus() still fires (no-ops on a null ref, but lints noisily).
   useEffect(() => {
-    if (open && textareaRef.current) {
-      setTimeout(() => textareaRef.current && textareaRef.current.focus(), 100);
-    }
+    if (!open || !textareaRef.current) return;
+    const t = setTimeout(() => textareaRef.current && textareaRef.current.focus(), 100);
+    return () => clearTimeout(t);
   }, [open]);
 
   async function send(messageOverride) {

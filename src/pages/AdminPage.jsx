@@ -2253,22 +2253,37 @@ export default function AdminPage() {
   // the admin sees new submissions appear without refreshing. Falls back
   // silently if the realtime channel can't be established — initial fetch
   // above still works either way.
+  //
+  // Debounce the refresh handlers: a bulk admin action (e.g. status change
+  // on 20 selected rows) fires 20 postgres_changes events in rapid
+  // succession; without debouncing each one kicked off its own full
+  // re-fetch and the racing responses flickered the optimistic state.
   const [realtimeStatus, setRealtimeStatus] = useState('connecting')
   useEffect(() => {
     if (authLoading) return
     if (!isAdmin) return
     if (!supabase) return
     let cancelled = false
-    const channel = supabase
-      .channel('admin-submissions-feed')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, () => {
+    let subsTimer = null
+    let expsTimer = null
+    const refreshSubs = () => {
+      if (subsTimer) clearTimeout(subsTimer)
+      subsTimer = setTimeout(() => {
         if (cancelled) return
         fetchAllSubmissions().then(rows => { if (!cancelled) setSubmissions(rows) }).catch(() => {})
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_expenses' }, () => {
+      }, 400)
+    }
+    const refreshExps = () => {
+      if (expsTimer) clearTimeout(expsTimer)
+      expsTimer = setTimeout(() => {
         if (cancelled) return
         fetchMonthlyExpenses({ limit: 5000 }).then(rows => { if (!cancelled) setMonthlyExpenses(Array.isArray(rows) ? rows : []) }).catch(() => {})
-      })
+      }, 400)
+    }
+    const channel = supabase
+      .channel('admin-submissions-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, refreshSubs)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_expenses' }, refreshExps)
       .subscribe(status => {
         if (cancelled) return
         if (status === 'SUBSCRIBED') setRealtimeStatus('live')
@@ -2276,6 +2291,8 @@ export default function AdminPage() {
       })
     return () => {
       cancelled = true
+      if (subsTimer) clearTimeout(subsTimer)
+      if (expsTimer) clearTimeout(expsTimer)
       try { supabase.removeChannel(channel) } catch {}
     }
   }, [isAdmin, authLoading])
@@ -2471,7 +2488,7 @@ export default function AdminPage() {
 
 
         {/* ANALYTICS TAB */}
-        {activeTab === 'billing' && <BillingAdmin submissions={submissions} />}
+        {activeTab === 'billing' && <BillingAdmin submissions={submissions} onSubmissionUpdate={(id, newData) => setSubmissions(prev => prev.map(s => s.id === id ? { ...s, data: newData } : s))} />}
 
         {activeTab === 'monthly-expenses' && <MonthlyExpensesAdmin submissions={submissions} monthlyExpenses={monthlyExpenses} />}
 

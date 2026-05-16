@@ -208,7 +208,7 @@ function monthLabel(ym) {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
-export default function BillingAdmin({ submissions }) {
+export default function BillingAdmin({ submissions, onSubmissionUpdate }) {
   const { user, profile, isDemo } = useAuth()
   const [editing, setEditing] = useState(null)
   const [monthYear, setMonthYear] = useState(() => {
@@ -344,7 +344,13 @@ export default function BillingAdmin({ submissions }) {
         targetType: 'submission', targetId: submission.id,
         details: { wo, customer: submission.customer_name, amount: billed, reason: reason || null },
       })
-      submission.data = merged
+      // Lift the update to the parent so its `submissions` array — which
+      // drives every revenue total in the header — re-renders immediately.
+      // Mutating `submission.data` in place worked for the modal closing
+      // flow but left the rest of AdminPage stale until the realtime
+      // re-fetch landed (or forever if realtime was offline).
+      if (typeof onSubmissionUpdate === 'function') onSubmissionUpdate(submission.id, merged)
+      else submission.data = merged
       toast.success('Marked non-billable — ' + fmtMoney(billed) + ' removed from totals')
     } catch (err) {
       toast.error('Could not mark non-billable: ' + (err.message || err))
@@ -368,7 +374,13 @@ export default function BillingAdmin({ submissions }) {
         targetType: 'submission', targetId: submission.id,
         details: { wo, customer: submission.customer_name },
       })
-      submission.data = merged
+      // Lift the update to the parent so its `submissions` array — which
+      // drives every revenue total in the header — re-renders immediately.
+      // Mutating `submission.data` in place worked for the modal closing
+      // flow but left the rest of AdminPage stale until the realtime
+      // re-fetch landed (or forever if realtime was offline).
+      if (typeof onSubmissionUpdate === 'function') onSubmissionUpdate(submission.id, merged)
+      else submission.data = merged
       toast.success('Restored as billable')
     } catch (err) {
       toast.error('Could not restore: ' + (err.message || err))

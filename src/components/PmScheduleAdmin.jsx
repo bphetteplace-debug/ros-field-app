@@ -313,15 +313,18 @@ export default function PmScheduleAdmin() {
 
   const handleStatusChange = async (entry, newStatus) => {
     const prev = entry.status
+    const prevCompleted = entry.date_completed
     if (prev === newStatus) return
-    // Optimistic update
-    setEntries(list => list.map(e => e.id === entry.id ? { ...e, status: newStatus } : e))
+    // Build the patch up front so the optimistic update mirrors what the
+    // server will write — previously the date_completed auto-stamp only
+    // hit the DB, so the row showed Completed-with-empty-date until a
+    // refetch landed.
+    const patch = { status: newStatus }
+    if (newStatus === 'Completed' && !entry.date_completed) {
+      patch.date_completed = new Date().toISOString().slice(0, 10)
+    }
+    setEntries(list => list.map(e => e.id === entry.id ? { ...e, ...patch } : e))
     try {
-      const patch = { status: newStatus }
-      // Auto-stamp completion date when flipping to Completed
-      if (newStatus === 'Completed' && !entry.date_completed) {
-        patch.date_completed = new Date().toISOString().slice(0, 10)
-      }
       await updatePmScheduleEntry(entry.id, patch)
       logAudit({
         userId: user?.id, userName: profile?.full_name || user?.email,
@@ -331,7 +334,7 @@ export default function PmScheduleAdmin() {
       })
     } catch (e) {
       toast.error('Update failed: ' + (e.message || e))
-      setEntries(list => list.map(x => x.id === entry.id ? { ...x, status: prev } : x))
+      setEntries(list => list.map(x => x.id === entry.id ? { ...x, status: prev, date_completed: prevCompleted } : x))
     }
   }
 

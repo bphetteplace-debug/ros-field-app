@@ -176,13 +176,17 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
 
   useEffect(() => { load() }, [load])
 
-  // Separately pull just month_year values once so dropdown shows every
-  // month that has data (regardless of which month is currently filtered)
-  useEffect(() => {
+  // Separately pull just month_year values so the dropdown shows every
+  // month that has data (regardless of which month is currently filtered).
+  // Reloads when `entries` changes — without that, adding the first
+  // expense for a brand-new month never made that month appear in the
+  // dropdown until a full page reload.
+  const refreshAllMonths = useCallback(() => {
     fetchMonthlyExpenses({ limit: 5000 }).then(list => {
       setAllMonths((list || []).map(e => e.month_year).filter(Boolean))
     }).catch(() => {})
   }, [])
+  useEffect(() => { refreshAllMonths() }, [refreshAllMonths, entries.length])
 
   const months = useMemo(() => monthOptions(allMonths.map(m => ({ month_year: m }))), [allMonths])
 
