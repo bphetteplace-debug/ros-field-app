@@ -184,23 +184,23 @@ function buildHtml(d) {
 
 export async function downloadCpaPdf({ submissions, monthlyExpenses, year }) {
   const d = buildCpaReportData(submissions, monthlyExpenses, year)
-  // Also stash the debt buckets so the CPA list can interpolate amounts
   d.debtBuckets = d.debtRows.reduce((acc, r) => { acc[r.label] = r.amount; return acc }, {})
 
   const html = buildHtml(d)
-  // Render onscreen but positioned off-page-flow at the top-left so html2canvas
-  // has a real layout to capture. Using `left:-9999px` works for visible-flow
-  // elements but can result in 0×0 capture for some setups; keep at top:0
-  // and rely on z-index + opacity to hide visually if needed.
+  // Render on-screen (visible) so html2canvas captures real pixels. The
+  // off-screen `left:-9999px` trick causes html2canvas to capture from a
+  // viewport that doesn't include the element. We mount it on-screen with
+  // a very high z-index, capture immediately, then remove. The flicker is
+  // brief (~700ms) — acceptable for a one-click export.
   const container = document.createElement('div')
-  container.style.cssText = 'position:fixed;top:0;left:0;width:8.5in;background:#fff;z-index:-1;opacity:0;pointer-events:none;'
+  container.style.cssText = (
+    'position:fixed;top:0;left:0;width:8.5in;background:#fff;' +
+    'z-index:99999;box-shadow:0 0 0 9999px rgba(0,0,0,0.5);'
+  )
   container.innerHTML = html
   document.body.appendChild(container)
-
-  // Force the browser to compute layout, then wait a paint frame so
-  // html2canvas captures actual rendered dimensions.
   void container.offsetHeight
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await new Promise(resolve => setTimeout(resolve, 300))
 
   try {
     const mod = await import('html2pdf.js')
@@ -209,8 +209,9 @@ export async function downloadCpaPdf({ submissions, monthlyExpenses, year }) {
       margin: 0,
       filename: 'ROS_YTD_Reconciliation_' + (d.year) + '_' + new Date().toISOString().slice(0, 10) + '.pdf',
       image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: false, logging: false, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
     }).from(container).save()
   } finally {
     container.remove()
