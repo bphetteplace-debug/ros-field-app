@@ -958,18 +958,28 @@ export default function FormPage() {
         </div>
 
         {/* ⏱ Live job clock — elapsed since Arrival Time. Auto-fills
-            Labor Hours at submit if the tech leaves it blank. */}
+            Labor Hours at submit if the tech leaves it blank. We compute
+            elapsed minutes precisely (NOT via decimalHoursBetween, which
+            rounds to 0.25 and would hide the pill for the first 7-15 min). */}
         {(() => {
-          const elapsed = startTime ? decimalHoursBetween(startTime, nowStr()) : null
-          if (elapsed == null || elapsed <= 0) return null
-          const h = Math.floor(elapsed)
-          const m = Math.round((elapsed - h) * 60)
-          const elapsedLabel = h > 0 ? `${h}h ${m}m` : `${m}m`
+          if (!startTime || !/^\d{1,2}:\d{2}$/.test(startTime)) return null
           const [hh, mm] = startTime.split(':').map(Number)
+          const now = new Date()
+          const startMin = hh * 60 + mm
+          const nowMin = now.getHours() * 60 + now.getMinutes()
+          let elapsedMin = nowMin - startMin
+          if (elapsedMin < 0) elapsedMin += 24 * 60  // crossed midnight
+          if (elapsedMin < 1) return null
+          const h = Math.floor(elapsedMin / 60)
+          const m = elapsedMin % 60
+          const elapsedLabel = h > 0 ? `${h}h ${m}m` : `${m}m`
+          // Quarter-rounded hours for the auto-fill line (matches what
+          // handleSubmit will actually write into Labor Hours).
+          const autoHours = Math.round(elapsedMin / 15) * 15 / 60
           const ap = hh >= 12 ? 'PM' : 'AM'
           const h12 = (hh % 12) || 12
           const startLabel = `${h12}:${String(mm).padStart(2,'0')} ${ap}`
-          const willAutoFill = !laborHours
+          const willAutoFill = !laborHours && autoHours > 0
           return (
             <div style={{
               background: willAutoFill ? 'linear-gradient(135deg, #0f1f38, #1a2e4a)' : '#f1f5f9',
@@ -999,13 +1009,13 @@ export default function FormPage() {
                 </div>
                 {willAutoFill ? (
                   <div style={{ fontSize: 11, opacity: 0.75, marginTop: 3 }}>
-                    ⚡ Auto-fills Labor Hours to <b style={{ color: '#fbbf24' }}>{elapsed}</b> at submit
+                    ⚡ Auto-fills Labor Hours to <b style={{ color: '#fbbf24' }}>{autoHours}</b> at submit
                   </div>
-                ) : (
+                ) : laborHours ? (
                   <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
                     Labor Hours manually set to {laborHours}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           )
