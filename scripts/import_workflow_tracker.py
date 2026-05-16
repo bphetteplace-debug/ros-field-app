@@ -216,7 +216,6 @@ def parse_workbook(path):
                 'date': date,
                 'work_order': wko,
                 'pm_number': wko,
-                'total_revenue': cost,
                 'labor_hours': hours,
                 'miles': miles,
                 'status': 'submitted',
@@ -250,15 +249,21 @@ def post_batch(url, key, batch):
 
 
 def fetch_existing_wkos(url, key):
-    """Returns the set of work_order numbers already in submissions, so
-    we don't double-import if the script gets re-run."""
+    """Returns the set of numbers already used as work_order OR pm_number
+    in submissions, so we don't trip the unique constraints on either."""
     req = urllib.request.Request(
-        url + '/rest/v1/submissions?select=work_order',
+        url + '/rest/v1/submissions?select=work_order,pm_number',
         headers={'apikey': key, 'Authorization': 'Bearer ' + key},
     )
+    used = set()
     with urllib.request.urlopen(req) as resp:
         rows = json.loads(resp.read())
-        return set(r.get('work_order') for r in rows if r.get('work_order') is not None)
+        for r in rows:
+            if r.get('work_order') is not None:
+                used.add(int(r['work_order']))
+            if r.get('pm_number') is not None:
+                used.add(int(r['pm_number']))
+    return used
 
 
 def main():
@@ -277,8 +282,17 @@ def main():
     print(f'Parsed {len(rows)} rows from workbook')
 
     existing = fetch_existing_wkos(supabase_url, supabase_key)
-    print(f'Existing submissions WKO count: {len(existing)}')
-    fresh = [r for r in rows if r['work_order'] not in existing]
+    print(f'Existing submissions WKO/pm count: {len(existing)}')
+    # Skip any row whose WKO collides with existing AND dedupe within
+    # the workbook itself (in case of typo'd duplicate rows).
+    seen_in_batch = set()
+    fresh = []
+    for r in rows:
+        n = r['work_order']
+        if n in existing or n in seen_in_batch:
+            continue
+        seen_in_batch.add(n)
+        fresh.append(r)
     print(f'New rows to insert: {len(fresh)} (skipped {len(rows) - len(fresh)} duplicates)')
 
     if not fresh:

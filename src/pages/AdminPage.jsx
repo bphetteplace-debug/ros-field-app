@@ -127,13 +127,15 @@ function ExpenseAnalytics({ submissions }) {
     return d >= start && d <= end
   })
 
-  // Group by tech
+  // Group by tech — non-billable WOs contribute hours but NOT revenue
   const byTech = {}
   for (const s of filtered) {
     const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
     if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
     const lbl2 = getTypeLabel(s)
-    const rev = (lbl2 === 'EXP' || lbl2 === 'INSP') ? 0 : parseFloat(s.data?.grandTotal || 0)
+    const isExpOrInsp = lbl2 === 'EXP' || lbl2 === 'INSP'
+    const isNonBillable = s.data?.billable === false
+    const rev = (isExpOrInsp || isNonBillable) ? 0 : parseFloat(s.data?.grandTotal || 0)
     byTech[tech].total += rev
     if (lbl2 === 'PM' || lbl2 === 'SC') byTech[tech].woCount += 1
     byTech[tech].laborHours += parseFloat(s.labor_hours || 0)
@@ -1322,7 +1324,7 @@ function CustomersAdmin({ submissions }) {
     const scs = jobs.filter(s => s.template === 'service_call')
     const expenses = own.filter(s => s.template === 'expense_report')
     const inspections = own.filter(s => s.template === 'daily_inspection')
-    const jobRev = (s) => parseFloat(s.data?.grandTotal || 0) || 0
+    const jobRev = (s) => s?.data?.billable === false ? 0 : (parseFloat(s.data?.grandTotal || 0) || 0)
     const totalRevenue = jobs.reduce((sum, s) => sum + jobRev(s), 0)
     const totalHours = jobs.reduce((sum, s) => sum + (parseFloat(s.labor_hours || 0) || 0), 0)
 
@@ -1591,7 +1593,11 @@ function AnalyticsAdmin({ submissions }) {
 
   const passCount = subs.filter(s => s.overall_result === 'pass' || s.status === 'approved').length
   const failCount = subs.filter(s => s.overall_result === 'fail').length
-  const totalRevenue = isDemo ? null : subs.reduce((sum, s) => sum + (parseFloat(s.total_revenue) || 0), 0)
+  const totalRevenue = isDemo ? null : subs.reduce((sum, s) => {
+    if (s?.data?.billable === false) return sum
+    const v = s?.data?.grandTotal != null ? s.data.grandTotal : s.total_revenue
+    return sum + (parseFloat(v) || 0)
+  }, 0)
 
   const techMap = {}
   subs.forEach(s => {
@@ -2253,10 +2259,11 @@ export default function AdminPage() {
     return haystack.includes(q)
   })
 
-  // Revenue: PM/SC only (excludes expenses). Filtered list respects user search/filter.
+  // Revenue: PM/SC only (excludes expenses + non-billable). Filtered list respects user search/filter.
   const totalRevenue = filtered.reduce((sum, s) => {
     const lbl = getTypeLabel(s)
     if (lbl === 'EXP' || lbl === 'INSP') return sum
+    if (s?.data?.billable === false) return sum
     return sum + parseFloat(s.data?.grandTotal || 0)
   }, 0)
   // Month-scoped stats (reset each month)
@@ -2267,6 +2274,7 @@ export default function AdminPage() {
   const monthRevenue = thisMonthSubs.reduce((sum, s) => {
     const lbl = getTypeLabel(s)
     if (lbl === 'EXP' || lbl === 'INSP') return sum
+    if (s?.data?.billable === false) return sum
     return sum + parseFloat(s.data?.grandTotal || 0)
   }, 0)
   const monthExpenses = thisMonthSubs.reduce((sum, s) => {
@@ -2294,7 +2302,10 @@ export default function AdminPage() {
     const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.location_name || s.profiles?.full_name || 'Unknown'
     if (!byTech[tech]) byTech[tech] = { total: 0, count: 0, woCount: 0, laborHours: 0, items: [] }
     const lbl2 = getTypeLabel(s)
-    const rev = lbl2 === 'EXP' ? parseFloat(s.data?.expenseTotal || 0) : parseFloat(s.data?.grandTotal || 0)
+    const isNonBillable = s.data?.billable === false
+    const rev = lbl2 === 'EXP'
+      ? parseFloat(s.data?.expenseTotal || 0)
+      : (isNonBillable ? 0 : parseFloat(s.data?.grandTotal || 0))
     byTech[tech].total += rev
     if (lbl2 === 'PM' || lbl2 === 'SC') byTech[tech].woCount += 1
     byTech[tech].laborHours += parseFloat(s.labor_hours || 0)

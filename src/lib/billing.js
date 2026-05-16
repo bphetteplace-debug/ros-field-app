@@ -91,10 +91,19 @@ export function agingBucket(s, asOf = new Date()) {
   return '90+ days'
 }
 
+// True if the row was cancelled / marked non-billable (e.g. a duplicate
+// visit, warranty work, etc.). Excluded from every revenue calculation
+// in the app.
+export function isNonBillable(s) {
+  return s?.data?.billable === false
+}
+
 // Convenience: amount we count as billed for this submission. Reads the
 // canonical data.grandTotal first (same path the rest of the app uses)
-// and falls back to total_revenue for any older rows.
+// and falls back to total_revenue for any older rows. Non-billable rows
+// always return 0 — they're invisible to every revenue total.
 export function billedAmount(s) {
+  if (isNonBillable(s)) return 0
   const v = s?.data?.grandTotal != null ? s.data.grandTotal : s?.total_revenue
   return parseFloat(v) || 0
 }
@@ -105,9 +114,9 @@ export function collectedAmount(s) {
   return 0
 }
 
-// Convenience: open amount = billed if not paid and billable, else 0.
+// Convenience: open amount = billed if not paid, else 0.
+// (billedAmount already returns 0 for non-billable rows.)
 export function openAmount(s) {
-  if (s?.data?.billable === false) return 0
   if (s?.data?.paidDate) return 0
   return billedAmount(s)
 }

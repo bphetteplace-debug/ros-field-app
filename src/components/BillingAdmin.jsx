@@ -22,6 +22,7 @@ import {
   collectedAmount,
   openAmount,
   isWorkOrder,
+  isNonBillable,
 } from '../lib/billing'
 
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL
@@ -79,6 +80,7 @@ function EditBillingModal({ submission, onClose, onSave }) {
     paidReference: initial.paidReference || '',
     paymentTerms: initial.paymentTerms || defaultTerms,
     billable: initial.billable !== false,
+    nonBillableReason: initial.nonBillableReason || '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -151,10 +153,23 @@ function EditBillingModal({ submission, onClose, onSave }) {
             </div>
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer' }}>
-            <input type='checkbox' checked={form.billable} onChange={e => set('billable', e.target.checked)} />
-            Billable (uncheck to exclude from totals + aging)
-          </label>
+          <div style={{ background: form.billable ? '#f8fafc' : '#fef2f2', border: '1px solid ' + (form.billable ? '#e5e7eb' : '#fca5a5'), borderRadius: 8, padding: 12 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#1a2332', cursor: 'pointer', fontWeight: 700 }}>
+              <input type='checkbox' checked={form.billable} onChange={e => set('billable', e.target.checked)} />
+              Billable {!form.billable && <span style={{ color: '#b91c1c' }}>— excluded from revenue everywhere</span>}
+            </label>
+            {!form.billable && (
+              <div style={{ marginTop: 10 }}>
+                <label style={lbl}>Reason (optional)</label>
+                <input
+                  value={form.nonBillableReason}
+                  onChange={e => set('nonBillableReason', e.target.value)}
+                  placeholder='Double visit, warranty, customer dispute…'
+                  style={{ ...inp, width: '100%' }}
+                />
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ padding: '12px 18px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} disabled={saving} style={{ background: 'transparent', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 6, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
@@ -280,6 +295,7 @@ export default function BillingAdmin({ submissions }) {
       paidReference: formFields.paidReference || null,
       paymentTerms: formFields.paymentTerms || null,
       billable: formFields.billable,
+      nonBillableReason: formFields.billable ? null : (formFields.nonBillableReason || null),
     }
     await patchSubmissionData(submission.id, merged)
     logAudit({
@@ -291,11 +307,67 @@ export default function BillingAdmin({ submissions }) {
         customer: submission.customer_name,
         approved: formFields.approvedDate || null,
         paid: formFields.paidDate || null,
+        billable: formFields.billable,
       },
     })
     toast.success('Billing updated')
-    // Optimistic local update so the row reflects change before realtime
     submission.data = merged
+  }
+
+  // One-click cancel: flips billable to false, prompts for an optional
+  // reason, removes the cost from every revenue total in the app.
+  const handleCancelRow = async (e, submission) => {
+    e.stopPropagation()
+    const billed = billedAmount(submission)
+    const wo = submission.work_order || submission.pm_number
+    const reason = window.prompt(
+      'Mark WO #' + wo + ' (' + (submission.customer_name || '') + ') as NON-BILLABLE?\n\n' +
+      'This removes ' + fmtMoney(billed) + ' from every revenue total in the app.\n\n' +
+      'Reason (optional — e.g. "double PM", "warranty", "customer dispute"):'
+    )
+    if (reason === null) return // cancelled the prompt
+    try {
+      const merged = {
+        ...(submission.data || {}),
+        billable: false,
+        nonBillableReason: reason || null,
+      }
+      await patchSubmissionData(submission.id, merged)
+      logAudit({
+        userId: user?.id, userName: profile?.full_name || user?.email,
+        action: 'billing_marked_non_billable',
+        targetType: 'submission', targetId: submission.id,
+        details: { wo, customer: submission.customer_name, amount: billed, reason: reason || null },
+      })
+      submission.data = merged
+      toast.success('Marked non-billable — ' + fmtMoney(billed) + ' removed from totals')
+    } catch (err) {
+      toast.error('Could not mark non-billable: ' + (err.message || err))
+    }
+  }
+
+  const handleRestoreRow = async (e, submission) => {
+    e.stopPropagation()
+    const wo = submission.work_order || submission.pm_number
+    if (!window.confirm('Restore WO #' + wo + ' as billable?')) return
+    try {
+      const merged = {
+        ...(submission.data || {}),
+        billable: true,
+        nonBillableReason: null,
+      }
+      await patchSubmissionData(submission.id, merged)
+      logAudit({
+        userId: user?.id, userName: profile?.full_name || user?.email,
+        action: 'billing_restored_billable',
+        targetType: 'submission', targetId: submission.id,
+        details: { wo, customer: submission.customer_name },
+      })
+      submission.data = merged
+      toast.success('Restored as billable')
+    } catch (err) {
+      toast.error('Could not restore: ' + (err.message || err))
+    }
   }
 
   const card = (label, value, color) => (
@@ -412,20 +484,31 @@ export default function BillingAdmin({ submissions }) {
               <tbody>
                 {filtered.map(r => {
                   const tech = (Array.isArray(r.data?.techs) && r.data.techs[0]) || r.profiles?.full_name || '—'
+                  const nonBillable = isNonBillable(r)
+                  const rawCost = parseFloat(r.data?.grandTotal || r.total_revenue || 0) || 0
                   return (
-                    <tr key={r.id} onClick={() => setEditing(r)} style={{ cursor: 'pointer' }}>
+                    <tr key={r.id} onClick={() => setEditing(r)} style={{ cursor: 'pointer', background: nonBillable ? '#fafafa' : 'transparent' }}>
                       <td style={cell}><StatusPill status={r._status} /></td>
                       <td style={cell}>{fmtDate(r.date)}</td>
                       <td style={{ ...cell, fontFamily: 'ui-monospace, Menlo, monospace', fontWeight: 700, color: '#1a2332' }}>#{r.work_order || r.pm_number || '—'}</td>
                       <td style={{ ...cell, fontFamily: 'ui-monospace, Menlo, monospace', color: '#64748b' }}>{r.data?.dbWoNumber || '—'}</td>
                       <td style={cell}>
-                        <div style={{ fontWeight: 700, color: '#1a2332' }}>{r.customer_name || '—'}</div>
-                        {r.location_name && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{r.location_name}</div>}
+                        <div style={{ fontWeight: 700, color: nonBillable ? '#94a3b8' : '#1a2332', textDecoration: nonBillable ? 'line-through' : 'none' }}>{r.customer_name || '—'}</div>
+                        {r.location_name && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, textDecoration: nonBillable ? 'line-through' : 'none' }}>{r.location_name}</div>}
+                        {nonBillable && r.data?.nonBillableReason && (
+                          <div style={{ fontSize: 10, color: '#b91c1c', marginTop: 3, fontStyle: 'italic' }}>
+                            🚫 {r.data.nonBillableReason}
+                          </div>
+                        )}
                       </td>
                       <td style={cell}>{tech}</td>
                       <td style={cell}>{r.data?.foreman || '—'}</td>
-                      <td style={{ ...cell, textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'ui-monospace, Menlo, monospace' }}>
-                        {!isDemo ? fmtMoney(r._billed) : '—'}
+                      <td style={{ ...cell, textAlign: 'right', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                        {isDemo ? '—' : nonBillable ? (
+                          <span style={{ color: '#94a3b8', textDecoration: 'line-through' }}>{fmtMoney(rawCost)}</span>
+                        ) : (
+                          <span style={{ color: '#16a34a', fontWeight: 700 }}>{fmtMoney(r._billed)}</span>
+                        )}
                       </td>
                       <td style={cell}>{fmtDate(r.data?.approvedDate)}</td>
                       <td style={cell}>
@@ -439,7 +522,24 @@ export default function BillingAdmin({ submissions }) {
                       <td style={cell}>
                         {r._aging && r._aging !== 'Not yet due' ? <span style={{ color: '#dc2626', fontWeight: 700 }}>{r._aging}</span> : (r._aging || '—')}
                       </td>
-                      <td style={{ ...cell, textAlign: 'right' }} onClick={ev => ev.stopPropagation()}>
+                      <td style={{ ...cell, textAlign: 'right', whiteSpace: 'nowrap' }} onClick={ev => ev.stopPropagation()}>
+                        {nonBillable ? (
+                          <button
+                            onClick={(ev) => handleRestoreRow(ev, r)}
+                            title='Restore as billable'
+                            style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 4 }}
+                          >
+                            ↻ Restore
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(ev) => handleCancelRow(ev, r)}
+                            title='Mark non-billable (double visit, warranty, etc.) — excluded from revenue'
+                            style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 4 }}
+                          >
+                            🚫 Cancel
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditing(r)}
                           style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 5, padding: '3px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}

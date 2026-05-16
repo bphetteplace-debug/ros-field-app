@@ -212,13 +212,21 @@ function monthLabel(monthYear) {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
-function monthOptions() {
-  const opts = []
-  for (let m = 1; m <= 12; m++) {
-    const k = '2026-' + String(m).padStart(2, '0')
-    opts.push({ value: k, label: monthLabel(k) })
+// Build the month dropdown: every month that has at least one entry
+// (across all years that exist in the data) + the full current year +
+// the full next year. So owner can always plan ahead and historical
+// data stays visible.
+function monthOptions(entries = []) {
+  const set = new Set()
+  for (const e of entries) {
+    if (e.month_year) set.add(e.month_year)
+    else if (e.shut_in_date) set.add(String(e.shut_in_date).slice(0, 7))
   }
-  return opts
+  const now = new Date()
+  for (const yr of [now.getFullYear(), now.getFullYear() + 1]) {
+    for (let m = 1; m <= 12; m++) set.add(yr + '-' + String(m).padStart(2, '0'))
+  }
+  return Array.from(set).sort().map(k => ({ value: k, label: monthLabel(k) }))
 }
 
 function fmtDate(d) {
@@ -228,7 +236,6 @@ function fmtDate(d) {
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const MONTH_OPTIONS = monthOptions()
 const DEFAULT_MONTH = (() => {
   const d = new Date()
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
@@ -270,6 +277,8 @@ export default function PmScheduleAdmin() {
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const monthDropdown = useMemo(() => monthOptions(entries), [entries])
 
   const filtered = useMemo(() => {
     let pool = entries
@@ -425,7 +434,7 @@ export default function PmScheduleAdmin() {
         <div>
           <label style={lbl}>Month</label>
           <select value={monthYear} onChange={e => setMonthYear(e.target.value)} style={{ ...inp, width: '100%' }}>
-            {MONTH_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {monthDropdown.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div>
