@@ -1320,8 +1320,9 @@ function CustomersAdmin({ submissions }) {
     const scs = jobs.filter(s => s.template === 'service_call')
     const expenses = own.filter(s => s.template === 'expense_report')
     const inspections = own.filter(s => s.template === 'daily_inspection')
-    const totalRevenue = jobs.reduce((sum, s) => sum + (parseFloat(s.total_revenue) || 0), 0)
-    const totalHours = jobs.reduce((sum, s) => sum + (parseFloat(s.data?.totalHours || s.data?.labor_hours) || 0), 0)
+    const jobRev = (s) => parseFloat(s.data?.grandTotal || 0) || 0
+    const totalRevenue = jobs.reduce((sum, s) => sum + jobRev(s), 0)
+    const totalHours = jobs.reduce((sum, s) => sum + (parseFloat(s.labor_hours || 0) || 0), 0)
 
     const sitesMap = new Map()
     own.forEach(s => {
@@ -1329,7 +1330,7 @@ function CustomersAdmin({ submissions }) {
       if (!site) return
       const entry = sitesMap.get(site) || { name: site, count: 0, revenue: 0, lastDate: '' }
       entry.count++
-      entry.revenue += parseFloat(s.total_revenue) || 0
+      entry.revenue += jobRev(s)
       const d = s.date || s.created_at || ''
       if (d > entry.lastDate) entry.lastDate = d
       sitesMap.set(site, entry)
@@ -1349,7 +1350,7 @@ function CustomersAdmin({ submissions }) {
       if (!d) return
       const key = d.slice(0, 7)
       if (monthly[key]) {
-        monthly[key].revenue += parseFloat(s.total_revenue) || 0
+        monthly[key].revenue += jobRev(s)
         monthly[key].jobs++
       }
     })
@@ -1555,8 +1556,8 @@ function CustomersAdmin({ submissions }) {
                         <span style={{ fontSize: 12, color: '#64748b' }}>{fmtDate(s.date || s.created_at)}</span>
                         <span style={{ fontSize: 12, color: '#475569' }}>· {tech}</span>
                         {s.location_name && <span style={{ fontSize: 12, color: '#64748b' }}>· {s.location_name}</span>}
-                        {!isDemo && s.total_revenue > 0 && (
-                          <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginLeft: 'auto' }}>{fmtMoney(s.total_revenue)}</span>
+                        {!isDemo && parseFloat(s.data?.grandTotal || 0) > 0 && (
+                          <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginLeft: 'auto' }}>{fmtMoney(parseFloat(s.data?.grandTotal || 0))}</span>
                         )}
                       </div>
                     </button>
