@@ -7,3 +7,7 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Local backup dumps from one-shot data cleanup scripts contain sensitive
+# financial detail (amounts, vendors, customer names). Keep on local disk.
+scripts/backup_*.json

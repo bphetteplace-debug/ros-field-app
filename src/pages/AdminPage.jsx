@@ -2302,9 +2302,11 @@ export default function AdminPage() {
   // Expenses (This Month) = tech-side expense_report submissions
   // + office-side monthly_expenses for the current month. Unified so
   // the header card matches what's in the Monthly Expenses tab.
+  // Debt Service rows (credit-card payoffs, loan principal) are excluded:
+  // they're non-deductible and would inflate the opex / depress Net P&L.
   const monthYearKey = nowD.getFullYear() + '-' + String(nowD.getMonth() + 1).padStart(2, '0')
   const monthOfficeExpenses = monthlyExpenses
-    .filter(e => e.month_year === monthYearKey)
+    .filter(e => e.month_year === monthYearKey && e.category !== 'Debt Service')
     .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
   const monthExpenses = monthOfficeExpenses + thisMonthSubs.reduce((sum, s) => {
     if (getTypeLabel(s) === 'EXP') return sum + parseFloat(s.data?.expenseTotal || 0)

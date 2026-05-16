@@ -15,12 +15,18 @@ function authHeaders(includeContent) {
   return h
 }
 
-export const EXPENSE_CATEGORIES = ['Fixed', 'Payroll', 'Other']
+export const EXPENSE_CATEGORIES = ['Fixed', 'Payroll', 'Other', 'Debt Service']
 
+// 'Debt Service' is excluded from P&L aggregation: credit-card payoffs and
+// loan principal repayments are non-deductible (only underlying line-item
+// charges + interest are). Sites that sum monthly_expenses for opex/Net P&L
+// must filter these out — see AdminPage 'Expenses (This Month)', taxExport
+// officeTotal, and MonthlyExpensesAdmin summary card 'Total'.
 export const EXPENSE_CATEGORY_STYLES = {
-  Fixed:   { bg: '#dbeafe', fg: '#1d4ed8' },
-  Payroll: { bg: '#ede9fe', fg: '#6d28d9' },
-  Other:   { bg: '#f1f5f9', fg: '#475569' },
+  Fixed:          { bg: '#dbeafe', fg: '#1d4ed8' },
+  Payroll:        { bg: '#ede9fe', fg: '#6d28d9' },
+  Other:          { bg: '#f1f5f9', fg: '#475569' },
+  'Debt Service': { bg: '#fef3c7', fg: '#92400e' },
 }
 
 function deriveMonthYear(date) {

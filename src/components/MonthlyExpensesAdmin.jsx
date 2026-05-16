@@ -199,11 +199,12 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
   }, [entries, categoryFilter, search])
 
   const summary = useMemo(() => {
-    const out = { Fixed: 0, Payroll: 0, Other: 0, total: 0 }
+    const out = { Fixed: 0, Payroll: 0, Other: 0, 'Debt Service': 0, total: 0 }
     for (const e of entries) {
       const amt = parseFloat(e.amount || 0) || 0
       out[e.category] = (out[e.category] || 0) + amt
-      out.total += amt
+      // 'Total' = deductible opex only. Debt Service stays out of the P&L total.
+      if (e.category !== 'Debt Service') out.total += amt
     }
     return out
   }, [entries])
@@ -350,7 +351,8 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
         {!isDemo && card('Fixed', fmtMoney(summary.Fixed), '#1d4ed8')}
         {!isDemo && card('Payroll', fmtMoney(summary.Payroll), '#6d28d9')}
         {!isDemo && card('Other', fmtMoney(summary.Other), '#475569')}
-        {!isDemo && card('Total', fmtMoney(summary.total), '#1a2332')}
+        {!isDemo && card('Debt Service', fmtMoney(summary['Debt Service']), '#92400e')}
+        {!isDemo && card('Total (deductible)', fmtMoney(summary.total), '#1a2332')}
         {card('Entries', entries.length, '#0891b2')}
       </div>
 
@@ -445,6 +447,10 @@ export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ opacity: 0.75 }}>Office Other</span>
               <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{fmtMoney(exportPreview.officeOther)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75, color: '#fbbf24' }}>Debt Service (excluded from P&L)</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', color: '#fbbf24' }}>{fmtMoney(exportPreview.officeDebtService || 0)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ opacity: 0.75 }}>Customers w/ revenue</span>

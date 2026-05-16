@@ -152,6 +152,9 @@ export function buildTaxExportRows(submissions, monthlyExpenses, range) {
   const officeFixed = office.filter(r => r.Category === 'Fixed').reduce((s, r) => s + r.Amount, 0)
   const officePayroll = office.filter(r => r.Category === 'Payroll').reduce((s, r) => s + r.Amount, 0)
   const officeOther = office.filter(r => r.Category === 'Other').reduce((s, r) => s + r.Amount, 0)
+  // Debt Service (credit-card payoffs, loan principal) — non-deductible, tracked
+  // separately and excluded from officeTotal so it never flows into Net P&L.
+  const officeDebtService = office.filter(r => r.Category === 'Debt Service').reduce((s, r) => s + r.Amount, 0)
   const officeTotal = officeFixed + officePayroll + officeOther
   const totalExpenses = techExpTotal + officeTotal
   const netProfit = revenueTotal - totalExpenses
@@ -171,6 +174,7 @@ export function buildTaxExportRows(submissions, monthlyExpenses, range) {
       officeFixed,
       officePayroll,
       officeOther,
+      officeDebtService,
       officeTotal,
       totalExpenses,
       netProfit,
@@ -282,11 +286,13 @@ export async function downloadTaxExportXlsx({ year, period = 'year', customStart
     { Field: 'Office Fixed', Value: s.officeFixed },
     { Field: 'Office Payroll', Value: s.officePayroll },
     { Field: 'Office Other', Value: s.officeOther },
-    { Field: 'Office total', Value: s.officeTotal },
+    { Field: 'Office total (deductible)', Value: s.officeTotal },
     { Field: 'Office expense records', Value: s.officeRecords },
     { Field: '', Value: '' },
-    { Field: 'TOTAL EXPENSES', Value: s.totalExpenses },
+    { Field: 'TOTAL EXPENSES (deductible)', Value: s.totalExpenses },
     { Field: 'NET P&L', Value: s.netProfit },
+    { Field: '', Value: '' },
+    { Field: 'Office Debt Service (NON-deductible, excluded from totals above)', Value: s.officeDebtService },
     { Field: '', Value: '' },
     { Field: 'Customers w/ revenue', Value: s.customerCount },
     { Field: 'Vendors paid', Value: s.vendorCount },
@@ -357,8 +363,9 @@ export function buildTaxExportCsv(submissions, monthlyExpenses, range) {
   lines.push(rowCsv(['Office Fixed', fmtMoney(s.officeFixed)]))
   lines.push(rowCsv(['Office Payroll', fmtMoney(s.officePayroll)]))
   lines.push(rowCsv(['Office Other', fmtMoney(s.officeOther)]))
-  lines.push(rowCsv(['Total expenses', fmtMoney(s.totalExpenses)]))
+  lines.push(rowCsv(['Total expenses (deductible)', fmtMoney(s.totalExpenses)]))
   lines.push(rowCsv(['Net P&L', fmtMoney(s.netProfit)]))
+  lines.push(rowCsv(['Office Debt Service (NON-deductible, excluded from totals above)', fmtMoney(s.officeDebtService)]))
   lines.push(rowCsv(['Total miles', String(s.totalMiles)]))
   lines.push(rowCsv(['Mileage deduction (est)', fmtMoney(s.mileageDeduction)]))
 
