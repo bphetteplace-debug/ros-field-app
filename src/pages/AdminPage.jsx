@@ -5,6 +5,7 @@ import NavBar from '../components/NavBar'
 import { fetchAllSubmissions, updateSubmissionStatus, deleteSubmission, fetchPartsCatalog, addPart, deletePart, updatePart, fetchSettings, saveSettings, getAuthToken, logAudit, fetchAuditLog, ensureShareToken, createAssignedSubmission } from '../lib/submissions'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/toast'
+import TechMap from '../components/TechMap'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -1632,7 +1633,10 @@ export default function AdminPage() {
 
         {/* LIVE PRESENCE TAB */}
         {activeTab === 'live' && (
-          <LivePresence />
+          <>
+            <TechMap />
+            <LivePresence />
+          </>
         )}
 
         {/* SETTINGS TAB */}
