@@ -13,6 +13,20 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     dsn: import.meta.env.VITE_SENTRY_DSN,
     environment: import.meta.env.MODE,
     tracesSampleRate: 0.1,
+    integrations: [
+      // Session Replay: records DOM mutations / clicks / network for sessions
+      // that fire an error. maskAllInputs stays true (default) so login
+      // passwords are never captured; page text + media stay visible so the
+      // recording is useful for diagnosing what the tech actually saw.
+      Sentry.replayIntegration({
+        maskAllText: false,
+        blockAllMedia: false,
+      }),
+    ],
+    // Don't record routine sessions; do record any session where an error
+    // fires, including the ~60s buffer leading up to the error.
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 1.0,
     beforeSend(event) {
       // Strip auth tokens from any error data
       if (event.request?.headers?.authorization) {
