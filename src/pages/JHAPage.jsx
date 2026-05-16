@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
@@ -53,6 +53,10 @@ export default function JHAPage() {
   // Additional
   const [additionalHazards, setAdditionalHazards] = useState('')
   const [photos, setPhotos] = useState([])
+  // Memoize photo preview URLs so each render doesn't leak one per photo.
+  // Revokes previous URLs when the photos array changes (or on unmount).
+  const photoUrls = useMemo(() => photos.map(p => URL.createObjectURL(p)), [photos])
+  useEffect(() => () => photoUrls.forEach(URL.revokeObjectURL), [photoUrls])
 
   // GPS
   const [gpsLat, setGpsLat] = useState(null)
@@ -411,7 +415,7 @@ export default function JHAPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
               {photos.map((photo, i) => (
                 <div key={i} style={{ position: 'relative' }}>
-                  <img src={URL.createObjectURL(photo)} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, display: 'block' }} />
+                  <img src={photoUrls[i]} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, display: 'block' }} />
                   <button type="button" onClick={() => setPhotos(ps => ps.filter((_, x) => x !== i))} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
                 </div>
               ))}

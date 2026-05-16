@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { saveSubmission, uploadPhotos, fetchSettings, getAuthToken, DEFAULT_TRUCKS, DEFAULT_TECHS } from '../lib/submissions'
@@ -11,12 +11,16 @@ import { captionPhoto } from '../lib/captionPhoto'
 const EXPENSE_CATEGORIES = ['Fuel', 'Meals', 'Lodging', 'Tools / Supplies', 'Repairs', 'Parking / Tolls', 'Miscellaneous']
 
 function PhotoPicker({ label, value, onChange }) {
+  // Memoize the object URL so we don't leak one per render, and revoke
+  // it when the photo changes (or the component unmounts).
+  const url = useMemo(() => value ? URL.createObjectURL(value) : null, [value])
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url) }, [url])
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>{label}</div>
       {value ? (
         <div style={{ position: 'relative', display: 'inline-block' }}>
-          <img src={URL.createObjectURL(value)} alt="" style={{ width: 110, height: 82, objectFit: 'cover', borderRadius: 5, border: '1px solid #ddd', display: 'block' }} />
+          <img src={url} alt="" style={{ width: 110, height: 82, objectFit: 'cover', borderRadius: 5, border: '1px solid #ddd', display: 'block' }} />
           <button type="button" onClick={() => onChange(null)} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>x</button>
         </div>
       ) : (

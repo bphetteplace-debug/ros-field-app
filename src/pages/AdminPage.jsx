@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
@@ -1206,7 +1206,11 @@ function UsersAdmin() {
     try {
       const token = getAuthToken()
       const res = await fetch(SUPA_URL_P + '/rest/v1/profiles?select=*&order=created_at.asc', {
-        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+        // Fall back to the anon key when token is null (e.g. early in the
+        // mount lifecycle) — RLS still scopes the response correctly.
+        // Without the fallback the lambda hits "Bearer null" and 401s
+        // silently behind a generic "Failed to load profiles".
+        headers: { 'apikey': SUPA_KEY_P, 'Authorization': 'Bearer ' + (token || SUPA_KEY_P), 'Content-Type': 'application/json' }
       })
       if (!res.ok) throw new Error('Failed to load profiles: ' + res.status)
       const data = await res.json()
@@ -1727,12 +1731,16 @@ function AuditLogAdmin() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Track in-flight requests so successive Refresh clicks don't race —
+  // latest call always wins. Older promise resolutions are ignored.
+  const inflightRef = useRef(0)
   const load = () => {
+    const myReq = ++inflightRef.current
     setLoading(true); setError(null)
     fetchAuditLog(200)
-      .then(rows => setEntries(rows))
-      .catch(e => setError(e.message || String(e)))
-      .finally(() => setLoading(false))
+      .then(rows => { if (myReq === inflightRef.current) setEntries(rows) })
+      .catch(e => { if (myReq === inflightRef.current) setError(e.message || String(e)) })
+      .finally(() => { if (myReq === inflightRef.current) setLoading(false) })
   }
 
   useEffect(() => { load() }, [])
@@ -2313,7 +2321,12 @@ export default function AdminPage() {
     const matchesStatus = filterStatus === 'ALL' || s.status === filterStatus
     const techList = Array.isArray(s.data?.techs) ? s.data.techs : []
     const matchesTech = filterTech === 'ALL' || techList.includes(filterTech)
-    const matchesDate = (!dateFrom || s.date >= dateFrom) && (!dateTo || s.date <= dateTo)
+    // Fall back to created_at (ISO timestamp — comparing against a date
+    // string works because YYYY-MM-DD sorts identically with the leading
+    // chars of YYYY-MM-DDTHH:MM:SS). Without the fallback any submission
+    // with a null `date` was silently excluded by the filter.
+    const sDate = s.date || (s.created_at || '').slice(0, 10)
+    const matchesDate = (!dateFrom || sDate >= dateFrom) && (!dateTo || sDate <= dateTo)
     if (!matchesType || !matchesStatus || !matchesTech || !matchesDate) return false
     if (!q) return true
     const haystack = [s.customer_name, s.location_name, s.date, s.truck_number, s.pm_number ? String(s.pm_number) : '', s.summary, s.profiles?.full_name, s.work_type, ...(Array.isArray(s.data?.techs) ? s.data.techs : [])].filter(Boolean).join(' ').toLowerCase()

@@ -24,26 +24,7 @@ export const supabase = (() => {
   return _client;
 })();
 
-// Helper: upload a photo to the submission-photos bucket
-export async function uploadPhoto(submissionId, section, file) {
-  if (!supabase) throw new Error('Cloud mode not configured');
-  const filename = `${submissionId}/${section}/${Date.now()}-${file.name}`;
-  const { data, error } = await supabase.storage
-    .from('submission-photos')
-    .upload(filename, file, { cacheControl: '3600', upsert: false });
-  if (error) throw error;
-  return data.path;
-}
-
-// Helper: get a signed URL for a photo (since the bucket is private)
-export async function getPhotoUrl(path) {
-  if (!supabase) return null;
-  const { data, error } = await supabase.storage
-    .from('submission-photos')
-    .createSignedUrl(path, 3600);  // 1 hour
-  if (error) {
-    console.error('Photo URL error:', error);
-    return null;
-  }
-  return data.signedUrl;
-}
+// Deleted dead-code: uploadPhoto + getPhotoUrl. Both used a signed-URL
+// pattern that doesn't apply here — the `submission-photos` bucket is
+// public, so callers go through getPhotoUrl in src/lib/submissions.js
+// which returns the cheaper public URL directly.

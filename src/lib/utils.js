@@ -21,7 +21,9 @@ export const nowTime = () => {
 export const parseTime = (str) => {
   if (!str) return null;
   const s = String(str).trim().toUpperCase();
-  // 12-hour with AM/PM
+  // 12-hour with AM/PM. Space between minute and AM/PM is optional so
+  // both "08:30 AM" and "08:30AM" parse — techs typing on a phone often
+  // skip the space.
   let m = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
   if (m) {
     let h = parseInt(m[1], 10);

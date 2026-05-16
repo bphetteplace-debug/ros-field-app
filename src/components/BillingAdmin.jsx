@@ -52,7 +52,10 @@ const inp = { border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px',
 const lbl = { fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' }
 
 function fmtMoney(n) {
-  return '$' + (Math.round(n || 0)).toLocaleString('en-US')
+  // Guard NaN / Infinity / non-numeric so a stray bad value renders as
+  // "$0" instead of literally "$NaN" or "$Infinity" leaking into the UI.
+  const v = Number.isFinite(n) ? n : 0
+  return '$' + (Math.round(v)).toLocaleString('en-US')
 }
 function fmtDate(d) {
   if (!d) return '—'
