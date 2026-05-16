@@ -2446,7 +2446,7 @@ export default function AdminPage() {
         {/* ANALYTICS TAB */}
         {activeTab === 'billing' && <BillingAdmin submissions={submissions} />}
 
-        {activeTab === 'monthly-expenses' && <MonthlyExpensesAdmin />}
+        {activeTab === 'monthly-expenses' && <MonthlyExpensesAdmin submissions={submissions} monthlyExpenses={monthlyExpenses} />}
 
         {activeTab === 'customers' && <CustomersAdmin submissions={submissions} />}
 

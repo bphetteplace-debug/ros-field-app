@@ -14,7 +14,7 @@ import {
   updateMonthlyExpense,
   deleteMonthlyExpense,
 } from '../lib/monthlyExpenses'
-import { downloadTaxExportCsv } from '../lib/taxExport'
+import { downloadTaxExportXlsx, downloadTaxExportCsv, computeTaxExportPreview, periodRange } from '../lib/taxExport'
 
 const inp = { border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
 const lbl = { fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' }
@@ -143,7 +143,7 @@ const DEFAULT_MONTH = (() => {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
 })()
 
-export default function MonthlyExpensesAdmin() {
+export default function MonthlyExpensesAdmin({ submissions = [], monthlyExpenses: parentExpenses }) {
   const { user, profile, isDemo } = useAuth()
   const [entries, setEntries] = useState([])
   const [monthYear, setMonthYear] = useState(DEFAULT_MONTH)
@@ -154,6 +154,10 @@ export default function MonthlyExpensesAdmin() {
   const [allMonths, setAllMonths] = useState([])
   const [exporting, setExporting] = useState(false)
   const [exportYear, setExportYear] = useState(String(new Date().getFullYear()))
+  const [exportPeriod, setExportPeriod] = useState('year') // year / q1 / q2 / q3 / q4 / custom
+  const [exportCustomStart, setExportCustomStart] = useState('')
+  const [exportCustomEnd, setExportCustomEnd] = useState('')
+  const [exportFormat, setExportFormat] = useState('xlsx')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -267,11 +271,42 @@ export default function MonthlyExpensesAdmin() {
     notes: '',
   })
 
+  // Full data sources for the export (separate from the table's
+  // month-scoped fetch). Falls back to the parent prop, otherwise the
+  // local entries (current month only).
+  const fullExpensesForExport = useMemo(
+    () => (Array.isArray(parentExpenses) && parentExpenses.length ? parentExpenses : entries),
+    [parentExpenses, entries]
+  )
+
+  const exportRange = useMemo(
+    () => periodRange(exportYear, exportPeriod, exportCustomStart, exportCustomEnd),
+    [exportYear, exportPeriod, exportCustomStart, exportCustomEnd]
+  )
+
+  const exportPreview = useMemo(
+    () => computeTaxExportPreview(submissions, fullExpensesForExport, exportRange),
+    [submissions, fullExpensesForExport, exportRange]
+  )
+
   const handleExport = async () => {
     setExporting(true)
     try {
-      await downloadTaxExportCsv(parseInt(exportYear, 10))
-      toast.success('Tax export downloaded — ROS_TaxExport_' + exportYear + '.csv')
+      const args = {
+        year: parseInt(exportYear, 10),
+        period: exportPeriod,
+        customStart: exportCustomStart,
+        customEnd: exportCustomEnd,
+        submissions,
+        monthlyExpenses: fullExpensesForExport,
+      }
+      if (exportFormat === 'xlsx') {
+        await downloadTaxExportXlsx(args)
+        toast.success('Tax export downloaded (XLSX) — open in Excel')
+      } else {
+        await downloadTaxExportCsv(args)
+        toast.success('Tax export downloaded (CSV)')
+      }
     } catch (e) {
       toast.error('Export failed: ' + (e.message || e))
     } finally {
@@ -283,6 +318,10 @@ export default function MonthlyExpensesAdmin() {
     const opts = new Set()
     for (const e of entries) if (e.month_year) opts.add(e.month_year.slice(0, 4))
     for (const m of allMonths) if (m) opts.add(m.slice(0, 4))
+    for (const s of submissions) {
+      const d = s.date || s.created_at
+      if (d) opts.add(String(d).slice(0, 4))
+    }
     const now = new Date().getFullYear()
     opts.add(String(now - 1))
     opts.add(String(now))
@@ -316,32 +355,125 @@ export default function MonthlyExpensesAdmin() {
       </div>
 
       {/* Tax export panel */}
-      <div style={{ background: '#0f1f38', borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, color: '#fff' }}>
-        <div style={{ flex: '1 1 auto', minWidth: 240 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 2 }}>📄 Year-end tax export</div>
-          <div style={{ fontSize: 11, opacity: 0.75, lineHeight: 1.4 }}>
-            One CSV with every revenue line, tech-side expense, and office expense for the year — sectioned + with totals. Hand to your CPA.
+      <div style={{ background: '#0f1f38', borderRadius: 12, padding: 16, marginBottom: 12, color: '#fff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>📄 Year-end tax export</div>
+            <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.4 }}>
+              Multi-sheet XLSX (recommended for your CPA) or single CSV. Includes revenue, tech-side expenses, office expenses, customer summary, 1099-NEC candidate vendors, and mileage deduction estimate. Each sheet has Excel filters and a frozen header.
+            </div>
           </div>
         </div>
-        <select
-          value={exportYear}
-          onChange={e => setExportYear(e.target.value)}
-          style={{ ...inp, width: 110, color: '#1a2332' }}
-        >
-          {exportYearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          style={{
-            background: exporting ? '#475569' : '#e65c00',
-            color: '#fff', border: 'none', borderRadius: 6,
-            padding: '8px 16px', fontSize: 12, fontWeight: 800,
-            cursor: exporting ? 'wait' : 'pointer',
-          }}
-        >
-          {exporting ? 'Building…' : '📥 Download CSV'}
-        </button>
+
+        {/* Control row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr)) auto', gap: 10, alignItems: 'end', marginBottom: 12 }}>
+          <div>
+            <label style={{ ...lbl, color: '#cbd5e1' }}>Year</label>
+            <select value={exportYear} onChange={e => setExportYear(e.target.value)} style={{ ...inp, width: '100%', color: '#1a2332' }}>
+              {exportYearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ ...lbl, color: '#cbd5e1' }}>Period</label>
+            <select value={exportPeriod} onChange={e => setExportPeriod(e.target.value)} style={{ ...inp, width: '100%', color: '#1a2332' }}>
+              <option value='year'>Full year</option>
+              <option value='q1'>Q1 (Jan–Mar)</option>
+              <option value='q2'>Q2 (Apr–Jun)</option>
+              <option value='q3'>Q3 (Jul–Sep)</option>
+              <option value='q4'>Q4 (Oct–Dec)</option>
+              <option value='custom'>Custom range</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ ...lbl, color: '#cbd5e1' }}>Format</label>
+            <select value={exportFormat} onChange={e => setExportFormat(e.target.value)} style={{ ...inp, width: '100%', color: '#1a2332' }}>
+              <option value='xlsx'>XLSX (Excel, recommended)</option>
+              <option value='csv'>CSV (single file)</option>
+            </select>
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              background: exporting ? '#475569' : '#e65c00',
+              color: '#fff', border: 'none', borderRadius: 8,
+              padding: '10px 22px', fontSize: 13, fontWeight: 800,
+              cursor: exporting ? 'wait' : 'pointer',
+              boxShadow: '0 4px 12px rgba(230,92,0,0.35)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {exporting ? 'Building…' : '📥 Download'}
+          </button>
+        </div>
+
+        {exportPeriod === 'custom' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={{ ...lbl, color: '#cbd5e1' }}>From</label>
+              <input type='date' value={exportCustomStart} onChange={e => setExportCustomStart(e.target.value)} style={{ ...inp, width: '100%', color: '#1a2332' }} />
+            </div>
+            <div>
+              <label style={{ ...lbl, color: '#cbd5e1' }}>To</label>
+              <input type='date' value={exportCustomEnd} onChange={e => setExportCustomEnd(e.target.value)} style={{ ...inp, width: '100%', color: '#1a2332' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Preview */}
+        <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: 12, fontSize: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94a3b8', marginBottom: 8 }}>
+            What you'll get — {exportRange.start} to {exportRange.end}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '6px 18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Revenue records</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{exportPreview.revenueRecords} · {fmtMoney(exportPreview.revenue)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Tech expenses</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{exportPreview.techExpRecords} · {fmtMoney(exportPreview.techExpenses)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Office Fixed</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{fmtMoney(exportPreview.officeFixed)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Office Payroll</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{fmtMoney(exportPreview.officePayroll)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Office Other</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{fmtMoney(exportPreview.officeOther)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Customers w/ revenue</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{exportPreview.customerCount}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Vendors paid (1099 ≥ $600)</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{exportPreview.vendorCount} · <b style={{ color: '#fbbf24' }}>{exportPreview.vendors1099} 1099</b></span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.75 }}>Miles · est deduction</span>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{Math.round(exportPreview.totalMiles).toLocaleString('en-US')} · {fmtMoney(exportPreview.mileageDeduction)}</span>
+            </div>
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', marginTop: 10, paddingTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '4px 18px', fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <b style={{ color: '#16a34a' }}>Revenue</b>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontWeight: 800 }}>{fmtMoney(exportPreview.revenue)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <b style={{ color: '#f97316' }}>Total expenses</b>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontWeight: 800 }}>{fmtMoney(exportPreview.totalExpenses)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <b style={{ color: exportPreview.netProfit >= 0 ? '#22d3ee' : '#fca5a5' }}>Net P&L</b>
+              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontWeight: 800 }}>{fmtMoney(exportPreview.netProfit)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filter bar */}
