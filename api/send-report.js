@@ -8,14 +8,54 @@ const TO = process.env.EMAIL_TO ? process.env.EMAIL_TO.split(',').map(e => e.tri
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { submissionId , pdfBase64 } = req.body || {};
   if (!submissionId) return res.status(400).json({ error: 'submissionId required' });
   if (!RESEND_KEY) return res.status(500).json({ error: 'Missing RESEND_API_KEY' });
   if (!SUPA_KEY) return res.status(500).json({ error: 'Missing Supabase key' });
 
+  // Auth: require Supabase user JWT. The caller must own the submission OR
+  // be an admin (profiles.role='admin'); otherwise unauthenticated callers
+  // could spam the office mailbox and abuse the caller-supplied pdfBase64
+  // as an arbitrary-attachment relay through the company domain.
+  const authHeader = req.headers.authorization || req.headers.Authorization || '';
+  const userToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!userToken) return res.status(401).json({ error: 'Missing auth token' });
+  let userId = null;
   try {
-    
+    const userRes = await fetch(SUPA_URL + '/auth/v1/user', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + userToken },
+    });
+    if (!userRes.ok) return res.status(401).json({ error: 'Invalid or expired session' });
+    const userBody = await userRes.json();
+    userId = userBody && userBody.id;
+    if (!userId) return res.status(401).json({ error: 'Invalid session' });
+  } catch (_e) {
+    return res.status(500).json({ error: 'Auth check failed' });
+  }
+
+  // Reject obviously-invalid pdfBase64 before forwarding to Resend.
+  // Real PDFs start with the bytes `%PDF-` (0x25 0x50 0x44 0x46 0x2D).
+  if (pdfBase64) {
+    if (typeof pdfBase64 !== 'string' || pdfBase64.length > 14_000_000) {
+      return res.status(400).json({ error: 'pdfBase64 invalid or too large' });
+    }
+    try {
+      const head = Buffer.from(pdfBase64.slice(0, 12), 'base64').toString('binary');
+      if (!head.startsWith('%PDF-')) {
+        return res.status(400).json({ error: 'pdfBase64 not a valid PDF' });
+      }
+    } catch (_e) {
+      return res.status(400).json({ error: 'pdfBase64 invalid base64' });
+    }
+  }
+
+  try {
+
     // Fetch submission + photos
     const subRes = await fetch(
       SUPA_URL + '/rest/v1/submissions?id=eq.' + submissionId + '&select=*,photos(id,storage_path,caption,display_order,section)',
@@ -28,6 +68,20 @@ module.exports = async function handler(req, res) {
     const rows = await subRes.json();
     if (!rows || rows.length === 0) return res.status(404).json({ error: 'Submission not found' });
     const sub = rows[0];
+
+    // Ownership / admin gate.
+    if (sub.created_by !== userId) {
+      const profRes = await fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=role', {
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
+      });
+      let isAdmin = false;
+      if (profRes.ok) {
+        const profs = await profRes.json();
+        isAdmin = profs && profs[0] && profs[0].role === 'admin';
+      }
+      if (!isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const d = sub.data || {};
     const photos = sub.photos || [];
     const template = sub.template || 'service_call';

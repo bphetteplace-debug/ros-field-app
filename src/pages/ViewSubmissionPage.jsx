@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { fetchSubmission, getPhotoUrl, deleteSubmission } from '../lib/submissions'
+import { fetchSubmission, getPhotoUrl, deleteSubmission, getAuthToken } from '../lib/submissions'
 import { useAuth } from '../lib/auth'
 import NavBar from '../components/NavBar'
 const DownloadPDFButton = lazy(() => import('../components/DownloadPDFButton').then(m => ({ default: m.DownloadPDFButton })))
@@ -87,7 +87,7 @@ export default function ViewSubmissionPage() {
     if (!sub) return
     setResending(true); setResendMsg('')
     try {
-      const res = await fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: sub.id }) })
+      const res = await fetch('/api/send-report', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') }, body: JSON.stringify({ submissionId: sub.id }) })
       const data = await res.json()
       setResendMsg(res.ok ? 'Report sent!' : 'Error: ' + (data.error || res.status))
     } catch(e) { setResendMsg('Error: ' + e.message) }

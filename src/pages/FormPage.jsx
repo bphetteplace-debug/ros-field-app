@@ -12,6 +12,7 @@ import {
   fetchPartsCatalog,
   fetchSubmission,
   fetchSubmissions,
+  getAuthToken,
 } from '../lib/submissions'
 import {
   saveDraft as saveDraftToStore,
@@ -745,7 +746,7 @@ export default function FormPage() {
     setSaveStatus('Sending email…');
     fetch('/api/send-report', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (getAuthToken() || '') },
       body: JSON.stringify({ submissionId: submission.id, pdfBase64 }),
     }).then(async r => {
       if (!r.ok) {
