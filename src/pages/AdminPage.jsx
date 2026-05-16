@@ -1272,6 +1272,310 @@ function UsersAdmin() {
 }
 
 // ─── ANALYTICS ADMIN ─────────────────────────────────────────────────────────
+// ─── CUSTOMER HISTORY ────────────────────────────────────────────────────────
+// One-stop view of a customer's relationship: lifetime stats, sites
+// serviced (sorted by last visit), monthly revenue spark, and a
+// chronological feed of every submission. Reads from the submissions
+// prop the AdminPage already loads — no extra fetch.
+function CustomersAdmin({ submissions }) {
+  const { isDemo } = useAuth()
+  const navigate = useNavigate()
+  const subs = submissions || []
+  const [selectedCustomer, setSelectedCustomer] = useState('')
+  const [search, setSearch] = useState('')
+
+  // Build the customer roster from actual submission data — anything the
+  // admin can see in the submissions list is selectable here.
+  const customerList = useMemo(() => {
+    const map = new Map()
+    subs.forEach(s => {
+      const name = (s.customer_name || '').trim()
+      if (!name) return
+      const entry = map.get(name) || { name, count: 0, lastDate: '' }
+      entry.count++
+      const d = s.date || s.created_at || ''
+      if (d > entry.lastDate) entry.lastDate = d
+      map.set(name, entry)
+    })
+    return Array.from(map.values()).sort((a, b) => b.count - a.count)
+  }, [subs])
+
+  const filteredCustomers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return customerList
+    return customerList.filter(c => c.name.toLowerCase().includes(q))
+  }, [customerList, search])
+
+  // Default to highest-job-count customer once data is available
+  useEffect(() => {
+    if (!selectedCustomer && customerList.length > 0) setSelectedCustomer(customerList[0].name)
+  }, [customerList, selectedCustomer])
+
+  const data = useMemo(() => {
+    if (!selectedCustomer) return null
+    const own = subs.filter(s => (s.customer_name || '').trim() === selectedCustomer)
+    if (own.length === 0) return null
+    const jobs = own.filter(s => s.template === 'pm_flare_combustor' || s.template === 'service_call')
+    const pms = jobs.filter(s => s.template === 'pm_flare_combustor')
+    const scs = jobs.filter(s => s.template === 'service_call')
+    const expenses = own.filter(s => s.template === 'expense_report')
+    const inspections = own.filter(s => s.template === 'daily_inspection')
+    const totalRevenue = jobs.reduce((sum, s) => sum + (parseFloat(s.total_revenue) || 0), 0)
+    const totalHours = jobs.reduce((sum, s) => sum + (parseFloat(s.data?.totalHours || s.data?.labor_hours) || 0), 0)
+
+    const sitesMap = new Map()
+    own.forEach(s => {
+      const site = (s.location_name || '').trim()
+      if (!site) return
+      const entry = sitesMap.get(site) || { name: site, count: 0, revenue: 0, lastDate: '' }
+      entry.count++
+      entry.revenue += parseFloat(s.total_revenue) || 0
+      const d = s.date || s.created_at || ''
+      if (d > entry.lastDate) entry.lastDate = d
+      sitesMap.set(site, entry)
+    })
+    const sites = Array.from(sitesMap.values()).sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''))
+
+    // Last 12 months of revenue, indexed by YYYY-MM
+    const monthly = {}
+    const now = new Date()
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+      monthly[key] = { revenue: 0, jobs: 0, label: d.toLocaleString('en-US', { month: 'short' }) + (i >= 9 || d.getMonth() === 0 ? ' ' + String(d.getFullYear()).slice(2) : '') }
+    }
+    jobs.forEach(s => {
+      const d = s.date || s.created_at
+      if (!d) return
+      const key = d.slice(0, 7)
+      if (monthly[key]) {
+        monthly[key].revenue += parseFloat(s.total_revenue) || 0
+        monthly[key].jobs++
+      }
+    })
+
+    const sorted = [...own].sort((a, b) => (b.date || b.created_at || '').localeCompare(a.date || a.created_at || ''))
+    const firstDate = sorted.length ? (sorted[sorted.length - 1].date || sorted[sorted.length - 1].created_at) : null
+    const lastDate = sorted.length ? (sorted[0].date || sorted[0].created_at) : null
+
+    return { own, jobs, pms, scs, expenses, inspections, totalRevenue, totalHours, sites, monthly, sorted, firstDate, lastDate }
+  }, [subs, selectedCustomer])
+
+  if (customerList.length === 0) {
+    return (
+      <div style={{ background: '#fff', borderRadius: 12, padding: '32px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>🏢</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a2332', marginBottom: 6 }}>No customer data yet</div>
+        <div style={{ fontSize: 13, color: '#666', maxWidth: 420, margin: '0 auto', lineHeight: 1.5 }}>
+          Customer histories will populate here as your techs submit jobs against named customers.
+        </div>
+      </div>
+    )
+  }
+
+  const fmtDate = (d) => {
+    if (!d) return '—'
+    const dt = new Date(d)
+    if (Number.isNaN(dt.getTime())) return d
+    return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+  const fmtMoney = (n) => '$' + (Math.round(n || 0)).toLocaleString('en-US')
+
+  const card = (label, value, color) => (
+    <div style={{ background: '#fff', borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '2px solid ' + color, flex: '1 1 140px', minWidth: 140 }}>
+      <div style={{ fontSize: 24, fontWeight: 900, color }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#888', fontWeight: 600, marginTop: 2 }}>{label}</div>
+    </div>
+  )
+
+  const typePill = (s) => {
+    const map = {
+      pm_flare_combustor: { bg: '#ede9fe', fg: '#6d28d9', label: 'PM' },
+      service_call:       { bg: '#dbeafe', fg: '#1d4ed8', label: 'SC' },
+      expense_report:     { bg: '#fce7f3', fg: '#be185d', label: 'EXP' },
+      daily_inspection:   { bg: '#fef3c7', fg: '#a16207', label: 'INSP' },
+      jha:                { bg: '#fee2e2', fg: '#b91c1c', label: 'JHA' },
+      quote:              { bg: '#d1fae5', fg: '#047857', label: 'QUOTE' },
+    }
+    const t = map[s.template] || { bg: '#f1f5f9', fg: '#475569', label: (s.template || '').slice(0, 8).toUpperCase() }
+    return (
+      <span style={{ background: t.bg, color: t.fg, fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 10, letterSpacing: 0.4 }}>
+        {t.label}
+      </span>
+    )
+  }
+
+  const monthlyEntries = data ? Object.entries(data.monthly) : []
+  const maxMonthRev = data ? Math.max(1, ...monthlyEntries.map(([, m]) => m.revenue)) : 1
+
+  return (
+    <div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#1a2332', marginBottom: 4 }}>🏢 Customer History</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
+        Pick a customer to see their lifetime activity, sites you've serviced, monthly revenue trend, and full job history.
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 280px) 1fr', gap: 16, alignItems: 'start' }}>
+        {/* Customer picker */}
+        <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+          <div style={{ padding: 12, borderBottom: '1px solid #e5e7eb' }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={'Search ' + customerList.length + ' customers…'}
+              style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 6, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit' }}
+            />
+          </div>
+          <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+            {filteredCustomers.length === 0 ? (
+              <div style={{ padding: 16, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>No customer matches.</div>
+            ) : filteredCustomers.map(c => {
+              const active = c.name === selectedCustomer
+              return (
+                <button
+                  key={c.name}
+                  onClick={() => setSelectedCustomer(c.name)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    background: active ? '#fff7ed' : 'transparent',
+                    border: 'none', borderLeft: active ? '3px solid #e65c00' : '3px solid transparent',
+                    cursor: 'pointer', padding: '10px 12px', fontFamily: 'inherit',
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#9a3412' : '#1a2332' }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    {c.count} job{c.count === 1 ? '' : 's'} · last {fmtDate(c.lastDate)}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Detail pane */}
+        {!data ? (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center', color: '#94a3b8' }}>
+            Pick a customer on the left to see their history.
+          </div>
+        ) : (
+          <div>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 12 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#1a2332' }}>{selectedCustomer}</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                {data.own.length} total record{data.own.length === 1 ? '' : 's'} · first {fmtDate(data.firstDate)} · last {fmtDate(data.lastDate)}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+              {card('PM', data.pms.length, '#7c3aed')}
+              {card('SC', data.scs.length, '#1d4ed8')}
+              {!isDemo && card('Revenue', fmtMoney(data.totalRevenue), '#16a34a')}
+              {card('Labor hrs', (data.totalHours || 0).toFixed(1), '#0891b2')}
+              {card('Sites', data.sites.length, '#ea580c')}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 12 }}>
+              {/* Sites */}
+              <div style={{ background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 10 }}>📍 Sites serviced</div>
+                {data.sites.length === 0 ? (
+                  <div style={{ color: '#aaa', fontSize: 12 }}>No location names on these records.</div>
+                ) : (
+                  <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                    {data.sites.map(site => (
+                      <div key={site.name} style={{ padding: '7px 0', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#1a2332', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{site.name}</div>
+                          <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Last visit {fmtDate(site.lastDate)}</div>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#475569', textAlign: 'right', flexShrink: 0 }}>
+                          <div>{site.count} visit{site.count === 1 ? '' : 's'}</div>
+                          {!isDemo && site.revenue > 0 && <div style={{ color: '#16a34a', fontWeight: 700 }}>{fmtMoney(site.revenue)}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Monthly revenue bars */}
+              <div style={{ background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 10 }}>📊 Last 12 months {!isDemo && '— revenue'}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 160, padding: '4px 0' }}>
+                  {monthlyEntries.map(([key, m]) => {
+                    const h = isDemo ? (m.jobs / Math.max(1, ...monthlyEntries.map(([, x]) => x.jobs))) * 100 : (m.revenue / maxMonthRev) * 100
+                    const display = isDemo ? m.jobs : m.revenue
+                    return (
+                      <div key={key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }} title={key + (isDemo ? ' · ' + m.jobs + ' jobs' : ' · ' + fmtMoney(m.revenue))}>
+                        <div style={{ width: '100%', height: 110, display: 'flex', alignItems: 'flex-end' }}>
+                          <div style={{
+                            width: '100%',
+                            height: Math.max(2, h) + '%',
+                            background: display > 0 ? 'linear-gradient(180deg, #16a34a, #15803d)' : '#e5e7eb',
+                            borderRadius: '3px 3px 0 0',
+                            transition: 'height 0.3s ease',
+                          }} />
+                        </div>
+                        <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, whiteSpace: 'nowrap' }}>{m.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {!isDemo && (
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 8, textAlign: 'right' }}>
+                    Peak month: {fmtMoney(maxMonthRev)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Activity feed */}
+            <div style={{ background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#1a2332', marginBottom: 10 }}>📋 Full history ({data.sorted.length})</div>
+              <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                {data.sorted.slice(0, 100).map(s => {
+                  const tech = (Array.isArray(s.data?.techs) && s.data.techs[0]) || s.profiles?.full_name || '—'
+                  const num = s.work_order || s.pm_number || ''
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => navigate('/view/' + s.id)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        background: 'transparent', border: 'none', borderBottom: '1px solid #f1f5f9',
+                        cursor: 'pointer', padding: '10px 4px', fontFamily: 'inherit',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        {typePill(s)}
+                        {num && <span style={{ fontSize: 12, fontWeight: 800, color: '#1a2332' }}>#{num}</span>}
+                        <span style={{ fontSize: 12, color: '#64748b' }}>{fmtDate(s.date || s.created_at)}</span>
+                        <span style={{ fontSize: 12, color: '#475569' }}>· {tech}</span>
+                        {s.location_name && <span style={{ fontSize: 12, color: '#64748b' }}>· {s.location_name}</span>}
+                        {!isDemo && s.total_revenue > 0 && (
+                          <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginLeft: 'auto' }}>{fmtMoney(s.total_revenue)}</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+                {data.sorted.length > 100 && (
+                  <div style={{ padding: 12, textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>
+                    Showing 100 most recent of {data.sorted.length} records.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AnalyticsAdmin({ submissions }) {
   const { isDemo } = useAuth()
   const subs = submissions || []
@@ -2045,6 +2349,9 @@ export default function AdminPage() {
           <button onClick={() => setActiveTab("users")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: activeTab === "users" ? "#dc2626" : "#fff", color: activeTab === "users" ? "#fff" : "#555", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
             Users
           </button>
+          <button onClick={() => setActiveTab('customers')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'customers' ? '#9a3412' : '#fff', color: activeTab === 'customers' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+            🏢 Customers
+          </button>
           <button onClick={() => setActiveTab('analytics')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: activeTab === 'analytics' ? '#16a34a' : '#fff', color: activeTab === 'analytics' ? '#fff' : '#555', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             📊 Analytics
           </button>
@@ -2084,6 +2391,8 @@ export default function AdminPage() {
 
 
         {/* ANALYTICS TAB */}
+        {activeTab === 'customers' && <CustomersAdmin submissions={submissions} />}
+
         {activeTab === 'analytics' && <AnalyticsAdmin submissions={submissions} />}
 
         {/* AUDIT LOG TAB */}
