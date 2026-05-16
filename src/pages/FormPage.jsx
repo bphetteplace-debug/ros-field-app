@@ -18,6 +18,7 @@ import {
   loadDraft as loadDraftFromStore,
   clearDraft as clearDraftFromStore,
 } from '../lib/draftStore'
+import { decimalHoursBetween } from '../lib/utils'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
@@ -93,7 +94,17 @@ const showsVideos      = jt => ['Service Call','Repair','Other'].includes(jt)
 const showsPMEquipment = jt => jt === 'PM'
 const showsSCEquipment = jt => ['Service Call','Repair','Other'].includes(jt)
 const showsIssueFields = jt => ['Service Call','Repair'].includes(jt)
-const nowStr = () => new Date().toTimeString().slice(0,5)
+// Returns current time as "HH:MM" 24-hr, snapped to nearest quarter hour
+// (so the auto-set Arrival/Departure times land on clean :00 / :15 / :30 / :45
+// marks instead of whatever odd minute the form happens to open at).
+const nowStr = () => {
+  const d = new Date()
+  const totalMin = (d.getHours() * 60 + d.getMinutes())
+  const rounded = (Math.round(totalMin / 15) * 15) % (24 * 60)
+  const hh = String(Math.floor(rounded / 60)).padStart(2, '0')
+  const mm = String(rounded % 60).padStart(2, '0')
+  return `${hh}:${mm}`
+}
 
 // ─── Shared style helpers ──────────────────────────────────────────────────────
 const cardStyle = {
@@ -332,6 +343,14 @@ export default function FormPage() {
   const [flares,    setFlares]    = useState([mkFlare()])
   const [heaters,   setHeaters]   = useState([mkHT()])
   const [scEquipment,setScEquipment]=useState([])
+
+  // Live job clock — re-renders every 60s so the pill stays fresh.
+  // Drives auto-fill of Labor Hours at submit if the tech leaves it blank.
+  const [, setLiveTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setLiveTick(t => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   const [gpsLat,      setGpsLat]      = useState(null)
   const [gpsLng,      setGpsLng]      = useState(null)
@@ -767,11 +786,19 @@ export default function FormPage() {
       const jtObj=JOB_TYPES.find(jt=>jt.value===jobType)
       const template=jtObj?.template||'service_call'
       const effectiveWoNumber=woNumber||''
+      // Auto-fill Labor Hours from elapsed-since-Arrival-Time if tech left
+      // it blank. Server-side rounds to 0.25 again; this gives the
+      // submission a useful number instead of '' when techs forget the field.
+      let effectiveLaborHours = laborHours
+      if (!effectiveLaborHours && startTime) {
+        const auto = decimalHoursBetween(startTime, nowStr())
+        if (auto != null && auto > 0) effectiveLaborHours = String(auto)
+      }
       const formData={
         jobType,pmNumber,woNumber:effectiveWoNumber,warrantyWork,customerName,truckNumber,locationName,
         customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,
         lastServiceDate,description,reportedIssue:showIssueFields?reportedIssue:'',rootCause:showIssueFields?rootCause:'',
-        permitsRequired,techs,equipment,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,
+        permitsRequired,techs,equipment,parts,miles,costPerMile,laborHours:effectiveLaborHours,hourlyRate,billableTechs,
         gpsLat,gpsLng,gpsAccuracy,
         arrestors:showPMEquipment?arrestors.map(a=>({arrestorId:a.arrestorId,condition:a.condition,filterChanged:a.filterChanged,notes:a.notes})):[],
         flares:showPMEquipment?flares.map(f=>({flareId:f.flareId,condition:f.condition,pilotLit:f.pilotLit,lastIgnition:f.lastIgnition,notes:f.notes})):[],
@@ -929,6 +956,60 @@ export default function FormPage() {
             })}
           </div>
         </div>
+
+        {/* ⏱ Live job clock — elapsed since Arrival Time. Auto-fills
+            Labor Hours at submit if the tech leaves it blank. */}
+        {(() => {
+          const elapsed = startTime ? decimalHoursBetween(startTime, nowStr()) : null
+          if (elapsed == null || elapsed <= 0) return null
+          const h = Math.floor(elapsed)
+          const m = Math.round((elapsed - h) * 60)
+          const elapsedLabel = h > 0 ? `${h}h ${m}m` : `${m}m`
+          const [hh, mm] = startTime.split(':').map(Number)
+          const ap = hh >= 12 ? 'PM' : 'AM'
+          const h12 = (hh % 12) || 12
+          const startLabel = `${h12}:${String(mm).padStart(2,'0')} ${ap}`
+          const willAutoFill = !laborHours
+          return (
+            <div style={{
+              background: willAutoFill ? 'linear-gradient(135deg, #0f1f38, #1a2e4a)' : '#f1f5f9',
+              color: willAutoFill ? '#fff' : T.text,
+              padding: '12px 16px',
+              borderRadius: T.radius,
+              marginBottom: 14,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: willAutoFill ? '0 6px 18px rgba(15,31,56,0.28), 0 0 0 1px rgba(230,92,0,0.15) inset' : '0 1px 3px rgba(0,0,0,0.06)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              {willAutoFill && (
+                <span style={{
+                  position: 'absolute', inset: 0, pointerEvents: 'none',
+                  background: 'radial-gradient(120% 80% at 100% 0%, rgba(230,92,0,0.18), transparent 60%)',
+                }} />
+              )}
+              <div style={{ fontSize: 22, lineHeight: 1, position: 'relative' }}>⏱</div>
+              <div style={{ flex: 1, lineHeight: 1.3, position: 'relative' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>Job clock</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 2 }}>
+                  {elapsedLabel}
+                  <span style={{ fontSize: 11, opacity: 0.7, fontWeight: 500, marginLeft: 8 }}>since {startLabel}</span>
+                </div>
+                {willAutoFill ? (
+                  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 3 }}>
+                    ⚡ Auto-fills Labor Hours to <b style={{ color: '#fbbf24' }}>{elapsed}</b> at submit
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
+                    Labor Hours manually set to {laborHours}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ══════════════════════════════════════════════════════════
             JOB INFORMATION
