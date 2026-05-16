@@ -184,15 +184,19 @@ function EditBillingModal({ submission, onClose, onSave }) {
   )
 }
 
+// Always show every month with data + the full current year + the
+// full next year, so the owner can jump ahead to plan or look at any
+// month — even one with no submissions yet.
 function monthOptions(allWOs) {
   const set = new Set()
   for (const s of allWOs) {
     const d = s.date || s.created_at
     if (d) set.add(String(d).slice(0, 7))
   }
-  // Add current month even if no rows yet
   const now = new Date()
-  set.add(now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'))
+  for (const yr of [now.getFullYear(), now.getFullYear() + 1]) {
+    for (let m = 1; m <= 12; m++) set.add(yr + '-' + String(m).padStart(2, '0'))
+  }
   return Array.from(set).sort().reverse()
 }
 
