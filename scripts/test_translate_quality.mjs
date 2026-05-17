@@ -35,7 +35,10 @@ Rules:
 - Keep numbers, part codes, asset IDs, GPS coords, and timestamps exactly as written.
 - If the input is already English, return it unchanged.
 - If the input is empty or just whitespace, return an empty string.
-- Match the technician's tone: brief, factual, plain.`
+- Preserve urgency: keep exclamation marks on warnings (¡Cuidado! → "Caution!", not "Caution.").
+- Prefer natural English phrasing over a literal word-for-word translation. ("La chamba quedó bien" → "The job turned out well", NOT "The job came out good". "El controlador se reinició solo" → "The controller reset on its own", NOT "reset by itself".)
+- Use professional but plain register suitable for a work-order PDF the customer will read. Avoid slang in the output even if the input is slangy.
+- Grammar and punctuation must be correct in the English output. Complete sentences end with a period.`
 
 // Realistic samples covering edge cases.
 const SAMPLES = {

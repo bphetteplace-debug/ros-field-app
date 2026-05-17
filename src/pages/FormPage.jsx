@@ -23,6 +23,8 @@ import {
   clearDraft as clearDraftFromStore,
 } from '../lib/draftStore'
 import { decimalHoursBetween } from '../lib/utils'
+import { useLang, t as tr, speechLocale } from '../lib/i18n'
+import { translateFields } from '../lib/translate'
 import { PARTS_CATALOG as PARTS_CATALOG_STATIC } from '../data/catalog'
 import { buildPDFData } from '../lib/pdfData'
 import { WorkOrderPDFTemplate } from '../components/WorkOrderPDFTemplate'
@@ -284,6 +286,8 @@ export default function FormPage() {
 
   const [searchParams] = useSearchParams()
   const initType = URL_PARAM_MAP[searchParams.get('type')||''] || 'PM'
+  const [lang] = useLang()
+  const t = (k) => tr(k, lang)
 
   const [pmNumber,  setPmNumber]  = useState(null)
   const [woNumber,  setWoNumber]  = useState(null)
@@ -967,6 +971,30 @@ export default function FormPage() {
         heaters:showPMEquipment?heaters.map(h=>({heaterId:h.heaterId,condition:h.condition,lastCleanDate:h.lastCleanDate,notes:h.notes,firetubeCnt:h.firetubes.length,firetubes:h.firetubes.map(ft=>({condition:ft.condition}))})):[],
         scEquipment:showSCEquip?scEquipment:[],
       }
+
+      // ES → EN translation for free-form text fields when the tech is in
+      // Spanish mode. PDF + admin views prefer data.translations.<field>_en
+      // when present. Failure-tolerant: translateFields() never throws and
+      // falls back to the source on outage so a submit isn't blocked by
+      // a translation hiccup.
+      if (lang === 'es') {
+        setSaveStatus('Translating to English…')
+        const sourceFields = {
+          description: formData.description || '',
+          reportedIssue: formData.reportedIssue || '',
+          rootCause: formData.rootCause || '',
+          equipment: formData.equipment || '',
+        }
+        const { translations } = await translateFields(sourceFields)
+        formData.translations = {
+          description_en: translations.description || '',
+          reportedIssue_en: translations.reportedIssue || '',
+          rootCause_en: translations.rootCause || '',
+          equipment_en: translations.equipment || '',
+          sourceLang: 'es',
+        }
+      }
+
       setSaveStatus('Saving submission…')
       const submission = resumingDraftId
         ? await finalizeAssignedDraft(resumingDraftId, formData, template)
@@ -1083,7 +1111,7 @@ export default function FormPage() {
         ══════════════════════════════════════════════════════════ */}
         <div style={{background:`linear-gradient(135deg, ${T.navy} 0%, ${accent} 100%)`,borderRadius:14,padding:'20px 22px',marginBottom:20,boxShadow:'0 4px 20px rgba(0,0,0,0.22)',color:'#fff',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
           <div>
-            <div style={{fontSize:10,fontWeight:800,letterSpacing:2,opacity:0.65,textTransform:'uppercase',marginBottom:4}}>Job Ticket</div>
+            <div style={{fontSize:10,fontWeight:800,letterSpacing:2,opacity:0.65,textTransform:'uppercase',marginBottom:4}}>{t('Job Ticket')}</div>
             <div className="id-mono" style={{fontSize:32,fontWeight:900,lineHeight:1.05,marginBottom:4}}>WO·{woNumber||'…'}</div>
             <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
               <span style={{background:'rgba(255,255,255,0.18)',backdropFilter:'blur(4px)',padding:'3px 12px',borderRadius:20,fontSize:13,fontWeight:700}}>{jtConfig.icon} {jobType}</span>
@@ -1101,7 +1129,7 @@ export default function FormPage() {
         <div style={{...cardStyle,marginBottom:20}}>
           <div style={{...sectionHeaderStyle(T.navy)}}>
             <span style={{fontSize:18}}>🏷️</span>
-            <span>Job Type</span>
+            <span>{t('Job Type')}</span>
           </div>
           <div style={{padding:'16px 14px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
             {JOB_TYPES.map(jt=>{
@@ -1125,7 +1153,7 @@ export default function FormPage() {
                   <div style={{fontSize:13,lineHeight:1.35}}>
                     {jt.label.split('\n').map((l,i)=><span key={i}>{l}{i===0&&jt.label.includes('\n')&&<br/>}</span>)}
                   </div>
-                  {active&&<div style={{marginTop:6,fontSize:10,fontWeight:800,letterSpacing:1,opacity:0.85,textTransform:'uppercase'}}>Selected ✓</div>}
+                  {active&&<div style={{marginTop:6,fontSize:10,fontWeight:800,letterSpacing:1,opacity:0.85,textTransform:'uppercase'}}>{t('Selected ✓')}</div>}
                 </button>
               )
             })}
@@ -1185,18 +1213,18 @@ export default function FormPage() {
               )}
               <div style={{ fontSize: 22, lineHeight: 1, position: 'relative' }}>⏱</div>
               <div style={{ flex: 1, lineHeight: 1.3, position: 'relative' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>Job clock</div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>{t('Job clock')}</div>
                 <div style={{ fontSize: 15, fontWeight: 800, marginTop: 2 }}>
                   {elapsedLabel}
-                  <span style={{ fontSize: 11, opacity: 0.7, fontWeight: 500, marginLeft: 8 }}>since {startLabel}</span>
+                  <span style={{ fontSize: 11, opacity: 0.7, fontWeight: 500, marginLeft: 8 }}>{t('since')} {startLabel}</span>
                 </div>
                 {willAutoFill ? (
                   <div style={{ fontSize: 11, opacity: 0.75, marginTop: 3 }}>
-                    ⚡ Auto-tracking · Labor Hours <b style={{ color: '#fbbf24' }}>{autoHours}</b>
+                    {t('⚡ Auto-tracking · Labor Hours')} <b style={{ color: '#fbbf24' }}>{autoHours}</b>
                   </div>
                 ) : laborHoursTouched && laborHours ? (
                   <div style={{ fontSize: 11, color: T.muted, marginTop: 3 }}>
-                    Labor Hours manually set to {laborHours}
+                    {t('Labor Hours manually set to')} {laborHours}
                   </div>
                 ) : null}
               </div>
@@ -1207,25 +1235,25 @@ export default function FormPage() {
         {/* ══════════════════════════════════════════════════════════
             JOB INFORMATION
         ══════════════════════════════════════════════════════════ */}
-        <Section icon="📋" title="Job Information" accent={accent}>
+        <Section icon="📋" title={t('Job Information')} accent={accent}>
           <div style={row}>
             <div style={fld}>
-              <label style={lbl}>Customer <span style={{color:T.red}}>*</span></label>
+              <label style={lbl}>{t('Customer')} <span style={{color:T.red}}>*</span></label>
               <select style={inp} value={customerName} onChange={e=>setCustomerName(e.target.value)}>
                 {CUSTOMERS.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
             <div style={fld}>
-              <label style={lbl}>Truck</label>
+              <label style={lbl}>{t('Truck')}</label>
               <select style={inp} value={truckNumber} onChange={e=>setTruckNumber(e.target.value)}>
-                {TRUCKS.map(t=><option key={t}>{t}</option>)}
+                {TRUCKS.map(tk=><option key={tk}>{tk}</option>)}
               </select>
             </div>
           </div>
 
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Location / Well Name <span style={{color:T.red}}>*</span></label>
-            <input style={inp} value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="e.g. Pad A — Well 12" />
+            <label style={lbl}>{t('Location / Well Name')} <span style={{color:T.red}}>*</span></label>
+            <input style={inp} value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder={t('e.g. Pad A — Well 12')} />
           </div>
 
           {/* Smart "Copy from last visit" chip — fires once customer +
@@ -1246,16 +1274,16 @@ export default function FormPage() {
             }}>
               <span style={{ fontSize: 22, lineHeight: 1 }}>📋</span>
               <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>Smart copy</div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.7 }}>{t('Smart copy')}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Copy details from your last visit here
+                  {t('Copy details from your last visit here')}
                   {lastVisit.date ? ' (' + new Date(lastVisit.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')' : ''}
                   {lastVisit.pm_number ? ' · #' + lastVisit.pm_number : ''}
                 </div>
               </div>
               <button type="button" onClick={() => applyLastVisit(lastVisit)}
                 style={{ fontSize: 12, padding: '7px 14px', background: T.orange, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 800, letterSpacing: 0.3, flexShrink: 0, boxShadow: '0 2px 8px rgba(230,92,0,0.4)' }}>
-                Copy
+                {t('Copy')}
               </button>
               <button type="button" onClick={() => setLastVisitDismissed(true)} aria-label="Dismiss"
                 style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', padding: 4, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -1267,7 +1295,7 @@ export default function FormPage() {
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <button type="button" onClick={captureGPS} disabled={gpsLoading}
                 style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',borderRadius:7,border:'none',background:gpsLat?T.green:accent,color:'#fff',fontSize:13,fontWeight:700,cursor:gpsLoading?'wait':'pointer',transition:'all 0.15s',fontFamily:'inherit'}}>
-                {gpsLoading?<>⏳ Getting GPS…</>:gpsLat?<>✅ GPS Captured</>:<>📍 Capture GPS</>}
+                {gpsLoading?<>{t('⏳ Getting GPS…')}</>:gpsLat?<>{t('✅ GPS Captured')}</>:<>{t('📍 Capture GPS')}</>}
               </button>
               {gpsLat&&(
                 <div style={{fontSize:12,color:'#15803d',fontWeight:600}}>
@@ -1278,7 +1306,7 @@ export default function FormPage() {
               {gpsLat&&(
                 <a href={`https://maps.google.com/?q=${gpsLat},${gpsLng}`} target="_blank" rel="noreferrer"
                   style={{fontSize:12,color:T.navyMid,fontWeight:600,textDecoration:'none',display:'flex',alignItems:'center',gap:3}}>
-                  🗺️ View Map ↗
+                  {t('🗺️ View Map ↗')}
                 </a>
               )}
             </div>
@@ -1287,7 +1315,7 @@ export default function FormPage() {
 
 
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Site Sign Photo</label>
+            <label style={lbl}>{t('Site Sign Photo')}</label>
             {siteSignPhoto ? (
               <div style={{position:'relative',display:'inline-block'}}>
                 <img src={URL.createObjectURL(siteSignPhoto)} alt="" style={{width:120,height:90,objectFit:'cover',borderRadius:7,border:'1.5px solid '+T.border,display:'block'}} />
@@ -1296,54 +1324,54 @@ export default function FormPage() {
             ) : (
               <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
                 <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
-                  📷 Camera
+                  📷 {t('Camera')}
                   <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={async e=>setSiteSignPhoto(await compressFile(e.target.files[0]||null))} />
                 </label>
                 <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 14px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
-                  🖼️ Gallery
+                  🖼️ {t('Gallery')}
                   <input type="file" accept="image/*" style={{display:'none'}} onChange={async e=>setSiteSignPhoto(await compressFile(e.target.files[0]||null))} />
                 </label>
               </div>
             )}
           </div>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Contact</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} placeholder="Name / phone" /></div>
-            <div style={fld}><label style={lbl}>Customer Work Order / PO # <span style={{color:'#dc2626'}}>*</span></label><input style={{...inp, borderColor: customerWorkOrder ? inp.borderColor : '#dc2626'}} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder="Required — enter the customer's WO/PO #" required /></div>
+            <div style={fld}><label style={lbl}>{t('Contact')}</label><input style={inp} value={customerContact} onChange={e=>setCustomerContact(e.target.value)} placeholder={t('Name / phone')} /></div>
+            <div style={fld}><label style={lbl}>{t('Customer Work Order / PO #')} <span style={{color:'#dc2626'}}>*</span></label><input style={{...inp, borderColor: customerWorkOrder ? inp.borderColor : '#dc2626'}} value={customerWorkOrder} onChange={e=>setCustomerWorkOrder(e.target.value)} placeholder={t("Required — enter the customer's WO/PO #")} required /></div>
           </div>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Type of Work</label>
+            <div style={fld}><label style={lbl}>{t('Type of Work')}</label>
               <select style={inp} value={typeOfWork} onChange={e=>setTypeOfWork(e.target.value)}>
                 {WORK_TYPES.map(w=><option key={w}>{w}</option>)}
               </select>
             </div>
-            <div style={fld}><label style={lbl}>GL Code</label><input style={inp} value={glCode} onChange={e=>setGlCode(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>{t('GL Code')}</label><input style={inp} value={glCode} onChange={e=>setGlCode(e.target.value)} /></div>
           </div>
           <div style={row}>
             <div style={fld}>
-              <label style={lbl}>Asset Tag</label>
+              <label style={lbl}>{t('Asset Tag')}</label>
               <div style={{position:'relative'}}>
-                <input style={{...inp,paddingRight:74}} value={assetTag} onChange={e=>setAssetTag(e.target.value)} placeholder="Scan or type" />
+                <input style={{...inp,paddingRight:74}} value={assetTag} onChange={e=>setAssetTag(e.target.value)} placeholder={t('Scan or type')} />
                 <CameraOcrButton onResult={setAssetTag} currentValue={assetTag} append />
-                <MicButton value={assetTag} onChange={setAssetTag} size={28} top={6} right={6} />
+                <MicButton value={assetTag} onChange={setAssetTag} size={28} top={6} right={6} lang={speechLocale(lang)} />
               </div>
             </div>
-            <div style={fld}><label style={lbl}>Work Area</label><input style={inp} value={workArea} onChange={e=>setWorkArea(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>{t('Work Area')}</label><input style={inp} value={workArea} onChange={e=>setWorkArea(e.target.value)} /></div>
           </div>
           <div style={{marginBottom:14}}>
-            <label style={lbl}>Last Service Date</label>
+            <label style={lbl}>{t('Last Service Date')}</label>
             <input type="date" style={inp} value={lastServiceDate} onChange={e=>setLastServiceDate(e.target.value)} />
           </div>
           <label style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:T.text,cursor:'pointer',userSelect:'none',padding:'8px 12px',background:warrantyWork?'#fef2f2':'transparent',borderRadius:7,border:warrantyWork?`1.5px solid ${T.red}`:'1.5px solid transparent',transition:'all 0.15s'}}>
             <input type="checkbox" checked={warrantyWork} onChange={e=>setWarrantyWork(e.target.checked)} style={{width:16,height:16,cursor:'pointer'}} />
             <span style={{fontWeight:warrantyWork?700:500,color:warrantyWork?T.red:T.text}}>
-              {warrantyWork?'⚠️ Warranty Work — No Charge':'Warranty Work (no charge to customer)'}
+              {warrantyWork?t('⚠️ Warranty Work — No Charge'):t('Warranty Work (no charge to customer)')}
             </span>
           </label>
         </Section>
 
         {/* ══ PERMIT REQUIREMENTS ══ */}
-        <Section icon="⚠️" title="Permit Requirements" accent={accent} collapsible defaultOpen={false}>
-          <div style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>Tap permits required for this job:</div>
+        <Section icon="⚠️" title={t('Permit Requirements')} accent={accent} collapsible defaultOpen={false}>
+          <div style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>{t('Tap permits required for this job:')}</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
             {PERMIT_TYPES.map(p=>{
               const active=permitsRequired.includes(p)
@@ -1360,103 +1388,103 @@ export default function FormPage() {
           </div>
           {permitsRequired.length>0&&(
             <div style={{marginTop:10,padding:'8px 12px',background:'#fff7ed',border:`1px solid ${T.orange}`,borderRadius:7,fontSize:12,color:'#92400e',fontWeight:700}}>
-              ⚠️ Active: {permitsRequired.join(' · ')}
+              {t('⚠️ Active:')} {permitsRequired.join(' · ')}
             </div>
           )}
         </Section>
 
         {/* ══ TECHNICIANS ══ */}
-        <Section icon="👷" title="Technicians" accent={accent}>
+        <Section icon="👷" title={t('Technicians')} accent={accent}>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
-            {TECHS_LIST.map(t=>{
-              const active=techs.includes(t)
+            {TECHS_LIST.map(techName=>{
+              const active=techs.includes(techName)
               return(
-                <button key={t} type="button" onClick={()=>toggleTech(t)}
+                <button key={techName} type="button" onClick={()=>toggleTech(techName)}
                   style={{padding:'8px 16px',borderRadius:22,border:`2px solid ${active?accent:T.border}`,
                     background:active?accent:T.inputBg, color:active?'#fff':T.text,
                     fontWeight:700,fontSize:13,cursor:'pointer',transition:'all 0.14s',fontFamily:'inherit',
                     boxShadow:active?'0 2px 8px rgba(0,0,0,0.15)':'none'}}>
-                  {active?'✓ ':''}{t}
+                  {active?'✓ ':''}{techName}
                 </button>
               )
             })}
           </div>
           {techs.length>0&&(
             <div style={{borderTop:`1px solid ${T.border}`,paddingTop:14,marginTop:4}}>
-              {techs.map(t=>(
-                <div key={t} style={{marginBottom:12,padding:'12px 14px',background:T.inputBg,borderRadius:8,border:`1px solid ${T.border}`}}>
+              {techs.map(techName=>(
+                <div key={techName} style={{marginBottom:12,padding:'12px 14px',background:T.inputBg,borderRadius:8,border:`1px solid ${T.border}`}}>
                   <SignaturePad
-                    label={`Technician: ${t}`}
+                    label={`${t('Technician')}: ${techName}`}
                     required
-                    isSigned={!!techSignatures[t]}
-                    onSave={d=>setTechSignatures(s=>({...s,[t]:d}))}
-                    onClear={()=>setTechSignatures(s=>{const n={...s};delete n[t];return n})}
+                    isSigned={!!techSignatures[techName]}
+                    onSave={d=>setTechSignatures(s=>({...s,[techName]:d}))}
+                    onClear={()=>setTechSignatures(s=>{const n={...s};delete n[techName];return n})}
                   />
                 </div>
               ))}
             </div>
           )}
           <div style={{display:'flex',alignItems:'center',gap:10,marginTop:techs.length?12:0}}>
-            <label style={{...lbl,marginBottom:0,whiteSpace:'nowrap'}}>Billable Techs:</label>
+            <label style={{...lbl,marginBottom:0,whiteSpace:'nowrap'}}>{t('Billable Techs:')}</label>
             <input style={{...inp,width:80,flex:'none'}} type="number" min="0" value={billableTechs} onChange={e=>setBillableTechs(e.target.value)} placeholder={String(techs.length||0)} />
-            {techs.length>0&&<span style={{fontSize:12,color:T.muted}}>(default: {techs.length} selected)</span>}
+            {techs.length>0&&<span style={{fontSize:12,color:T.muted}}>{t('(default:')} {techs.length} {t('selected)')}</span>}
           </div>
         </Section>
 
         {/* ══ DATE & TIME ══ */}
-        <Section icon="🕐" title="Date & Time" accent={accent}>
+        <Section icon="🕐" title={t('Date & Time')} accent={accent}>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Date</label><input type="date" style={inp} value={date} onChange={e=>setDate(e.target.value)} /></div>
-            <div style={fld}><label style={lbl}>Arrival Time</label><input type="time" style={inp} value={startTime} onChange={e=>setStartTime(roundQuarter(e.target.value))} /></div>
-            <div style={fld}><label style={lbl}>Departure Time</label><input type="time" style={inp} value={departureTime} onChange={e=>setDepartureTime(roundQuarter(e.target.value))} /></div>
+            <div style={fld}><label style={lbl}>{t('Date')}</label><input type="date" style={inp} value={date} onChange={e=>setDate(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>{t('Arrival Time')}</label><input type="time" style={inp} value={startTime} onChange={e=>setStartTime(roundQuarter(e.target.value))} /></div>
+            <div style={fld}><label style={lbl}>{t('Departure Time')}</label><input type="time" style={inp} value={departureTime} onChange={e=>setDepartureTime(roundQuarter(e.target.value))} /></div>
           </div>
         </Section>
 
         {/* ══ WORK DESCRIPTION ══ */}
-        <Section icon="📝" title="Work Description" accent={accent}>
+        <Section icon="📝" title={t('Work Description')} accent={accent}>
           {showIssueFields&&(
             <>
               <div style={{marginBottom:14}}>
-                <label style={lbl}>Reported Issue *</label>
+                <label style={lbl}>{t('Reported Issue')} *</label>
                 <div style={{position:'relative'}}>
-                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:84}} value={reportedIssue} onChange={e=>setReportedIssue(e.target.value)} placeholder="What was the customer-reported problem?" />
+                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:84}} value={reportedIssue} onChange={e=>setReportedIssue(e.target.value)} placeholder={t('What was the customer-reported problem?')} />
                   <PolishButton value={reportedIssue} onChange={setReportedIssue} top={6} right={44} size={32} />
-                  <MicButton value={reportedIssue} onChange={setReportedIssue} />
+                  <MicButton value={reportedIssue} onChange={setReportedIssue} lang={speechLocale(lang)} />
                 </div>
               </div>
               <div style={{marginBottom:14}}>
-                <label style={lbl}>Root Cause</label>
+                <label style={lbl}>{t('Root Cause')}</label>
                 <div style={{position:'relative'}}>
-                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:84}} value={rootCause} onChange={e=>setRootCause(e.target.value)} placeholder="Identified root cause..." />
+                  <textarea style={{...inp,minHeight:72,resize:'vertical',paddingRight:84}} value={rootCause} onChange={e=>setRootCause(e.target.value)} placeholder={t('Identified root cause...')} />
                   <PolishButton value={rootCause} onChange={setRootCause} top={6} right={44} size={32} />
-                  <MicButton value={rootCause} onChange={setRootCause} />
+                  <MicButton value={rootCause} onChange={setRootCause} lang={speechLocale(lang)} />
                 </div>
               </div>
             </>
           )}
           <div style={{marginBottom:14}}>
-            <label style={lbl}>{showIssueFields?'Work Performed':'Description'}</label>
+            <label style={lbl}>{showIssueFields?t('Work Performed'):t('Description')}</label>
             <div style={{position:'relative'}}>
-              <textarea style={{...inp,minHeight:88,resize:'vertical',paddingRight:84}} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Describe all work performed..." />
+              <textarea style={{...inp,minHeight:88,resize:'vertical',paddingRight:84}} value={description} onChange={e=>setDescription(e.target.value)} placeholder={t('Describe all work performed...')} />
               <PolishButton value={description} onChange={setDescription} top={6} right={44} size={32} />
-              <MicButton value={description} onChange={setDescription} />
+              <MicButton value={description} onChange={setDescription} lang={speechLocale(lang)} />
             </div>
           </div>
           <div>
-            <label style={lbl}>Equipment / Serial Numbers</label>
+            <label style={lbl}>{t('Equipment / Serial Numbers')}</label>
             <div style={{position:'relative'}}>
-              <input style={{...inp,paddingRight:108}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Scan nameplate, dictate, or type" />
+              <input style={{...inp,paddingRight:108}} value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder={t('Scan nameplate, dictate, or type')} />
               <CameraOcrButton onResult={setEquipment} currentValue={equipment} append />
               <PolishButton value={equipment} onChange={setEquipment} size={28} top={6} right={70} />
-              <MicButton value={equipment} onChange={setEquipment} size={28} top={6} right={6} />
+              <MicButton value={equipment} onChange={setEquipment} size={28} top={6} right={6} lang={speechLocale(lang)} />
             </div>
           </div>
         </Section>
 
         {/* ══ SC EQUIPMENT ══ */}
         {showSCEquip&&(
-          <Section icon="🔩" title="Equipment Worked On" accent={accent}>
-            <div style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>Select all equipment types worked on this call:</div>
+          <Section icon="🔩" title={t('Equipment Worked On')} accent={accent}>
+            <div style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>{t('Select all equipment types worked on this call:')}</div>
             <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:12}}>
               {SC_EQUIP_TYPES.map(type=>{
                 const active=scEquipment.some(e=>e.type===type)
@@ -1473,11 +1501,11 @@ export default function FormPage() {
             {scEquipment.map((item,i)=>(
               <div key={item.type} style={{marginBottom:8,padding:'10px 12px',background:T.inputBg,borderRadius:7,border:`1px solid ${T.border}`}}>
                 <div style={{fontSize:12,fontWeight:800,color:accent,marginBottom:5,textTransform:'uppercase',letterSpacing:0.5}}>{item.type}</div>
-                <input style={inp} placeholder={`Notes for ${item.type}…`} value={item.notes||''}
+                <input style={inp} placeholder={`${t('Notes for')} ${item.type}…`} value={item.notes||''}
                   onChange={e=>setScEquipment(p=>p.map((x,xi)=>xi===i?{...x,notes:e.target.value}:x))} />
               </div>
             ))}
-            {scEquipment.length===0&&<div style={{fontSize:13,color:T.muted,textAlign:'center',padding:'10px 0',fontStyle:'italic'}}>No equipment selected yet</div>}
+            {scEquipment.length===0&&<div style={{fontSize:13,color:T.muted,textAlign:'center',padding:'10px 0',fontStyle:'italic'}}>{t('No equipment selected yet')}</div>}
           </Section>
         )}
 
@@ -1485,141 +1513,141 @@ export default function FormPage() {
         {showPMEquipment&&(
           <>
             {/* FLAME ARRESTORS */}
-            <Section icon="🔥" title="Flame Arrestors" accent={accent}>
+            <Section icon="🔥" title={t('Flame Arrestors')} accent={accent}>
               {arrestors.map((a,i)=>(
                 <div key={i} style={{border:`1.5px solid ${T.border}`,borderRadius:9,padding:14,marginBottom:12,background:T.inputBg}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                    <span style={{fontWeight:800,color:T.navyMid,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>Arrestor #{i+1}</span>
+                    <span style={{fontWeight:800,color:T.navyMid,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>{t('Arrestor #')}{i+1}</span>
                     {arrestors.length>1&&<button type="button" onClick={()=>setArrestors(a=>a.filter((_,idx)=>idx!==i))} style={{background:'none',border:'none',color:T.red,cursor:'pointer',fontSize:18,padding:0,fontWeight:700}}>✕</button>}
                   </div>
                   <div style={row}>
                     <div style={fld}>
-                      <label style={lbl}>ID / Tag #</label>
+                      <label style={lbl}>{t('ID / Tag #')}</label>
                       <div style={{position:'relative'}}>
-                        <input style={{...inp,paddingRight:42}} value={a.arrestorId} onChange={e=>updArr(i,'arrestorId',e.target.value)} placeholder="ARR-001 or scan" />
+                        <input style={{...inp,paddingRight:42}} value={a.arrestorId} onChange={e=>updArr(i,'arrestorId',e.target.value)} placeholder={t('ARR-001 or scan')} />
                         <CameraOcrButton onResult={v=>updArr(i,'arrestorId',v)} currentValue={a.arrestorId} top={6} right={6} />
                       </div>
                     </div>
-                    <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={a.condition} onChange={e=>updArr(i,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
+                    <div style={fld}><label style={lbl}>{t('Condition')}</label><select style={inp} value={a.condition} onChange={e=>updArr(i,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
                   <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer',marginBottom:10,userSelect:'none'}}>
                     <input type="checkbox" checked={a.filterChanged} onChange={e=>updArr(i,'filterChanged',e.target.checked)} style={{width:15,height:15}} />
-                    Filter / Element Changed
+                    {t('Filter / Element Changed')}
                   </label>
                   <div style={{marginBottom:10}}>
-                    <label style={lbl}>Notes</label>
+                    <label style={lbl}>{t('Notes')}</label>
                     <div style={{position:'relative'}}>
-                      <input style={{...inp,paddingRight:74}} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <input style={{...inp,paddingRight:74}} value={a.notes} onChange={e=>updArr(i,'notes',e.target.value)} placeholder={t('Notes…')} />
                       <PolishButton value={a.notes} onChange={v=>updArr(i,'notes',v)} size={28} top={6} right={38} />
-                      <MicButton value={a.notes} onChange={v=>updArr(i,'notes',v)} size={28} top={6} right={6} />
+                      <MicButton value={a.notes} onChange={v=>updArr(i,'notes',v)} size={28} top={6} right={6} lang={speechLocale(lang)} />
                     </div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                    <PhotoPicker label="Before — Photo 1" value={a.before1} onChange={v=>updArr(i,'before1',v)} />
-                    <PhotoPicker label="Before — Photo 2" value={a.before2} onChange={v=>updArr(i,'before2',v)} />
-                    <PhotoPicker label="After — Photo 1"  value={a.after1}  onChange={v=>updArr(i,'after1',v)} />
-                    <PhotoPicker label="After — Photo 2"  value={a.after2}  onChange={v=>updArr(i,'after2',v)} />
+                    <PhotoPicker label={t('Before — Photo 1')} value={a.before1} onChange={v=>updArr(i,'before1',v)} />
+                    <PhotoPicker label={t('Before — Photo 2')} value={a.before2} onChange={v=>updArr(i,'before2',v)} />
+                    <PhotoPicker label={t('After — Photo 1')}  value={a.after1}  onChange={v=>updArr(i,'after1',v)} />
+                    <PhotoPicker label={t('After — Photo 2')}  value={a.after2}  onChange={v=>updArr(i,'after2',v)} />
                   </div>
                 </div>
               ))}
               {arrestors.length<5&&(
                 <button type="button" onClick={()=>setArrestors(a=>[...a,mkArr()])}
                   style={{width:'100%',padding:10,background:'transparent',border:`1.5px dashed ${T.border}`,borderRadius:8,cursor:'pointer',color:T.muted,fontSize:13,fontWeight:600,fontFamily:'inherit',transition:'all 0.13s'}}>
-                  + Add Arrestor ({arrestors.length}/5)
+                  {t('+ Add Arrestor')} ({arrestors.length}/5)
                 </button>
               )}
             </Section>
 
             {/* FLARES */}
-            <Section icon="🔦" title="Flares" accent={accent}>
+            <Section icon="🔦" title={t('Flares')} accent={accent}>
               {flares.map((f,i)=>(
                 <div key={i} style={{border:`1.5px solid ${T.border}`,borderRadius:9,padding:14,marginBottom:12,background:T.inputBg}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                    <span style={{fontWeight:800,color:T.navyMid,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>Flare #{i+1}</span>
+                    <span style={{fontWeight:800,color:T.navyMid,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>{t('Flare #')}{i+1}</span>
                     {flares.length>1&&<button type="button" onClick={()=>setFlares(f=>f.filter((_,idx)=>idx!==i))} style={{background:'none',border:'none',color:T.red,cursor:'pointer',fontSize:18,padding:0}}>✕</button>}
                   </div>
                   <div style={row}>
                     <div style={fld}>
-                      <label style={lbl}>Flare ID / Tag #</label>
+                      <label style={lbl}>{t('Flare ID / Tag #')}</label>
                       <div style={{position:'relative'}}>
-                        <input style={{...inp,paddingRight:42}} value={f.flareId} onChange={e=>updFlare(i,'flareId',e.target.value)} placeholder="FLR-001 or scan" />
+                        <input style={{...inp,paddingRight:42}} value={f.flareId} onChange={e=>updFlare(i,'flareId',e.target.value)} placeholder={t('FLR-001 or scan')} />
                         <CameraOcrButton onResult={v=>updFlare(i,'flareId',v)} currentValue={f.flareId} top={6} right={6} />
                       </div>
                     </div>
-                    <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={f.condition} onChange={e=>updFlare(i,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
+                    <div style={fld}><label style={lbl}>{t('Condition')}</label><select style={inp} value={f.condition} onChange={e=>updFlare(i,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
                   <div style={{...row,alignItems:'center'}}>
                     <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer',userSelect:'none',flex:1}}>
                       <input type="checkbox" checked={f.pilotLit} onChange={e=>updFlare(i,'pilotLit',e.target.checked)} style={{width:15,height:15}} />
-                      Pilot Lit on Departure
+                      {t('Pilot Lit on Departure')}
                     </label>
-                    <div style={fld}><label style={lbl}>Last Ignition</label><input type="date" style={inp} value={f.lastIgnition} onChange={e=>updFlare(i,'lastIgnition',e.target.value)} /></div>
+                    <div style={fld}><label style={lbl}>{t('Last Ignition')}</label><input type="date" style={inp} value={f.lastIgnition} onChange={e=>updFlare(i,'lastIgnition',e.target.value)} /></div>
                   </div>
                   <div style={{marginBottom:10}}>
-                    <label style={lbl}>Notes</label>
+                    <label style={lbl}>{t('Notes')}</label>
                     <div style={{position:'relative'}}>
-                      <input style={{...inp,paddingRight:74}} value={f.notes} onChange={e=>updFlare(i,'notes',e.target.value)} placeholder="Notes…" />
+                      <input style={{...inp,paddingRight:74}} value={f.notes} onChange={e=>updFlare(i,'notes',e.target.value)} placeholder={t('Notes…')} />
                       <PolishButton value={f.notes} onChange={v=>updFlare(i,'notes',v)} size={28} top={6} right={38} />
-                      <MicButton value={f.notes} onChange={v=>updFlare(i,'notes',v)} size={28} top={6} right={6} />
+                      <MicButton value={f.notes} onChange={v=>updFlare(i,'notes',v)} size={28} top={6} right={6} lang={speechLocale(lang)} />
                     </div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                    <PhotoPicker label="Photo 1" value={f.photo1} onChange={v=>updFlare(i,'photo1',v)} />
-                    <PhotoPicker label="Photo 2" value={f.photo2} onChange={v=>updFlare(i,'photo2',v)} />
+                    <PhotoPicker label={t('Photo 1')} value={f.photo1} onChange={v=>updFlare(i,'photo1',v)} />
+                    <PhotoPicker label={t('Photo 2')} value={f.photo2} onChange={v=>updFlare(i,'photo2',v)} />
                   </div>
                 </div>
               ))}
               {flares.length<3&&(
                 <button type="button" onClick={()=>setFlares(f=>[...f,mkFlare()])} style={{width:'100%',padding:10,background:'transparent',border:`1.5px dashed ${T.border}`,borderRadius:8,cursor:'pointer',color:T.muted,fontSize:13,fontWeight:600,fontFamily:'inherit'}}>
-                  + Add Flare ({flares.length}/3)
+                  {t('+ Add Flare')} ({flares.length}/3)
                 </button>
               )}
             </Section>
 
             {/* HEATER TREATERS */}
-            <Section icon="🌡️" title="Heater Treaters" accent={accent}>
+            <Section icon="🌡️" title={t('Heater Treaters')} accent={accent}>
               {heaters.map((h,hi)=>(
                 <div key={hi} style={{border:`1.5px solid ${T.border}`,borderRadius:9,padding:14,marginBottom:12,background:T.inputBg}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                    <span style={{fontWeight:800,color:T.navyMid,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>Heater Treater #{hi+1}</span>
+                    <span style={{fontWeight:800,color:T.navyMid,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>{t('Heater Treater #')}{hi+1}</span>
                     {heaters.length>1&&<button type="button" onClick={()=>setHeaters(h=>h.filter((_,idx)=>idx!==hi))} style={{background:'none',border:'none',color:T.red,cursor:'pointer',fontSize:18,padding:0}}>✕</button>}
                   </div>
                   <div style={row}>
                     <div style={fld}>
-                      <label style={lbl}>ID / Tag #</label>
+                      <label style={lbl}>{t('ID / Tag #')}</label>
                       <div style={{position:'relative'}}>
-                        <input style={{...inp,paddingRight:42}} value={h.heaterId} onChange={e=>updHT(hi,'heaterId',e.target.value)} placeholder="HT-001 or scan" />
+                        <input style={{...inp,paddingRight:42}} value={h.heaterId} onChange={e=>updHT(hi,'heaterId',e.target.value)} placeholder={t('HT-001 or scan')} />
                         <CameraOcrButton onResult={v=>updHT(hi,'heaterId',v)} currentValue={h.heaterId} top={6} right={6} />
                       </div>
                     </div>
-                    <div style={fld}><label style={lbl}>Condition</label><select style={inp} value={h.condition} onChange={e=>updHT(hi,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
+                    <div style={fld}><label style={lbl}>{t('Condition')}</label><select style={inp} value={h.condition} onChange={e=>updHT(hi,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select></div>
                   </div>
-                  <div style={{marginBottom:10}}><label style={lbl}>Last Tube Clean Date</label><input type="date" style={inp} value={h.lastCleanDate} onChange={e=>updHT(hi,'lastCleanDate',e.target.value)} /></div>
+                  <div style={{marginBottom:10}}><label style={lbl}>{t('Last Tube Clean Date')}</label><input type="date" style={inp} value={h.lastCleanDate} onChange={e=>updHT(hi,'lastCleanDate',e.target.value)} /></div>
                   <div style={{marginBottom:10}}>
-                    <label style={lbl}>Notes</label>
+                    <label style={lbl}>{t('Notes')}</label>
                     <div style={{position:'relative'}}>
-                      <input style={{...inp,paddingRight:74}} value={h.notes} onChange={e=>updHT(hi,'notes',e.target.value)} placeholder="Notes…" />
+                      <input style={{...inp,paddingRight:74}} value={h.notes} onChange={e=>updHT(hi,'notes',e.target.value)} placeholder={t('Notes…')} />
                       <PolishButton value={h.notes} onChange={v=>updHT(hi,'notes',v)} size={28} top={6} right={38} />
-                      <MicButton value={h.notes} onChange={v=>updHT(hi,'notes',v)} size={28} top={6} right={6} />
+                      <MicButton value={h.notes} onChange={v=>updHT(hi,'notes',v)} size={28} top={6} right={6} lang={speechLocale(lang)} />
                     </div>
                   </div>
                   <div>
-                    <div style={{fontWeight:700,fontSize:12,color:T.navyMid,marginBottom:8,textTransform:'uppercase',letterSpacing:0.5}}>Firetubes ({h.firetubes.length}/10)</div>
+                    <div style={{fontWeight:700,fontSize:12,color:T.navyMid,marginBottom:8,textTransform:'uppercase',letterSpacing:0.5}}>{t('Firetubes')} ({h.firetubes.length}/10)</div>
                     {h.firetubes.map((ft,fi)=>(
                       <div key={fi} style={{border:`1px solid ${T.border}`,borderRadius:7,padding:10,marginBottom:8,background:T.card}}>
-                        <div style={{fontWeight:700,fontSize:12,marginBottom:7,color:T.navyMid}}>Firetube #{fi+1}</div>
-                        <div style={{marginBottom:8}}><label style={lbl}>Condition</label>
+                        <div style={{fontWeight:700,fontSize:12,marginBottom:7,color:T.navyMid}}>{t('Firetube #')}{fi+1}</div>
+                        <div style={{marginBottom:8}}><label style={lbl}>{t('Condition')}</label>
                           <select style={{...inp,fontSize:13,padding:'7px 10px'}} value={ft.condition} onChange={e=>updFT(hi,fi,'condition',e.target.value)}>{CONDITION_OPTS.map(c=><option key={c}>{c}</option>)}</select>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                          <PhotoPicker label="Photo 1" value={ft.photo1} onChange={v=>updFT(hi,fi,'photo1',v)} />
-                          <PhotoPicker label="Photo 2" value={ft.photo2} onChange={v=>updFT(hi,fi,'photo2',v)} />
+                          <PhotoPicker label={t('Photo 1')} value={ft.photo1} onChange={v=>updFT(hi,fi,'photo1',v)} />
+                          <PhotoPicker label={t('Photo 2')} value={ft.photo2} onChange={v=>updFT(hi,fi,'photo2',v)} />
                         </div>
                       </div>
                     ))}
                     {h.firetubes.length<10&&(
                       <button type="button" onClick={()=>updHT(hi,'firetubes',[...h.firetubes,mkFT()])} style={{width:'100%',padding:8,background:'transparent',border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',color:T.muted,fontSize:12,fontWeight:600,fontFamily:'inherit'}}>
-                        + Add Firetube
+                        {t('+ Add Firetube')}
                       </button>
                     )}
                   </div>
@@ -1627,7 +1655,7 @@ export default function FormPage() {
               ))}
               {heaters.length<5&&(
                 <button type="button" onClick={()=>setHeaters(h=>[...h,mkHT()])} style={{width:'100%',padding:10,background:'transparent',border:`1.5px dashed ${T.border}`,borderRadius:8,cursor:'pointer',color:T.muted,fontSize:13,fontWeight:600,fontFamily:'inherit'}}>
-                  + Add Heater Treater ({heaters.length}/5)
+                  {t('+ Add Heater Treater')} ({heaters.length}/5)
                 </button>
               )}
             </Section>
@@ -1635,7 +1663,7 @@ export default function FormPage() {
         )}
 
         {/* ══ PARTS USED ══ */}
-        <Section icon="🧰" title="Parts Used" accent={accent}>
+        <Section icon="🧰" title={t('Parts Used')} accent={accent}>
           {parts.length>0&&(
             <div style={{marginBottom:14}}>
               {parts.map(p=>(
@@ -1679,13 +1707,13 @@ export default function FormPage() {
 
           <button type="button" onClick={()=>setShowCatalog(v=>!v)}
             style={{width:'100%',padding:11,background:showCatalog?accent:T.inputBg,color:showCatalog?'#fff':T.text,border:`1.5px solid ${showCatalog?accent:T.border}`,borderRadius:8,cursor:'pointer',fontWeight:700,fontSize:13,transition:'all 0.15s',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:7}}>
-            {showCatalog?'▲ Close Catalog':'🔍 Add Part from Catalog'}
+            {showCatalog?t('▲ Close Catalog'):t('🔍 Add Part from Catalog')}
           </button>
 
           {showCatalog&&(
             <div style={{marginTop:10,border:`1.5px solid ${T.border}`,borderRadius:9,overflow:'hidden',background:T.card}}>
               <div style={{padding:'10px 12px',borderBottom:`1px solid ${T.border}`,background:T.inputBg}}>
-                <input style={inp} placeholder="Search by name or SKU…" value={partSearch} onChange={e=>setPartSearch(e.target.value)} autoFocus />
+                <input style={inp} placeholder={t('Search by name or SKU…')} value={partSearch} onChange={e=>setPartSearch(e.target.value)} autoFocus />
               </div>
               <div style={{maxHeight:260,overflowY:'auto'}}>
                 {filteredParts.slice(0,80).map(p=>(
@@ -1698,7 +1726,7 @@ export default function FormPage() {
                     <div style={{fontSize:13,fontWeight:700,color:accent,flexShrink:0,marginLeft:10}}>${parseFloat(p.price||0).toFixed(2)}</div>
                   </button>
                 ))}
-                {filteredParts.length===0&&<div style={{padding:'16px',fontSize:13,color:T.muted,textAlign:'center',fontStyle:'italic'}}>No parts found</div>}
+                {filteredParts.length===0&&<div style={{padding:'16px',fontSize:13,color:T.muted,textAlign:'center',fontStyle:'italic'}}>{t('No parts found')}</div>}
               </div>
             </div>
           )}
@@ -1706,46 +1734,46 @@ export default function FormPage() {
 
         {/* ══ VIDEOS ══ */}
         {showVideos&&(
-          <Section icon="🎥" title="Arrival & Departure Videos" accent={accent}>
-            <div style={{fontSize:13,color:T.muted,marginBottom:14,fontWeight:500}}>Record a short video on arrival and after completing the work.</div>
+          <Section icon="🎥" title={t('Arrival & Departure Videos')} accent={accent}>
+            <div style={{fontSize:13,color:T.muted,marginBottom:14,fontWeight:500}}>{t('Record a short video on arrival and after completing the work.')}</div>
             <div style={row}>
               <div style={fld}>
-                <label style={lbl}>Arrival Video</label>
+                <label style={lbl}>{t('Arrival Video')}</label>
                 {arrivalVideo?(
                   <div style={{background:T.inputBg,borderRadius:9,padding:8,border:`1.5px solid ${T.green}`}}>
                     <video src={URL.createObjectURL(arrivalVideo)} controls style={{width:'100%',borderRadius:6,marginBottom:6}} />
-                    <button type="button" onClick={()=>setArrivalVideo(null)} style={{fontSize:12,color:T.red,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:600}}>✕ Remove</button>
+                    <button type="button" onClick={()=>setArrivalVideo(null)} style={{fontSize:12,color:T.red,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:600}}>{t('✕ Remove')}</button>
                   </div>
                 ):(
                   <>
                     <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'22px 10px',background:T.inputBg,border:`2px dashed ${T.border}`,borderRadius:9,cursor:'pointer',minHeight:90,textAlign:'center'}}>
                       <span style={{fontSize:24}}>🎬</span>
-                      <span style={{fontSize:12,color:T.muted,fontWeight:600}}>Record Arrival</span>
+                      <span style={{fontSize:12,color:T.muted,fontWeight:600}}>{t('Record Arrival')}</span>
                       <input type="file" accept="video/*" capture="environment" style={{display:'none'}} onChange={e=>setArrivalVideo(e.target.files[0]||null)} />
                     </label>
                     <label style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:5,padding:'6px 10px',marginTop:6,background:'transparent',border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
-                      🖼️ Or upload from gallery
+                      {t('🖼️ Or upload from gallery')}
                       <input type="file" accept="video/*" style={{display:'none'}} onChange={e=>setArrivalVideo(e.target.files[0]||null)} />
                     </label>
                   </>
                 )}
               </div>
               <div style={fld}>
-                <label style={lbl}>Departure Video</label>
+                <label style={lbl}>{t('Departure Video')}</label>
                 {departureVideo?(
                   <div style={{background:T.inputBg,borderRadius:9,padding:8,border:`1.5px solid ${T.green}`}}>
                     <video src={URL.createObjectURL(departureVideo)} controls style={{width:'100%',borderRadius:6,marginBottom:6}} />
-                    <button type="button" onClick={()=>setDepartureVideo(null)} style={{fontSize:12,color:T.red,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:600}}>✕ Remove</button>
+                    <button type="button" onClick={()=>setDepartureVideo(null)} style={{fontSize:12,color:T.red,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:600}}>{t('✕ Remove')}</button>
                   </div>
                 ):(
                   <>
                     <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,padding:'22px 10px',background:T.inputBg,border:`2px dashed ${T.border}`,borderRadius:9,cursor:'pointer',minHeight:90,textAlign:'center'}}>
                       <span style={{fontSize:24}}>🎬</span>
-                      <span style={{fontSize:12,color:T.muted,fontWeight:600}}>Record Departure</span>
+                      <span style={{fontSize:12,color:T.muted,fontWeight:600}}>{t('Record Departure')}</span>
                       <input type="file" accept="video/*" capture="environment" style={{display:'none'}} onChange={e=>setDepartureVideo(e.target.files[0]||null)} />
                     </label>
                     <label style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:5,padding:'6px 10px',marginTop:6,background:'transparent',border:`1px dashed ${T.border}`,borderRadius:6,cursor:'pointer',fontSize:11,color:T.muted,fontWeight:600}}>
-                      🖼️ Or upload from gallery
+                      {t('🖼️ Or upload from gallery')}
                       <input type="file" accept="video/*" style={{display:'none'}} onChange={e=>setDepartureVideo(e.target.files[0]||null)} />
                     </label>
                   </>
@@ -1756,11 +1784,11 @@ export default function FormPage() {
         )}
 
         {/* == JOB PHOTOS == */}
-        <Section icon="photo" title="Job Photos" accent={accent}>
+        <Section icon="photo" title={t('Job Photos')} accent={accent}>
           {photos.length>0 && (
             <div style={{marginBottom:14}}>
               <div style={{fontSize:11,color:T.muted,fontWeight:600,marginBottom:8,letterSpacing:0.3}}>
-                ◂ ▸ arrows to reorder · ⋮⋮ to drag · tap photo to enlarge · × to remove
+                {t('◂ ▸ arrows to reorder · ⋮⋮ to drag · tap photo to enlarge · × to remove')}
               </div>
               <SortablePhotoGrid
                 items={photos}
@@ -1774,37 +1802,37 @@ export default function FormPage() {
           )}
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 16px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
-              Take Photo
+              {t('Take Photo')}
               <input type="file" accept="image/*" capture="environment" multiple style={{display:'none'}} onChange={e=>addPhoto(e.target.files)} />
             </label>
             <label style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 16px',background:T.inputBg,border:'1.5px dashed '+T.border,borderRadius:8,cursor:'pointer',fontSize:13,color:T.muted,fontWeight:700}}>
-              From Gallery{photos.length>0&&' ('+photos.length+' added)'}
+              {t('From Gallery')}{photos.length>0&&' ('+photos.length+' '+t('added')+')'}
               <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>addPhoto(e.target.files)} />
             </label>
           </div>
         </Section>
 
         {/* ══ COST SUMMARY ══ */}
-        <Section icon="💰" title="Cost Summary" accent={accent}>
+        <Section icon="💰" title={t('Cost Summary')} accent={accent}>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Miles Driven</label><input style={inp} type="number" min="0" value={miles} onChange={e=>setMiles(e.target.value)} placeholder="0" /></div>
-            <div style={fld}><label style={lbl}>Rate ($/mile)</label><input style={inp} type="number" min="0" step="0.01" value={costPerMile} onChange={e=>setCostPerMile(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>{t('Miles Driven')}</label><input style={inp} type="number" min="0" value={miles} onChange={e=>setMiles(e.target.value)} placeholder="0" /></div>
+            <div style={fld}><label style={lbl}>{t('Rate ($/mile)')}</label><input style={inp} type="number" min="0" step="0.01" value={costPerMile} onChange={e=>setCostPerMile(e.target.value)} /></div>
           </div>
           <div style={row}>
-            <div style={fld}><label style={lbl}>Labor Hours</label><input style={inp} type="number" min="0" step="0.25" value={laborHours} onChange={e=>{setLaborHours(e.target.value); setLaborHoursTouched(true)}} placeholder="0.0" /></div>
-            <div style={fld}><label style={lbl}>Rate ($/hour)</label><input style={inp} type="number" min="0" value={hourlyRate} onChange={e=>setHourlyRate(e.target.value)} /></div>
+            <div style={fld}><label style={lbl}>{t('Labor Hours')}</label><input style={inp} type="number" min="0" step="0.25" value={laborHours} onChange={e=>{setLaborHours(e.target.value); setLaborHoursTouched(true)}} placeholder="0.0" /></div>
+            <div style={fld}><label style={lbl}>{t('Rate ($/hour)')}</label><input style={inp} type="number" min="0" value={hourlyRate} onChange={e=>setHourlyRate(e.target.value)} /></div>
           </div>
 
           {warrantyWork?(
             <div style={{textAlign:'center',padding:'16px',color:T.red,fontWeight:800,fontSize:16,border:`2.5px solid ${T.red}`,borderRadius:9,background:'#fef2f2',letterSpacing:1}}>
-              ⚠️ WARRANTY — NO CHARGE
+              {t('⚠️ WARRANTY — NO CHARGE')}
             </div>
           ):(
             <div style={{background:T.inputBg,borderRadius:9,border:`1.5px solid ${T.border}`,overflow:'hidden'}}>
               {[
-                ['🔩 Parts',`${parts.length} item${parts.length!==1?'s':''}`,partsTotal],
-                ['🚗 Mileage',`${miles||0} mi × $${costPerMile}/mi`,mileageTotal],
-                ['⏱️ Labor',`${laborHours||0} hrs × $${hourlyRate}/hr × ${effBill} tech${effBill!==1?'s':''}`,laborTotal],
+                [t('🔩 Parts'),`${parts.length} ${parts.length!==1?t('items'):t('item')}`,partsTotal],
+                [t('🚗 Mileage'),`${miles||0} mi × $${costPerMile}/mi`,mileageTotal],
+                [t('⏱️ Labor'),`${laborHours||0} hrs × $${hourlyRate}/hr × ${effBill} ${effBill!==1?t('techs'):t('tech')}`,laborTotal],
               ].map(([label,detail,amount])=>(
                 <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',borderBottom:`1px solid ${T.border}`}}>
                   <div>
@@ -1815,7 +1843,7 @@ export default function FormPage() {
                 </div>
               ))}
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',background:`linear-gradient(135deg, ${T.navy} 0%, ${accent} 100%)`}}>
-                <span style={{fontSize:14,fontWeight:800,color:'rgba(255,255,255,0.9)',textTransform:'uppercase',letterSpacing:1}}>Total</span>
+                <span style={{fontSize:14,fontWeight:800,color:'rgba(255,255,255,0.9)',textTransform:'uppercase',letterSpacing:1}}>{t('Total')}</span>
                 <span style={{fontSize:22,fontWeight:900,color:'#fff'}}>${grandTotal.toFixed(2)}</span>
               </div>
             </div>
@@ -1857,17 +1885,17 @@ export default function FormPage() {
           <div style={{display:'flex',gap:8}}>
             <button type="button" onClick={saveDraft}
               style={{flex:'0 0 44%',padding:14,background:draftSaved?T.green:'#fff',color:draftSaved?'#fff':T.muted,border:`1.5px solid ${draftSaved?T.green:T.border}`,borderRadius:10,fontWeight:700,fontSize:14,cursor:'pointer',transition:'all 0.2s',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-              {draftSaved?'✅ Saved':'💾 Save Draft'}
+              {draftSaved?t('✅ Saved'):t('💾 Save Draft')}
             </button>
             {pendingSubmission ? (
               <button type="button" onClick={handleRetry} disabled={saving}
                 style={{flex:1,padding:14,background:saving?'#9ca3af':'#dc2626',color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:15,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 14px rgba(220,38,38,0.32)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3}}>
-                {saving?`⏳ ${saveStatus||'Retrying…'}`:`🔄 Retry (${failedEntries.length})`}
+                {saving?`⏳ ${saveStatus||t('Retrying…')}`:`${t('🔄 Retry')} (${failedEntries.length})`}
               </button>
             ) : (
               <button type="button" onClick={() => { setSaveError(null); setShowReview(true); }} disabled={saving}
                 style={{flex:1,padding:14,background:saving?'#9ca3af':`linear-gradient(135deg, ${accent} 0%, ${T.orange} 100%)`,color:'#fff',border:'none',borderRadius:10,fontWeight:900,fontSize:15,cursor:saving?'not-allowed':'pointer',boxShadow:saving?'none':'0 4px 14px rgba(0,0,0,0.22)',transition:'all 0.18s',fontFamily:'inherit',letterSpacing:0.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                {saving?`⏳ ${saveStatus||'Saving…'}`:`Review & Send ${jtConfig.icon}`}
+                {saving?`⏳ ${saveStatus||t('Saving…')}`:`${t('Review & Send')} ${jtConfig.icon}`}
               </button>
             )}
           </div>

@@ -27,6 +27,11 @@ export const fmtTime = (d) => {
  */
 export async function buildPDFData(sub, getUrl) {
     const d = sub.data || {};
+    // If the tech filed in Spanish, FormPage stamps English copies of the
+    // free-form fields into d.translations at submit time. Prefer those for
+    // the PDF since the customer + office both read English. Originals stay
+    // in d.description / d.reportedIssue / d.rootCause as audit trail.
+    const tr = d.translations || {};
 
   // Field technicians
   const techNames = Array.isArray(d.techs)
@@ -114,9 +119,9 @@ export async function buildPDFData(sub, getUrl) {
         warranty_work:      d.warrantyWork || false,
         permits_required:   d.permitsRequired || [],
         technicians:        techNames,
-        description_of_work: sub.summary || d.description || '',
-        reported_issue:     d.reportedIssue || '',
-        root_cause:         d.rootCause || '',
+        description_of_work: tr.description_en || sub.summary || d.description || '',
+        reported_issue:     tr.reportedIssue_en || d.reportedIssue || '',
+        root_cause:         tr.rootCause_en || d.rootCause || '',
         equipment,
         parts,
         mileage_miles:      miles,

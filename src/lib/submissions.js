@@ -401,6 +401,11 @@ export async function saveSubmission(formData, userId, templateOverride) {
     miles, costPerMile, laborHours, hourlyRate, billableTechs,
     arrestors, flares, heaters, scEquipment,
             reportedIssue, rootCause, lastServiceDate, permitsRequired,
+    // i18n: when tech files in Spanish, FormPage populates an English
+    // translation bundle so the PDF + admin views can prefer the English
+    // copy. { description_en, reportedIssue_en, rootCause_en, equipment_en,
+    // sourceLang }
+    translations,
     // Expense Report fields
     expenseItems, expenseTotal,
     // Daily Inspection fields
@@ -490,6 +495,8 @@ export async function saveSubmission(formData, userId, templateOverride) {
       gpsLat: gpsLat || null,
       gpsLng: gpsLng || null,
       gpsAccuracy: gpsAccuracy || null,
+      // Translations bundle (only present when tech filed in non-English).
+      translations: translations || null,
       // JHA-specific fields (stored in data JSONB)
       jhaSteps: jhaSteps || [],
       jhaPPE: jhaPPE || [],
@@ -903,6 +910,7 @@ export async function finalizeAssignedDraft(id, formData, templateOverride) {
     arrestors, flares, heaters, scEquipment,
     reportedIssue, rootCause, lastServiceDate, permitsRequired,
     gpsLat, gpsLng, gpsAccuracy,
+    translations,
   } = formData;
 
   const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
@@ -969,6 +977,7 @@ export async function finalizeAssignedDraft(id, formData, templateOverride) {
       gpsLat: gpsLat || null,
       gpsLng: gpsLng || null,
       gpsAccuracy: gpsAccuracy || null,
+      translations: translations || existingData.translations || null,
     },
   });
   if (Array.isArray(result) && result.length === 0) throw new Error('Finalize returned no row');

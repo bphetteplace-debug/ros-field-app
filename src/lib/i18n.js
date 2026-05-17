@@ -177,6 +177,140 @@ const ES = {
   'Elapsed': 'Tiempo Transcurrido',
   'Auto-filled': 'Llenado automáticamente',
   'On the clock': 'En servicio',
+  'Job clock': 'Reloj del Trabajo',
+  'since': 'desde',
+  'Labor Hours manually set to': 'Horas de mano de obra establecidas manualmente a',
+  '⚡ Auto-tracking · Labor Hours': '⚡ Seguimiento automático · Horas de mano de obra',
+
+  // FormPage section titles + headers
+  'Job Information': 'Información del Trabajo',
+  'Permit Requirements': 'Requisitos de Permisos',
+  'Technicians': 'Técnicos',
+  'Date & Time': 'Fecha y Hora',
+  'Work Description': 'Descripción del Trabajo',
+  'Equipment Worked On': 'Equipo Trabajado',
+  'Heater Treaters': 'Tratadores de Calor',
+  'Work Performed': 'Trabajo Realizado',
+  'Selected ✓': 'Seleccionado ✓',
+  'Smart copy': 'Copia inteligente',
+  'Copy details from your last visit here': 'Copiar detalles de su última visita aquí',
+  'Copy': 'Copiar',
+
+  // GPS
+  '⏳ Getting GPS…': '⏳ Obteniendo GPS…',
+  '✅ GPS Captured': '✅ GPS Capturado',
+  '📍 Capture GPS': '📍 Capturar GPS',
+  '🗺️ View Map ↗': '🗺️ Ver Mapa ↗',
+
+  // Placeholders
+  'e.g. Pad A — Well 12': 'ej. Plataforma A — Pozo 12',
+  'Name / phone': 'Nombre / teléfono',
+  "Required — enter the customer's WO/PO #": 'Requerido — ingrese la WO/PO # del cliente',
+  'Scan or type': 'Escanear o escribir',
+  'Scan nameplate, dictate, or type': 'Escanear placa, dictar o escribir',
+  'What was the customer-reported problem?': '¿Cuál fue el problema reportado por el cliente?',
+  'Identified root cause...': 'Causa raíz identificada...',
+  'Describe all work performed...': 'Describa todo el trabajo realizado...',
+  'Notes…': 'Notas…',
+  'Equipment / Serial Numbers': 'Equipo / Números de Serie',
+  'ARR-001 or scan': 'ARR-001 o escanear',
+  'FLR-001 or scan': 'FLR-001 o escanear',
+  'HT-001 or scan': 'HT-001 o escanear',
+
+  // Warranty
+  '⚠️ Warranty Work — No Charge': '⚠️ Trabajo en Garantía — Sin Cargo',
+  'Warranty Work (no charge to customer)': 'Trabajo en Garantía (sin cargo al cliente)',
+
+  // Tech section
+  'Billable Techs:': 'Técnicos Facturables:',
+  '(default:': '(predeterminado:',
+  'selected)': 'seleccionados)',
+
+  // Permits + equipment
+  'Tap permits required for this job:': 'Toque los permisos requeridos para este trabajo:',
+  '⚠️ Active:': '⚠️ Activos:',
+  'Select all equipment types worked on this call:': 'Seleccione todos los tipos de equipo trabajados en esta llamada:',
+  'Notes for': 'Notas para',
+  'No equipment selected yet': 'Aún no se ha seleccionado equipo',
+
+  // Arrestor / flare / heater
+  'Arrestor #': 'Arrestador #',
+  'Flare #': 'Antorcha #',
+  'Heater Treater #': 'Tratador de Calor #',
+  'Firetube #': 'Tubo de Fuego #',
+  'ID / Tag #': 'ID / Etiqueta #',
+  'Flare ID / Tag #': 'ID / Etiqueta de Antorcha #',
+  'Filter / Element Changed': 'Filtro / Elemento Cambiado',
+  'Pilot Lit on Departure': 'Piloto Encendido al Salir',
+  'Photo 1': 'Foto 1',
+  'Photo 2': 'Foto 2',
+  'Before — Photo 1': 'Antes — Foto 1',
+  'Before — Photo 2': 'Antes — Foto 2',
+  'After — Photo 1': 'Después — Foto 1',
+  'After — Photo 2': 'Después — Foto 2',
+  '+ Add Arrestor': '+ Agregar Arrestador',
+  '+ Add Flare': '+ Agregar Antorcha',
+  '+ Add Heater Treater': '+ Agregar Tratador de Calor',
+  '+ Add Firetube': '+ Agregar Tubo de Fuego',
+
+  // Parts catalog + cost summary
+  'Add Custom Part': 'Agregar Parte Personalizada',
+  'Search catalog': 'Buscar catálogo',
+  'No parts added': 'No se han agregado partes',
+  'Qty': 'Cant',
+  'Total': 'Total',
+  'Subtotal': 'Subtotal',
+
+  // Photo gallery
+  'Work Photos': 'Fotos del Trabajo',
+  '+ Camera': '+ Cámara',
+  '+ Gallery': '+ Galería',
+  'photos added': 'fotos agregadas',
+  'No photos added': 'No se han agregado fotos',
+
+  // Submit / footer
+  'Review Submission': 'Revisar Envío',
+  'Saving — please wait…': 'Guardando — por favor espere…',
+  'Tap to review and submit': 'Toque para revisar y enviar',
+  'Submission saved': 'Envío guardado',
+  'Retry photo upload': 'Reintentar carga de fotos',
+
+  // Misc
+  'Use last': 'Usar último',
+  'as template': 'como plantilla',
+  'previous job': 'trabajo anterior',
+
+  // Heater section + parts + videos + photos + cost summary + submit
+  'Last Tube Clean Date': 'Última Fecha de Limpieza de Tubos',
+  'Firetubes': 'Tubos de Fuego',
+  'Parts Used': 'Partes Usadas',
+  '▲ Close Catalog': '▲ Cerrar Catálogo',
+  '🔍 Add Part from Catalog': '🔍 Agregar Parte del Catálogo',
+  'Search by name or SKU…': 'Buscar por nombre o SKU…',
+  'No parts found': 'No se encontraron partes',
+  'Arrival & Departure Videos': 'Videos de Llegada y Salida',
+  'Record a short video on arrival and after completing the work.': 'Grabe un video corto al llegar y después de completar el trabajo.',
+  '✕ Remove': '✕ Quitar',
+  'Record Arrival': 'Grabar Llegada',
+  'Record Departure': 'Grabar Salida',
+  '🖼️ Or upload from gallery': '🖼️ O subir desde galería',
+  'Job Photos': 'Fotos del Trabajo',
+  '◂ ▸ arrows to reorder · ⋮⋮ to drag · tap photo to enlarge · × to remove': '◂ ▸ flechas para reordenar · ⋮⋮ para arrastrar · toque la foto para ampliar · × para quitar',
+  '⚠️ WARRANTY — NO CHARGE': '⚠️ GARANTÍA — SIN CARGO',
+  '🔩 Parts': '🔩 Partes',
+  '🚗 Mileage': '🚗 Millaje',
+  '⏱️ Labor': '⏱️ Mano de Obra',
+  'item': 'artículo',
+  'items': 'artículos',
+  'tech': 'técnico',
+  'techs': 'técnicos',
+  'hrs ×': 'hrs ×',
+  '✅ Saved': '✅ Guardado',
+  '💾 Save Draft': '💾 Guardar Borrador',
+  'Retrying…': 'Reintentando…',
+  '🔄 Retry': '🔄 Reintentar',
+  'Saving…': 'Guardando…',
+  'Review & Send': 'Revisar y Enviar',
 }
 
 const DICT = { en: {}, es: ES }
