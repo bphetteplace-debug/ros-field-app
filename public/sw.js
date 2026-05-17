@@ -102,6 +102,46 @@ async function syncOfflineQueue() {
   clients.forEach(client => client.postMessage({ type: 'SYNC_QUEUE' }));
 }
 
+// ── PUSH: OS-level notifications when the app is closed ────────────────────
+// Payload shape from the lambda:
+//   { title, body, url?, tag?, icon?, badge? }
+// `tag` groups/replaces older notifications of the same type so a tech
+// who receives 3 assignments in a row sees only the latest one, not a stack.
+self.addEventListener('push', event => {
+  if (!event.data) return;
+  let payload = {};
+  try { payload = event.data.json(); } catch { payload = { title: 'ReliableTrack', body: event.data.text() }; }
+  const title = payload.title || 'ReliableTrack';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icon-192.png',
+    badge: payload.badge || '/icon-192.png',
+    tag: payload.tag || undefined,
+    renotify: !!payload.tag,           // re-vibrate even when replacing same-tag
+    vibrate: [120, 70, 120],
+    data: { url: payload.url || '/submissions' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ── NOTIFICATION CLICK: focus existing tab or open the deep link ──────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/submissions';
+  event.waitUntil((async () => {
+    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // If any tab is open, focus it and post the navigation intent.
+    for (const c of allClients) {
+      if ('focus' in c) {
+        c.postMessage({ type: 'NAVIGATE', url });
+        return c.focus();
+      }
+    }
+    // Otherwise open a fresh tab to the deep link.
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  })());
+});
+
 // ── MESSAGE: handle messages from the app ─────────────────────────────────
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();

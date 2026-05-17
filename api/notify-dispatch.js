@@ -9,6 +9,7 @@ const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_A
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 const APP_URL = process.env.APP_URL || 'https://pm.reliable-oilfield-services.com';
+const { sendPushToUser } = require('./_push');
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -58,10 +59,12 @@ module.exports = async function handler(req, res) {
   }
 
   // Verify the dispatch token actually exists, so attackers can't fake
-  // tracking URLs in the email.
+  // tracking URLs in the email. Also grab tech_id + id so we can fan a
+  // push notification to the tech after the email goes out.
+  let dispatchId = null, techId = null;
   try {
     const dispRes = await fetch(
-      SUPA_URL + '/rest/v1/active_dispatch?share_token=eq.' + encodeURIComponent(token) + '&select=id&limit=1',
+      SUPA_URL + '/rest/v1/active_dispatch?share_token=eq.' + encodeURIComponent(token) + '&select=id,tech_id&limit=1',
       { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } },
     );
     if (!dispRes.ok) return res.status(500).json({ error: 'Dispatch lookup failed' });
@@ -69,6 +72,8 @@ module.exports = async function handler(req, res) {
     if (!Array.isArray(dispRows) || dispRows.length === 0) {
       return res.status(404).json({ error: 'Dispatch token not found' });
     }
+    dispatchId = dispRows[0].id;
+    techId = dispRows[0].tech_id;
   } catch (_e) {
     return res.status(500).json({ error: 'Dispatch verify failed' });
   }
@@ -115,7 +120,20 @@ module.exports = async function handler(req, res) {
     });
     const emailData = await emailResp.json();
     if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
-    return res.status(200).json({ ok: true, emailId: emailData.id, trackingUrl });
+
+    // Best-effort OS-level push to the tech being dispatched. Silent no-op
+    // when VAPID env vars aren't configured.
+    let pushResult = null;
+    try {
+      pushResult = await sendPushToUser(techId, {
+        title: '📍 New dispatch',
+        body: 'Heading to ' + (destinationLabel || customerName || 'customer site'),
+        url: '/submissions',
+        tag: 'dispatch-' + (dispatchId || ''),
+      });
+    } catch (e) { console.warn('[notify-dispatch] push send failed:', e?.message || e); }
+
+    return res.status(200).json({ ok: true, emailId: emailData.id, trackingUrl, push: pushResult });
   } catch (err) {
     console.error('notify-dispatch error:', err);
     return res.status(500).json({ error: err.message || String(err) });

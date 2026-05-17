@@ -3,8 +3,100 @@ import { getQueueCount } from '../lib/offlineSync';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { toast } from '../lib/toast';
+import { isPushSupported, getNotificationPermission, isPushSubscribed, subscribeToPush } from '../lib/pushSubscription';
 import DispatchTrackingBar from './DispatchTrackingBar';
 import AssistantDrawer from './AssistantDrawer';
+
+// Slim banner that offers OS-level push notifications when supported,
+// the user hasn't decided yet, and they haven't dismissed it this session.
+// Shown alongside the ConnectionBanner so it doesn't push the main app
+// content around mid-flow.
+function NotificationPermissionBanner() {
+  const { user } = useAuth();
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user?.id) { setShow(false); return; }
+      if (!isPushSupported()) { setShow(false); return; }
+      if (getNotificationPermission() !== 'default') { setShow(false); return; }
+      try {
+        if (sessionStorage.getItem('push-banner-dismissed') === '1') { setShow(false); return; }
+      } catch (_) {}
+      const already = await isPushSubscribed();
+      if (cancelled) return;
+      setShow(!already);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const enable = async () => {
+    setBusy(true);
+    const result = await subscribeToPush();
+    setBusy(false);
+    if (result.ok) {
+      toast.success('🔔 Notifications enabled');
+      setShow(false);
+    } else if (result.reason === 'denied') {
+      toast.warning('Notifications blocked. To re-enable: tap the lock icon in your browser address bar.');
+      setShow(false);
+    } else if (result.reason === 'not-configured') {
+      toast.error('Push not yet configured — VAPID env vars missing.');
+      setShow(false);
+    } else if (result.reason === 'unsupported') {
+      setShow(false);
+    } else {
+      toast.error('Could not enable notifications. Try again later.');
+    }
+  };
+
+  const dismiss = () => {
+    try { sessionStorage.setItem('push-banner-dismissed', '1'); } catch (_) {}
+    setShow(false);
+  };
+
+  if (!show) return null;
+  return (
+    <div
+      role="status"
+      style={{
+        background: '#0f1f38',
+        color: '#fff',
+        padding: '10px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        fontSize: 13,
+        lineHeight: 1.35,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 9999,
+        flexWrap: 'wrap',
+      }}
+    >
+      <span style={{ fontWeight: 600 }}>🔔 Get push alerts for new jobs &amp; dispatches</span>
+      <button
+        type="button"
+        onClick={enable}
+        disabled={busy}
+        style={{ background: '#e65c00', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 14px', fontWeight: 800, fontSize: 12, cursor: busy ? 'wait' : 'pointer', boxShadow: '0 2px 6px rgba(230,92,0,0.4)' }}
+      >
+        {busy ? 'Enabling…' : 'Enable'}
+      </button>
+      <button
+        type="button"
+        onClick={dismiss}
+        style={{ background: 'transparent', color: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, padding: '5px 10px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+      >
+        Later
+      </button>
+    </div>
+  );
+}
 
 // In-app real-time notifications. Subscribes to Supabase Realtime for
 // rows targeting the current user so techs get an immediate toast when:
@@ -154,6 +246,7 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-slate-100">
       <ConnectionBanner />
+      <NotificationPermissionBanner />
       <NotificationListener />
       <DispatchTrackingBar />
       {children}

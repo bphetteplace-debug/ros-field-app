@@ -30,6 +30,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
     "tesseract.js": "^7.0.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

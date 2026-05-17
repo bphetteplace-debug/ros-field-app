@@ -74,11 +74,22 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(reg => {
         console.log('[SW] Registered, scope:', reg.scope);
-        // Listen for sync messages from the SW
+        // Listen for sync + nav messages from the SW
         navigator.serviceWorker.addEventListener('message', event => {
-          if (event.data && event.data.type === 'SYNC_QUEUE') {
+          if (!event.data) return;
+          if (event.data.type === 'SYNC_QUEUE') {
             // Dispatch a custom event so FormPage / SubmissionsListPage can handle it
             window.dispatchEvent(new CustomEvent('ros-sync-queue'));
+          } else if (event.data.type === 'NAVIGATE' && typeof event.data.url === 'string') {
+            // User tapped an OS-level push notification while the app was
+            // already open. Hard-navigate to the deep link — simpler than
+            // wiring react-router from outside the React tree.
+            try {
+              const url = new URL(event.data.url, window.location.origin);
+              if (url.origin === window.location.origin) {
+                window.location.assign(url.pathname + url.search + url.hash);
+              }
+            } catch (_e) {}
           }
         });
       })

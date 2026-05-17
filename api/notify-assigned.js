@@ -8,6 +8,7 @@ const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_A
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM || 'ReliableTrack <reports@reliable-oilfield-services.com>';
 const APP_URL = process.env.APP_URL || 'https://pm.reliable-oilfield-services.com';
+const { sendPushToUser } = require('./_push');
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -137,7 +138,21 @@ module.exports = async function handler(req, res) {
     });
     const emailData = await emailResp.json();
     if (!emailResp.ok) return res.status(500).json({ error: 'Resend error', details: emailData });
-    return res.status(200).json({ ok: true, emailId: emailData.id });
+
+    // Fire OS-level Web Push to every browser the assigned tech has
+    // subscribed from. Silent no-op when VAPID env vars aren't configured —
+    // email path is already complete by this point so push is best-effort.
+    let pushResult = null;
+    try {
+      pushResult = await sendPushToUser(sub.created_by, {
+        title: '📤 New ' + jobType + ' assigned',
+        body: (sub.customer_name || 'Service Call') + (woNumber ? ' · #' + woNumber : ''),
+        url: '/edit/' + sub.id,
+        tag: 'assignment-' + sub.id,
+      });
+    } catch (e) { console.warn('[notify-assigned] push send failed:', e?.message || e); }
+
+    return res.status(200).json({ ok: true, emailId: emailData.id, push: pushResult });
   } catch (err) {
     console.error('notify-assigned error:', err);
     return res.status(500).json({ error: err.message || String(err) });
