@@ -178,7 +178,12 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var workType = fmt(sub.work_type || extra.typeOfWork);
   var workArea = fmt(sub.work_area || extra.workArea);
   var truckNum = fmt(sub.truck_number);
-  var description = safeStr(sub.summary || extra.description || '');
+  // i18n: when tech filed in Spanish, FormPage's submit-time translateFields()
+  // stamps English copies into extra.translations. Prefer those for the PDF
+  // since the customer + office both read English. Originals stay in
+  // sub.summary / extra.description as audit trail.
+  var tr = (extra && extra.translations) ? extra.translations : {};
+  var description = safeStr(tr.description_en || sub.summary || extra.description || '');
   var dateStr  = fmtDate(sub.submitted_at || sub.created_at);
   var startTime   = fmt(extra.startTime);
   var deptTime    = fmt(extra.departureTime);
@@ -192,8 +197,8 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
   var arrestors   = isPM && Array.isArray(extra.arrestors) ? extra.arrestors : [];
   var flares      = isPM && Array.isArray(extra.flares) ? extra.flares : [];
   var heaters     = isPM && Array.isArray(extra.heaters) ? extra.heaters : [];
-  var reportedIssue = safeStr(extra.reportedIssue || '');
-  var rootCause     = safeStr(extra.rootCause || '');
+  var reportedIssue = safeStr(tr.reportedIssue_en || extra.reportedIssue || '');
+  var rootCause     = safeStr(tr.rootCause_en || extra.rootCause || '');
 
   // Technicians
   var techNames = [];
@@ -438,7 +443,8 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     for (var ai=0; ai<arrestors.length; ai++) {
       var arr = arrestors[ai];
       var arrId = safeStr(arr.arrestorId || arr.tagNumber || 'Unlabeled');
-      var arrLine = '#'+(ai+1)+' '+arrId+' | Cond: '+safeStr(arr.condition||'-')+(arr.filterChanged?' | Filter Changed':'')+safeStr(arr.notes?' | '+arr.notes:'');
+      var arrNotes = arr.notes_en || arr.notes;
+      var arrLine = '#'+(ai+1)+' '+arrId+' | Cond: '+safeStr(arr.condition||'-')+(arr.filterChanged?' | Filter Changed':'')+safeStr(arrNotes?' | '+arrNotes:'');
       if (y < 60) break;
       page.drawText(arrLine.substring(0,90), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
       y -= 13;
@@ -454,7 +460,8 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     for (var fi=0; fi<flares.length; fi++) {
       var flr = flares[fi];
       var flrId = safeStr(flr.flareId || flr.serialNumber || 'Unlabeled');
-      var flrLine = '#'+(fi+1)+' '+flrId+' | Cond: '+safeStr(flr.condition||'-')+' | Pilot: '+(flr.pilotLit?'Lit':'Not Lit')+safeStr(flr.lastIgnitionDate?' | Last Ign: '+flr.lastIgnitionDate:'')+safeStr(flr.notes?' | '+flr.notes:'');
+      var flrNotes = flr.notes_en || flr.notes;
+      var flrLine = '#'+(fi+1)+' '+flrId+' | Cond: '+safeStr(flr.condition||'-')+' | Pilot: '+(flr.pilotLit?'Lit':'Not Lit')+safeStr(flr.lastIgnitionDate?' | Last Ign: '+flr.lastIgnitionDate:'')+safeStr(flrNotes?' | '+flrNotes:'');
       if (y < 60) break;
       page.drawText(flrLine.substring(0,90), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
       y -= 13;
@@ -470,7 +477,8 @@ async function generateWorkOrderPDF(sub, allPhotos, pdfBase64 = null) {
     for (var hi=0; hi<heaters.length; hi++) {
       var htr = heaters[hi];
       var htrId = safeStr(htr.heaterId || htr.unitId || 'Unlabeled');
-      var htrLine = '#'+(hi+1)+' '+htrId+' | Cond: '+safeStr(htr.condition||'-')+' | Firetube: '+safeStr(htr.firetubeCondition||'-')+safeStr(htr.lastCleanDate?' | Last Clean: '+htr.lastCleanDate:'')+safeStr(htr.notes?' | '+htr.notes:'');
+      var htrNotes = htr.notes_en || htr.notes;
+      var htrLine = '#'+(hi+1)+' '+htrId+' | Cond: '+safeStr(htr.condition||'-')+' | Firetube: '+safeStr(htr.firetubeCondition||'-')+safeStr(htr.lastCleanDate?' | Last Clean: '+htr.lastCleanDate:'')+safeStr(htrNotes?' | '+htrNotes:'');
       if (y < 60) break;
       page.drawText(htrLine.substring(0,90), { x:M+4, y:y-4, size:8, font:hFont, color:darkGray });
       y -= 13;

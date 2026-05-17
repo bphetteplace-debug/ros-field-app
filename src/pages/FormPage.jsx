@@ -974,9 +974,9 @@ export default function FormPage() {
 
       // ES → EN translation for free-form text fields when the tech is in
       // Spanish mode. PDF + admin views prefer data.translations.<field>_en
-      // when present. Failure-tolerant: translateFields() never throws and
-      // falls back to the source on outage so a submit isn't blocked by
-      // a translation hiccup.
+      // (and per-equipment item.notes_en) when present. Failure-tolerant:
+      // translateFields() never throws and falls back to the source on
+      // outage so a submit isn't blocked by a translation hiccup.
       if (lang === 'es') {
         setSaveStatus('Translating to English…')
         const sourceFields = {
@@ -985,7 +985,35 @@ export default function FormPage() {
           rootCause: formData.rootCause || '',
           equipment: formData.equipment || '',
         }
+        // Batch every per-equipment notes field so one round-trip covers
+        // the whole submission. Keys carry the structural address so we
+        // can map English values back into the equipment arrays below.
+        ;(formData.arrestors || []).forEach((a, i) => { if (a.notes) sourceFields['arrestor_' + i + '_notes'] = a.notes })
+        ;(formData.flares || []).forEach((f, i) => { if (f.notes) sourceFields['flare_' + i + '_notes'] = f.notes })
+        ;(formData.heaters || []).forEach((h, i) => { if (h.notes) sourceFields['heater_' + i + '_notes'] = h.notes })
+        ;(formData.scEquipment || []).forEach((s, i) => { if (s.notes) sourceFields['sc_equipment_' + i + '_notes'] = s.notes })
+
         const { translations } = await translateFields(sourceFields)
+
+        // Inject _en variants into each equipment item so consumers
+        // (ViewSubmissionPage, pdfData, lambda PDF) can prefer English.
+        formData.arrestors = (formData.arrestors || []).map((a, i) => {
+          const en = translations['arrestor_' + i + '_notes']
+          return en ? { ...a, notes_en: en } : a
+        })
+        formData.flares = (formData.flares || []).map((f, i) => {
+          const en = translations['flare_' + i + '_notes']
+          return en ? { ...f, notes_en: en } : f
+        })
+        formData.heaters = (formData.heaters || []).map((h, i) => {
+          const en = translations['heater_' + i + '_notes']
+          return en ? { ...h, notes_en: en } : h
+        })
+        formData.scEquipment = (formData.scEquipment || []).map((s, i) => {
+          const en = translations['sc_equipment_' + i + '_notes']
+          return en ? { ...s, notes_en: en } : s
+        })
+
         formData.translations = {
           description_en: translations.description || '',
           reportedIssue_en: translations.reportedIssue || '',

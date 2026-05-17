@@ -321,7 +321,7 @@ export default function ViewSubmissionPage() {
                   {scEquipment.map((item, i) => (
                     <div key={i} style={{ marginBottom: i < scEquipment.length - 1 ? 12 : 0, paddingBottom: i < scEquipment.length - 1 ? 12 : 0, borderBottom: i < scEquipment.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#1a2332', marginBottom: 4 }}>{item.type}</div>
-                      {item.notes && <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5 }}>{item.notes}</div>}
+                      {(item.notes_en || item.notes) && <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5 }}>{item.notes_en || item.notes}</div>}
                     </div>
                   ))}
                 </CardBody>
@@ -340,7 +340,7 @@ export default function ViewSubmissionPage() {
                         <Field label='Condition' value={a.condition} />
                         <Field label='Filter Changed' value={a.filterChanged ? 'Yes' : 'No'} />
                       </div>
-                      {a.notes && <div style={{ marginTop: 8, fontSize: 13, color: '#555', fontStyle: 'italic' }}>{a.notes}</div>}
+                      {(a.notes_en || a.notes) && <div style={{ marginTop: 8, fontSize: 13, color: '#555', fontStyle: 'italic' }}>{a.notes_en || a.notes}</div>}
                     </div>
                   ))}
                 </CardBody>
@@ -360,7 +360,7 @@ export default function ViewSubmissionPage() {
                         <Field label='Pilot Lit' value={f.pilotLit ? 'Yes' : 'No'} />
                         <Field label='Last Ignition' value={f.lastIgnition} />
                       </div>
-                      {f.notes && <div style={{ marginTop: 8, fontSize: 13, color: '#555', fontStyle: 'italic' }}>{f.notes}</div>}
+                      {(f.notes_en || f.notes) && <div style={{ marginTop: 8, fontSize: 13, color: '#555', fontStyle: 'italic' }}>{f.notes_en || f.notes}</div>}
                     </div>
                   ))}
                 </CardBody>
@@ -381,7 +381,7 @@ export default function ViewSubmissionPage() {
                           <Field label='Condition' value={h.condition} />
                           <Field label='Last Tube Clean' value={h.lastCleanDate} />
                         </div>
-                        {h.notes && <div style={{ fontSize: 13, color: '#555', fontStyle: 'italic', marginBottom: 8 }}>{h.notes}</div>}
+                        {(h.notes_en || h.notes) && <div style={{ fontSize: 13, color: '#555', fontStyle: 'italic', marginBottom: 8 }}>{h.notes_en || h.notes}</div>}
                         {fts.length > 0 && (
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Firetubes ({fts.length})</div>

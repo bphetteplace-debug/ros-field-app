@@ -363,7 +363,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {arrestors.map((a,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' · Filter Changed':''}{a.notes?' · '+a.notes:''}
+                  <b>#{i+1} {a.arrestorId||'Unlabeled'}</b> &mdash; {a.condition||''}{a.filterChanged?' · Filter Changed':''}{(a.notes_en||a.notes)?' · '+(a.notes_en||a.notes):''}
                 </div>
               ))}
             </div>
@@ -375,7 +375,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {flares.map((f,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' · Last Ignition: '+f.last_ignition:''}{f.notes?' · '+f.notes:''}
+                  <b>#{i+1} {f.flareId||'Unlabeled'}</b> &mdash; {f.condition||''}, Pilot: {f.pilotLit?'Lit':'Not Lit'}{f.last_ignition?' · Last Ignition: '+f.last_ignition:''}{(f.notes_en||f.notes)?' · '+(f.notes_en||f.notes):''}
                 </div>
               ))}
             </div>
@@ -387,7 +387,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
             <div style={{...badgesWrap,borderTop:'none',flexDirection:'column',alignItems:'flex-start'}}>
               {heaters.map((h,i)=>(
                 <div key={i} style={{fontSize:'8.5pt',marginBottom:2}}>
-                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{h.notes?' · '+h.notes:''}
+                  <b>#{i+1} {h.heaterId||'Unlabeled'}</b> &mdash; {h.condition||''}, Firetubes: {h.firetubeCnt||(h.firetubes&&h.firetubes.length)||0}{(h.notes_en||h.notes)?' · '+(h.notes_en||h.notes):''}
                 </div>
               ))}
             </div>
