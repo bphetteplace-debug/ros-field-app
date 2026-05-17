@@ -508,14 +508,7 @@ export function WorkOrderPDFTemplate({ data, layout, branding }) {
   const renderSignatures = () => (
     <>
       <div style={sectionBar}>Authorization &amp; Sign-Off</div>
-      <div style={sigGrid}>
-        <div style={sigCell}>
-          <div style={sigLabel}>Customer Signature</div>
-          {custSig
-            ? <img src={custSig.url} alt="Customer signature" style={sigImg} crossOrigin="anonymous" />
-            : <div style={sigLine} />}
-          <div style={{ ...sigLabel, marginTop: 6 }}>Customer / Authorized Representative</div>
-        </div>
+      <div style={{ ...sigGrid, gridTemplateColumns: '1fr' }}>
         <div style={sigCellLast}>
           <div style={sigLabel}>Technician Certification</div>
           <div style={{ fontSize: '8pt', color: MID, marginTop: 4, lineHeight: 1.5 }}>

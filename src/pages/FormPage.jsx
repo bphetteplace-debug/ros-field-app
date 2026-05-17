@@ -221,7 +221,7 @@ function SignaturePad({ label, required=false, onSave, onClear, isSigned=false }
   const start = e => {
     drawing.current=true
     const c=canvasRef.current, ctx=c.getContext('2d')
-    ctx.lineWidth=2.5; ctx.strokeStyle=T.navy; ctx.lineJoin='round'; ctx.lineCap='round'
+    ctx.lineWidth=3.2; ctx.strokeStyle=T.navy; ctx.lineJoin='round'; ctx.lineCap='round'
     const p=getPos(e,c); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault()
   }
   const move = e => {
@@ -231,7 +231,7 @@ function SignaturePad({ label, required=false, onSave, onClear, isSigned=false }
   }
   const stop = () => { drawing.current=false }
   const handleSave  = () => onSave(canvasRef.current.toDataURL('image/png'))
-  const handleClear = () => { canvasRef.current.getContext('2d').clearRect(0,0,560,110); onClear() }
+  const handleClear = () => { canvasRef.current.getContext('2d').clearRect(0,0,700,220); onClear() }
 
   return (
     <div style={{ marginBottom:16 }}>
@@ -240,8 +240,8 @@ function SignaturePad({ label, required=false, onSave, onClear, isSigned=false }
         {required && <span style={{ fontSize:10, fontWeight:800, color:T.red, textTransform:'uppercase', letterSpacing:0.5, background:'#fef2f2', padding:'2px 6px', borderRadius:4 }}>Required</span>}
         {isSigned && <span style={{ fontSize:11, fontWeight:800, color:T.green, background:'#f0fdf4', padding:'2px 8px', borderRadius:4 }}>✓ Signed</span>}
       </div>
-      <canvas ref={canvasRef} width={560} height={110}
-        style={{ border: isSigned?`2px solid ${T.green}`:`2px dashed ${T.border}`, borderRadius:8, touchAction:'none', background:isSigned?'#f0fdf4':'#fafbfd', width:'100%', maxWidth:560, display:'block', cursor:'crosshair' }}
+      <canvas ref={canvasRef} width={700} height={220}
+        style={{ border: isSigned?`2px solid ${T.green}`:`2px dashed ${T.border}`, borderRadius:8, touchAction:'none', background:isSigned?'#f0fdf4':'#fafbfd', width:'100%', maxWidth:700, height:220, display:'block', cursor:'crosshair' }}
         onMouseDown={start} onMouseMove={move} onMouseUp={stop} onMouseLeave={stop}
         onTouchStart={start} onTouchMove={move} onTouchEnd={stop} />
       <div style={{ display:'flex', gap:8, marginTop:8 }}>
@@ -338,7 +338,6 @@ export default function FormPage() {
   const [lightboxIdx, setLightboxIdx]   = useState(-1)
 
   const [techSignatures, setTechSignatures] = useState({})
-  const [customerSig,    setCustomerSig]    = useState(null)
   const [siteSignPhoto, setSiteSignPhoto] = useState(null)
 
   const mkArr   = () => ({ arrestorId:'', condition:'Good', filterChanged:false, notes:'', before1:null, before2:null, after1:null, after2:null })
@@ -571,8 +570,7 @@ export default function FormPage() {
     flares,    // FULL (includes photo1/photo2 Blobs)
     heaters,   // FULL (firetubes include photo1/photo2 Blobs)
     scEquipment,
-    customerSig, // data URL string
-  }),[jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,laborHoursTouched,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,customerSig])
+  }),[jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,laborHoursTouched,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment])
 
   // Photo bundle — the loose photo state slots that aren't embedded in
   // structured objects. Kept separate from `fields` for clarity but IDB
@@ -628,7 +626,6 @@ export default function FormPage() {
           : [mkFT()],
       })))
     }
-    if(typeof d.customerSig==='string')setCustomerSig(d.customerSig)
   },[]) // eslint-disable-line
 
   // Auto-load saved draft on mount. Reads from IDB (with one-time fallback
@@ -667,7 +664,7 @@ export default function FormPage() {
     if(draftTimerRef.current) clearTimeout(draftTimerRef.current)
     draftTimerRef.current = setTimeout(saveDraft, 2000)
     return ()=>{ if(draftTimerRef.current) clearTimeout(draftTimerRef.current) }
-  },[user?.id,jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,customerSig,photos,siteSignPhoto,partPhotos,arrivalVideo,departureVideo,saveDraft])
+  },[user?.id,jobType,warrantyWork,customerName,truckNumber,locationName,customerContact,customerWorkOrder,typeOfWork,glCode,assetTag,workArea,date,startTime,departureTime,lastServiceDate,description,reportedIssue,rootCause,techs,equipment,permitsRequired,parts,miles,costPerMile,laborHours,hourlyRate,billableTechs,arrestors,flares,heaters,scEquipment,photos,siteSignPhoto,partPhotos,arrivalVideo,departureVideo,saveDraft])
 
   // Fetch the user's most recent matching submission once, so we can offer
   // a "Start from last job" template. Filtered to the SAME template as the
@@ -906,7 +903,6 @@ export default function FormPage() {
                     if(pf.length) photoDataUrls[`flare-${i}-serial`]=await Promise.all(pf.map(async x=>({dataUrl:await toDataUrl(x.file),caption:x.caption})))
         }
       }
-      if(customerSig) photoDataUrls['customer-sig']=[{dataUrl:customerSig,caption:'Customer Signature'}]
       const tse=Object.entries(techSignatures)
             if(tse.length) tse.forEach(([name,dataUrl])=>{ if(dataUrl) photoDataUrls['sig-'+name]=[{dataUrl,caption:name+' Signature'}] })
 
@@ -1745,19 +1741,6 @@ export default function FormPage() {
           </div>
         </Section>
 
-        {/* ══ CUSTOMER SIGN-OFF ══ */}
-        <Section icon="✍️" title="Customer Sign-Off" accent={accent}>
-          <p style={{fontSize:13,color:T.muted,margin:'0 0 14px',lineHeight:1.5}}>
-            Customer signature confirms satisfactory completion of the work described above.
-          </p>
-          <SignaturePad
-            label="Customer Signature"
-            isSigned={!!customerSig}
-            onSave={d=>setCustomerSig(d)}
-            onClear={()=>setCustomerSig(null)}
-          />
-        </Section>
-
         {/* ══ COST SUMMARY ══ */}
         <Section icon="💰" title="Cost Summary" accent={accent}>
           <div style={row}>
@@ -1869,7 +1852,7 @@ export default function FormPage() {
             grandTotal,
             arrestors, flares, heaters, scEquipment, showPMEquipment, showSCEquip,
             gpsLat, gpsLng, gpsAccuracy,
-            photos, customerSig, techSignatures, siteSignPhoto,
+            photos, techSignatures, siteSignPhoto,
             arrivalVideo, departureVideo, showVideos,
           }}
           saving={saving}

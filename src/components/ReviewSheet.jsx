@@ -56,7 +56,7 @@ export default function ReviewSheet({ data, onEdit, onConfirm, saving, saveStatu
     grandTotal,
     arrestors, flares, heaters, scEquipment, showPMEquipment, showSCEquip,
     gpsLat, gpsLng, gpsAccuracy,
-    photos, customerSig, techSignatures, siteSignPhoto,
+    photos, techSignatures, siteSignPhoto,
     arrivalVideo, departureVideo, showVideos,
   } = data;
 
@@ -69,7 +69,6 @@ export default function ReviewSheet({ data, onEdit, onConfirm, saving, saveStatu
   if (!locationName)       warnings.push('No location / well name');
   if (!description)        warnings.push('Description / Work Performed is empty');
   if (!techs || techs.length === 0) warnings.push('No technicians selected');
-  if (!customerSig)        warnings.push('Customer signature not captured');
   if (techSigCount === 0)  warnings.push('No tech signatures captured');
   if (showIssueFields && !reportedIssue) warnings.push('Reported Issue is empty (SC requires this)');
   if (!photos || photos.length === 0) warnings.push('No job photos added');
@@ -291,29 +290,19 @@ export default function ReviewSheet({ data, onEdit, onConfirm, saving, saveStatu
 
         {/* SIGNATURES */}
         <SectionCard title="Signatures" accent={accent}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Customer {customerSig ? ICON_OK : ICON_WARN}</div>
-              {customerSig
-                ? <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: 4 }}><img src={customerSig} alt="Customer signature" style={{ width: '100%', height: 60, objectFit: 'contain', display: 'block' }} /></div>
-                : <div style={{ background: '#fef9c3', border: '1px dashed #facc15', borderRadius: 6, padding: '14px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#854d0e' }}>Not captured</div>}
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Techs ({techSigCount}/{(techs || []).length})</div>
-              {techSigCount > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {Object.entries(techSignatures || {}).filter(([, v]) => v).map(([name, dataUrl]) => (
-                    <div key={name} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: 3 }}>
-                      <img src={dataUrl} alt={name + ' signature'} style={{ width: '100%', height: 28, objectFit: 'contain', display: 'block' }} />
-                      <div style={{ fontSize: 9, color: '#64748b', textAlign: 'center', marginTop: 1 }}>{name}</div>
-                    </div>
-                  ))}
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Techs ({techSigCount}/{(techs || []).length})</div>
+          {techSigCount > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {Object.entries(techSignatures || {}).filter(([, v]) => v).map(([name, dataUrl]) => (
+                <div key={name} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, padding: 4 }}>
+                  <img src={dataUrl} alt={name + ' signature'} style={{ width: '100%', height: 48, objectFit: 'contain', display: 'block' }} />
+                  <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', marginTop: 2 }}>{name}</div>
                 </div>
-              ) : (
-                <div style={{ background: '#fef9c3', border: '1px dashed #facc15', borderRadius: 6, padding: '14px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#854d0e' }}>None captured</div>
-              )}
+              ))}
             </div>
-          </div>
+          ) : (
+            <div style={{ background: '#fef9c3', border: '1px dashed #facc15', borderRadius: 6, padding: '14px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#854d0e' }}>None captured</div>
+          )}
         </SectionCard>
 
         {/* VIDEOS */}
