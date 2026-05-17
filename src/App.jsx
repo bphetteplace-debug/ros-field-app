@@ -57,6 +57,7 @@ const DailyInspectionPage = lazyWithRetry(() => import('./pages/DailyInspectionP
 const JHAPage = lazyWithRetry(() => import('./pages/JHAPage.jsx'));
 const InventoryPage = lazyWithRetry(() => import('./pages/InventoryPage.jsx'));
 const QuotePage = lazyWithRetry(() => import('./pages/QuotePage.jsx'));
+const EndOfDayPage = lazyWithRetry(() => import('./pages/EndOfDayPage.jsx'));
 
 function PageFallback() {
   return (
@@ -121,6 +122,7 @@ export default function App() {
           <Route path="/jha" element={<JHAPage />} />
               <Route path="/inventory" element={user ? <InventoryPage /> : <Navigate to="/login" replace />} />
               <Route path="/quote" element={user ? <QuotePage /> : <Navigate to="/login" replace />} />
+          <Route path="/end-of-day" element={<EndOfDayPage />} />
           <Route path="/preview" element={<PreviewPage />} />
           <Route path="/view/:id" element={<ViewSubmissionPage />} />
           {/* Techs can edit their own submissions; admins can edit any. Access is enforced inside EditSubmissionPage. */}

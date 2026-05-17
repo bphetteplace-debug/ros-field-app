@@ -204,6 +204,39 @@ export default function SubmissionsListPage() {
       )}
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '12px 12px 80px' }}>
+        {/* End-of-day wrap-up entry — slim card that's hard to miss but doesn't
+            push the search bar off-screen. Visible all day (the tech can peek
+            mid-shift to see their progress), but worded as a closing action. */}
+        <button
+          type="button"
+          onClick={() => navigate('/end-of-day')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            background: 'linear-gradient(135deg, #0f1f38 0%, #1e3a5f 50%, #e65c00 130%)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 12,
+            padding: '11px 16px',
+            marginBottom: 12,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 14px rgba(15,31,56,0.22)',
+            letterSpacing: 0.2,
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span style={{ fontSize: 22, lineHeight: 1 }}>🏁</span>
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, opacity: 0.7, textTransform: 'uppercase' }}>End of day</span>
+              <span style={{ fontSize: 13, fontWeight: 700, marginTop: 1 }}>See today's wrap-up</span>
+            </span>
+          </span>
+          <span style={{ fontSize: 14, opacity: 0.7 }}>→</span>
+        </button>
+
         {/* SEARCH + FILTER */}
         <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
