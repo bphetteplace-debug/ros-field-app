@@ -293,13 +293,22 @@ export default function ViewSubmissionPage() {
               </InfoCard>
             )}
 
-            {/* DESCRIPTION */}
-            {sub.summary && (
+            {/* DESCRIPTION — when the submission was filed in Spanish,
+                data.translations.description_en holds the English version
+                stamped at submit time. Prefer English for the on-screen view
+                so admins reading the ticket don't have to mentally translate.
+                Original Spanish stays in sub.summary as audit trail. */}
+            {(d.translations?.description_en || sub.summary) && (
               <InfoCard>
                 <CardHeader title='Description of Work' icon='📝' />
                 <CardBody>
-                  <div style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line' }}>{sub.summary}</div>
-                  {d.equipment && <div style={{ marginTop: 10, fontSize: 13, color: '#555' }}><strong>Equipment:</strong> {d.equipment}</div>}
+                  <div style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line' }}>{d.translations?.description_en || sub.summary}</div>
+                  {(d.translations?.equipment_en || d.equipment) && <div style={{ marginTop: 10, fontSize: 13, color: '#555' }}><strong>Equipment:</strong> {d.translations?.equipment_en || d.equipment}</div>}
+                  {d.translations?.sourceLang === 'es' && (
+                    <div style={{ marginTop: 12, padding: '6px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 11, color: '#1e40af', fontWeight: 600 }}>
+                      🌎 Auto-translated from Spanish at submit time. Original source is preserved on the row.
+                    </div>
+                  )}
                 </CardBody>
               </InfoCard>
             )}
