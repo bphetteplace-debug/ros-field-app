@@ -11,3 +11,5 @@ dist/
 # Local backup dumps from one-shot data cleanup scripts contain sensitive
 # financial detail (amounts, vendors, customer names). Keep on local disk.
 scripts/backup_*.json
+.vercel
+.env*.local
