@@ -2637,7 +2637,7 @@ export default function AdminPage() {
             {loading && (
               <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 12, padding: '12px 14px', borderTop: i === 0 ? 'none' : '1px solid #f1f5f9', alignItems: 'center' }}>
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 120px 100px 200px', gap: 12, padding: '12px 14px', borderTop: i === 0 ? 'none' : '1px solid #f1f5f9', alignItems: 'center' }}>
                     <div className="shimmer" style={{ height: 14, width: 14, borderRadius: 3 }}></div>
                     <div className="shimmer" style={{ height: 12, width: '70%' }}></div>
                     <div className="shimmer" style={{ height: 12, width: '85%' }}></div>
@@ -2677,7 +2677,7 @@ export default function AdminPage() {
             {/* TABLE */}
             {!loading && !error && filtered.length > 0 && (
               <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto', overflowY: 'visible' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px', alignItems: 'center', minWidth: 720 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 120px 100px 200px', gap: 0, background: '#1a2332', color: '#aaa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, padding: '8px 14px', alignItems: 'center', minWidth: 850 }}>
                   <div>
                     {!isDemo && (
                       <input
@@ -2713,7 +2713,7 @@ export default function AdminPage() {
                   const displayName = lbl === 'EXP' || lbl === 'INSP' ? (techs[0] || s.location_name || '-') : (s.customer_name || '-')
                   const displaySub = lbl === 'EXP' ? 'Expense Report' : lbl === 'INSP' ? (s.data?.inspectionType || 'Inspection') + ' — Truck ' + (s.truck_number || '?') : (s.location_name || '')
                   return (
-                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 90px 90px 100px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: selectedIds.has(s.id) ? '#eff6ff' : (isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa')), alignItems: 'center', borderLeft: '3px solid ' + color, minWidth: 720 }}>
+                    <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '32px 70px 1fr 1fr 90px 80px 120px 100px 200px', gap: 0, padding: '8px 14px', borderBottom: '1px solid #f0f0f0', background: selectedIds.has(s.id) ? '#eff6ff' : (isBeingDeleted ? '#fff5f5' : (i % 2 === 0 ? '#fff' : '#fafafa')), alignItems: 'center', borderLeft: '3px solid ' + color, minWidth: 850 }}>
                       <div onClick={e => e.stopPropagation()}>
                         {!isDemo && (
                           <input
