@@ -887,6 +887,94 @@ export async function updateSubmission(id, formData) {
   })
 }
 
+// ── FINALIZE ASSIGNED DRAFT ──────────────────────────────────────────────────
+// Tech opens an admin-assigned draft via /form?resume=:id, fills it out, and
+// submits via the normal FormPage flow. Mirrors saveSubmission's payload
+// shape but PATCHes the existing row (preserving the pre-claimed pm_number
+// and work_order) and flips status to 'submitted'. data.assignedBy /
+// assignedByName / assignedAt / dueDate ride through underneath so the audit
+// trail of "this was an admin-assigned job" stays on the row forever.
+export async function finalizeAssignedDraft(id, formData, templateOverride) {
+  const {
+    jobType, warrantyWork, customerName, truckNumber, locationName,
+    customerContact, customerWorkOrder, typeOfWork, glCode, assetTag, workArea,
+    date, startTime, departureTime, description, techs, equipment, parts,
+    miles, costPerMile, laborHours, hourlyRate, billableTechs,
+    arrestors, flares, heaters, scEquipment,
+    reportedIssue, rootCause, lastServiceDate, permitsRequired,
+    gpsLat, gpsLng, gpsAccuracy,
+  } = formData;
+
+  const partsTotal = (parts || []).reduce((sum, p) => sum + (p.price || 0) * (p.qty || 0), 0);
+  const mileageTotal = parseFloat(miles || 0) * parseFloat(costPerMile || 1.50);
+  const effectiveBillable = parseInt(billableTechs) || (techs || []).length;
+  const roundedLaborHours = roundQuarter(laborHours);
+  const laborTotal = warrantyWork ? 0 : roundedLaborHours * parseFloat(hourlyRate || 115.00) * effectiveBillable;
+  const grandTotal = warrantyWork ? 0 : partsTotal + mileageTotal + laborTotal;
+
+  let template;
+  if (templateOverride) {
+    template = templateOverride;
+  } else if (jobType === 'PM') {
+    template = 'pm_flare_combustor';
+  } else if (jobType === 'Service Call') {
+    template = 'service_call';
+  } else {
+    template = 'service_call';
+  }
+
+  // Pull existing data first so assignment audit fields + any office-side
+  // billing fields the admin stamped on don't get clobbered by the spread.
+  let existingData = {};
+  try {
+    const rows = await supaRest('GET', 'submissions?id=eq.' + encodeURIComponent(id) + '&select=data');
+    if (Array.isArray(rows) && rows[0] && rows[0].data) existingData = rows[0].data;
+  } catch (_e) {}
+
+  const result = await supaRest('PATCH', 'submissions?id=eq.' + encodeURIComponent(id), {
+    status: 'submitted',
+    template,
+    customer_name: customerName,
+    truck_number: truckNumber,
+    location_name: locationName,
+    contact: customerContact,
+    work_type: typeOfWork,
+    gl_code: glCode,
+    asset_tag: assetTag,
+    work_area: workArea,
+    date,
+    start_time: startTime || null,
+    departure_time: departureTime || null,
+    summary: description,
+    miles: parseFloat(miles || 0),
+    cost_per_mile: parseFloat(costPerMile || 0),
+    labor_hours: roundedLaborHours,
+    labor_rate: parseFloat(hourlyRate || 0),
+    updated_at: new Date().toISOString(),
+    data: {
+      ...existingData,
+      jobType, warrantyWork, techs, equipment, parts, miles, costPerMile,
+      laborHours: roundedLaborHours, hourlyRate, billableTechs: effectiveBillable, description,
+      glCode, assetTag, workArea, startTime, departureTime, typeOfWork,
+      customerWorkOrder: customerWorkOrder || '', customerContact,
+      partsTotal, mileageTotal, laborTotal, grandTotal,
+      arrestors: jobType === 'PM' ? (arrestors || []) : [],
+      flares: jobType === 'PM' ? (flares || []) : [],
+      heaters: jobType === 'PM' ? (heaters || []) : [],
+      scEquipment: ['Service Call', 'Repair', 'Other'].includes(jobType) ? (scEquipment || []) : [],
+      reportedIssue: reportedIssue || '',
+      rootCause: rootCause || '',
+      lastServiceDate: lastServiceDate || '',
+      permitsRequired: permitsRequired || [],
+      gpsLat: gpsLat || null,
+      gpsLng: gpsLng || null,
+      gpsAccuracy: gpsAccuracy || null,
+    },
+  });
+  if (Array.isArray(result) && result.length === 0) throw new Error('Finalize returned no row');
+  return Array.isArray(result) ? result[0] : result;
+}
+
 // ── PARTS CATALOG ────────────────────────────────────────────────────────────
 export async function fetchPartsCatalog() {
   try {

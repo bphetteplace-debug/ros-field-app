@@ -342,7 +342,7 @@ export default function SubmissionsListPage() {
             <div key={s.id} style={{ background: '#fff', borderRadius: 14, marginBottom: 12, boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05)', overflow: 'hidden', transition: 'transform 0.18s ease, box-shadow 0.18s ease' }}
                  onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 2px 4px rgba(15,23,42,0.06), 0 10px 24px rgba(15,23,42,0.08)'}}
                  onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.05)'}}>
-              <Link to={'/view/' + s.id} style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}>
+              <Link to={isAssignedDraft(s) ? '/form?resume=' + s.id : '/view/' + s.id} style={{ textDecoration: 'none', display: 'block', color: 'inherit' }}>
                 {/* Top color tag — replaces the utilitarian left border with a slim accent */}
                 <div style={{ height: 3, background: color }} />
                 <div style={{ padding: '14px 16px 12px' }}>
@@ -371,11 +371,11 @@ export default function SubmissionsListPage() {
               </Link>
               <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 12px', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
-                  onClick={e => { e.preventDefault(); navigate('/edit/' + s.id) }}
+                  onClick={e => { e.preventDefault(); navigate(isAssignedDraft(s) ? '/form?resume=' + s.id : '/edit/' + s.id) }}
                   style={{ background: 'transparent', border: 'none', padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer', borderRadius: 6 }}
                   onMouseEnter={e=>{e.currentTarget.style.color='#1a2332';e.currentTarget.style.background='#f1f5f9'}}
                   onMouseLeave={e=>{e.currentTarget.style.color='#64748b';e.currentTarget.style.background='transparent'}}
-                >✏️ Edit</button>
+                >{isAssignedDraft(s) ? '📝 Open Job' : '✏️ Edit'}</button>
               </div>
             </div>
           )

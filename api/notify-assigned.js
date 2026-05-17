@@ -83,7 +83,10 @@ module.exports = async function handler(req, res) {
 
     const jobType = d.jobType || (sub.template === 'pm_flare_combustor' ? 'PM' : 'Service Call');
     const woNumber = sub.work_order || sub.pm_number || '';
-    const editUrl = APP_URL + '/edit/' + sub.id;
+    // Tech opens this URL to land on FormPage in "resume" mode — pre-filled
+    // from the assigned draft row, full PM/SC form UX (sig pad, photos, etc.),
+    // submits via the normal flow which finalizes the existing row.
+    const jobUrl = APP_URL + '/form?resume=' + sub.id;
     const subject = 'New ' + jobType + ' assigned — ' + (sub.customer_name || '') + ' (#' + woNumber + ')';
     const greetingName = (recipientName || '').split(/\s+/)[0] || 'team';
 
@@ -119,9 +122,9 @@ module.exports = async function handler(req, res) {
       +   '<table style="width:100%;border-collapse:collapse;margin:8px 0 0 0">' + tableRows + '</table>'
       +   descBlock
       +   '<div style="margin:22px 0 8px 0;text-align:center">'
-      +     '<a href="' + editUrl + '" style="display:inline-block;background:#e35b04;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px">Open Job in App →</a>'
+      +     '<a href="' + jobUrl + '" style="display:inline-block;background:#e35b04;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px">Open Job in App →</a>'
       +   '</div>'
-      +   '<p style="margin:18px 0 0 0;font-size:11px;color:#888;text-align:center">If the button doesn\'t work, paste this link into your browser:<br><span style="color:#555">' + editUrl + '</span></p>'
+      +   '<p style="margin:18px 0 0 0;font-size:11px;color:#888;text-align:center">If the button doesn\'t work, paste this link into your browser:<br><span style="color:#555">' + jobUrl + '</span></p>'
       + '</div>'
       + '<div style="text-align:center;color:#aaa;font-size:11px;margin-top:14px">Reliable Oilfield Services · reports@reliable-oilfield-services.com</div>'
       + '</div>';
@@ -147,7 +150,7 @@ module.exports = async function handler(req, res) {
       pushResult = await sendPushToUser(sub.created_by, {
         title: '📤 New ' + jobType + ' assigned',
         body: (sub.customer_name || 'Service Call') + (woNumber ? ' · #' + woNumber : ''),
-        url: '/edit/' + sub.id,
+        url: '/form?resume=' + sub.id,
         tag: 'assignment-' + sub.id,
       });
     } catch (e) { console.warn('[notify-assigned] push send failed:', e?.message || e); }

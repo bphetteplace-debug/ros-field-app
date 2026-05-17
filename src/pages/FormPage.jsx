@@ -13,6 +13,7 @@ import {
   fetchSubmission,
   fetchSubmissions,
   fetchLastVisit,
+  finalizeAssignedDraft,
   getAuthToken,
 } from '../lib/submissions'
 import { toast } from '../lib/toast'
@@ -286,6 +287,9 @@ export default function FormPage() {
 
   const [pmNumber,  setPmNumber]  = useState(null)
   const [woNumber,  setWoNumber]  = useState(null)
+  // When tech opens /form?resume=:id (admin-assigned draft entry point),
+  // we reuse the existing draft row instead of inserting a new submission.
+  const [resumingDraftId, setResumingDraftId] = useState(null)
   const [CUSTOMERS, setCUSTOMERS] = useState(DEFAULT_CUSTOMERS)
   const [TRUCKS,    setTRUCKS]    = useState(DEFAULT_TRUCKS)
   const [TECHS_LIST,setTECHS_LIST]= useState(DEFAULT_TECHS)
@@ -535,13 +539,44 @@ export default function FormPage() {
   useEffect(()=>{
     // Unified numbering: claim one wo_number atomically; pm_number mirrors it.
     // The 91xx PM range is retired — all submissions live in the 10000+ pool.
-    getNextWoNumber().then(n=>{
-      if(n){
-        const num = String(n)
-        setWoNumber(num)
-        setPmNumber(parseInt(num, 10))
-      }
-    }).catch(()=>{})
+    const claimFreshWo = () => {
+      getNextWoNumber().then(n=>{
+        if(n){
+          const num = String(n)
+          setWoNumber(num)
+          setPmNumber(parseInt(num, 10))
+        }
+      }).catch(()=>{})
+    }
+    const resumeId = searchParams.get('resume')
+    if (resumeId) {
+      // Resume mode: tech opened an admin-assigned draft. Pull the existing
+      // row, hydrate state from it, and reuse its pre-claimed wo_number so
+      // we don't burn a fresh one on every reopen. If the row is missing
+      // or already submitted (stale link), fall through to fresh-form
+      // behavior so the tech still ends up with a usable form + new wo.
+      fetchSubmission(resumeId).then(sub => {
+        if (!sub || sub.status !== 'draft') { claimFreshWo(); return }
+        const data = sub.data || {}
+        applyLoadedDraft({
+          ...data,
+          customerName: sub.customer_name || data.customerName,
+          locationName: sub.location_name || data.locationName,
+          customerContact: sub.contact || data.customerContact,
+          typeOfWork: sub.work_type || data.typeOfWork,
+          date: sub.date || data.date,
+          description: sub.summary || data.description,
+        })
+        const wo = String(sub.work_order || sub.pm_number || '')
+        if (wo) {
+          setWoNumber(wo)
+          setPmNumber(parseInt(wo, 10))
+        }
+        setResumingDraftId(sub.id)
+      }).catch(claimFreshWo)
+    } else {
+      claimFreshWo()
+    }
     fetchPartsCatalog().then(p=>{if(p&&p.length)setPartsCatalog(p.map(r=>({code:r.code||'',desc:r.description,name:r.description,price:parseFloat(r.price||0),category:r.category||''})))}).catch(()=>{})
     fetchSettings().then(s=>{
       if(!s)return
@@ -556,7 +591,13 @@ export default function FormPage() {
     if(CUSTOMERS.length&&!customerName)setCustomerName(CUSTOMERS[0])
   },[CUSTOMERS]) // eslint-disable-line
 
-  const draftKey = `form_draft_${user?.id}`
+  // Scope the IDB autosave key by resume id when we're filling out an
+  // admin-assigned draft, so the tech's in-progress edits on that assignment
+  // don't leak into (or get clobbered by) their normal /form draft.
+  const resumeIdParam = searchParams.get('resume') || null
+  const draftKey = resumeIdParam
+    ? `form_draft_${user?.id}_resume_${resumeIdParam}`
+    : `form_draft_${user?.id}`
   // Full draft snapshot — text fields, structured objects, AND photo state.
   // The pre-IDB version stripped photos out (and stripped arrestor/flare/
   // heater photo fields too); now everything goes in so a refresh
@@ -927,7 +968,9 @@ export default function FormPage() {
         scEquipment:showSCEquip?scEquipment:[],
       }
       setSaveStatus('Saving submission…')
-      const submission=await saveSubmission(formData,user.id,template)
+      const submission = resumingDraftId
+        ? await finalizeAssignedDraft(resumingDraftId, formData, template)
+        : await saveSubmission(formData, user.id, template)
       if(submission?.id&&Object.keys(photoDataUrls).length>0){
         // Count total photos so we can show "Uploading X of Y…" before the
         // first batch completes — total isn't known to uploadPhotos until
